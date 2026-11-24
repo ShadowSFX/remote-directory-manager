@@ -45,6 +45,9 @@ public partial class PaneView : UserControl
     /// <summary>The active tab's content area: remote-desktop surfaces are placed over it by the window's session overlay.</summary>
     public FrameworkElement ContentArea => TabView.ContentArea;
 
+    /// <summary>Height of the tab strip row (drop zone for reordering / moving tabs).</summary>
+    public const double StripHeight = 40;
+
     /// <summary>The tab strip (drop target for reordering / moving tabs).</summary>
     public ListBox Strip => TabStrip;
 
@@ -86,6 +89,33 @@ public partial class PaneView : UserControl
     {
         if (Pane is not null) Main?.Activate(Pane);
     }
+
+    // ───────────── Dragging a tab (reorder, move to another pane, split) ─────────────
+    private BrowserTabViewModel? _dragTab;
+    private Point _dragStart;
+
+    private void TabStrip_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragTab = null;
+        var source = e.OriginalSource as DependencyObject;
+        if (Ui.FindAncestor<Button>(source) is not null) return; // the close button
+        if (Ui.FindAncestor<ListBoxItem>(source)?.DataContext is not BrowserTabViewModel tab) return;
+        _dragTab = tab; // the tab under the pointer, not SelectedItem (selection may still change)
+        _dragStart = e.GetPosition(TabStrip);
+    }
+
+    private void TabStrip_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_dragTab is not { } tab || e.LeftButton != MouseButtonState.Pressed) return;
+        var pos = e.GetPosition(TabStrip);
+        if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+        _dragTab = null;
+        TabStrip.ReleaseMouseCapture(); // the ListBox captured the mouse for drag-selection
+        PaneDragSession.Run(TabStrip, tab, new DataObject(PaneDragSession.TabFormat, tab.Title));
+    }
+
+    private void TabStrip_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e) => _dragTab = null;
 
     private void TabStrip_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {

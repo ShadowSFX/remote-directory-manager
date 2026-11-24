@@ -21,7 +21,8 @@
                     <ListBox x:Name="TabStrip" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" Background="Transparent" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollBarVisibility="Disabled"
                              ScrollViewer.CanContentScroll="False" PreviewMouseWheel="TabStrip_PreviewMouseWheel"
-                             PreviewMouseDown="TabStrip_PreviewMouseDown" AllowDrop="True" DragOver="Tab_DragOver" Drop="Tab_Drop">
+                             PreviewMouseDown="TabStrip_PreviewMouseDown" PreviewMouseLeftButtonDown="TabStrip_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="TabStrip_PreviewMouseMove" PreviewMouseLeftButtonUp="TabStrip_PreviewMouseLeftButtonUp" AllowDrop="True" DragOver="Tab_DragOver" Drop="Tab_Drop">
                         <ListBox.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Horizontal" />

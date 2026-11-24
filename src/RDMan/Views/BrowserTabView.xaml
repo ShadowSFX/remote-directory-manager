@@ -337,14 +337,14 @@
         <!-- ═══════════ Content ═══════════ -->
         <Grid Grid.Row="3" x:Name="ContentArea">
             <!-- Desktop: not connected -->
-            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460" Margin="32"
+            <StackPanel x:Name="IdlePanel" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460" Margin="32"
                         Visibility="{Binding Session.ShowIdle, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
-                <Border Width="64" Height="64" CornerRadius="32" Background="{DynamicResource Accent.Subtle}" HorizontalAlignment="Center">
+                <Border x:Name="IdleIcon" Width="64" Height="64" CornerRadius="32" Background="{DynamicResource Accent.Subtle}" HorizontalAlignment="Center">
                     <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="26" Foreground="{DynamicResource Accent.Text}" />
                 </Border>
                 <TextBlock Style="{StaticResource Text.Title}" HorizontalAlignment="Center" Margin="0,18,0,8" TextAlignment="Center" TextWrapping="Wrap"
                            Text="{Binding Session.Server.Name}" />
-                <TextBlock Text="{ui:Tr Desktop.Idle.Body}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" />
+                <TextBlock x:Name="IdleBody" Text="{ui:Tr Desktop.Idle.Body}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" TextWrapping="Wrap" />
                 <Button Style="{StaticResource Btn.Primary}" HorizontalAlignment="Center" Margin="0,20,0,0" MinWidth="140" Height="36"
                         Command="{Binding Session.ConnectCommand}" AutomationProperties.Name="{ui:Tr Desktop.Connect}">
                     <StackPanel Orientation="Horizontal">

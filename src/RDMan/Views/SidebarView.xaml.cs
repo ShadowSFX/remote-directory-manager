@@ -183,7 +183,8 @@ public partial class SidebarView : UserControl
         var data = new DataObject(NodeFormat, _dragCandidate);
         try
         {
-            DragDrop.DoDragDrop(Tree, data, DragDropEffects.Move);
+            // Dropped on the panes, a server/group opens there (or in a new pane at an edge); in the tree it reorganizes.
+            PaneDragSession.Run(Tree, _dragCandidate, data);
         }
         finally
         {

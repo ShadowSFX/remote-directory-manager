@@ -163,6 +163,28 @@
         <!-- ═══════════ Toasts ═══════════
              In a Popup (its own window) so they show above a remote desktop session, which is a native child
              window that would otherwise paint over any WPF content ("airspace"). Positioned in code-behind. -->
+        <!-- ═══════════ Pane drop overlay ═══════════
+             Open only while a tab or tree node is dragged. It is the drop target itself (a Popup sits above remote
+             desktop windows, so drops work over a live session too) and draws where the drop will land: a pane half
+             for a split, the whole pane to move there, or an insertion bar in a tab strip. -->
+        <Popup x:Name="DropPopup" Placement="Relative" PlacementTarget="{Binding ElementName=PanesArea}" AllowsTransparency="True"
+               StaysOpen="True" Focusable="False" PopupAnimation="None">
+            <Canvas x:Name="DropCanvas" Background="#01000000" AllowDrop="True"
+                    DragEnter="Drop_DragOver" DragOver="Drop_DragOver" DragLeave="Drop_DragLeave" Drop="Drop_Drop">
+                <Border x:Name="DropZone" Visibility="Collapsed" IsHitTestVisible="False" CornerRadius="6" BorderThickness="2"
+                        BorderBrush="{DynamicResource Accent}" Background="{DynamicResource Accent.Subtle}" Opacity="0.72" />
+                <Border x:Name="InsertMarker" Visibility="Collapsed" IsHitTestVisible="False" Width="3" CornerRadius="1.5"
+                        Background="{DynamicResource Accent}" />
+                <Border x:Name="DragChip" Visibility="Collapsed" IsHitTestVisible="False" CornerRadius="6" Padding="10,5"
+                        Background="{DynamicResource Bg.Popup}" BorderBrush="{DynamicResource Line.Popup}" BorderThickness="1">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="16" ShadowDepth="4" Direction="270" Opacity="0.3" />
+                    </Border.Effect>
+                    <TextBlock x:Name="DragChipText" MaxWidth="260" TextTrimming="CharacterEllipsis" />
+                </Border>
+            </Canvas>
+        </Popup>
+
         <!-- ═══════════ Full-screen bar ═══════════
              Desktop sessions in full screen: shown briefly on entry and whenever the mouse touches the top edge
              (a Popup, so it sits above the session's native window). -->

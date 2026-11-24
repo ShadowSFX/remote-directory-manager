@@ -67,7 +67,7 @@ public partial class MainWindow : Window
         vm.Toasts.Items.CollectionChanged += (_, _) => UpdateToastPopup();
         ToastList.SizeChanged += (_, _) => RepositionPopups();
         // Give the keyboard a home at startup so shortcuts (Ctrl+K, Ctrl+T…) work before the first click.
-        ContentRendered += (_, _) => Dispatcher.BeginInvoke(FocusContent, System.Windows.Threading.DispatcherPriority.Input);
+        ContentRendered += (_, _) => Dispatcher.BeginInvoke(() => FocusPane(_vm.ActivePane), System.Windows.Threading.DispatcherPriority.Input);
         SidebarColumn.Width = new GridLength(vm.State.Settings.SidebarWidth);
         UpdateMaximizeState();
         // Editor grid + window-level session overlay.
@@ -146,7 +146,7 @@ public partial class MainWindow : Window
         if (LayoutHost.ViewFor(pane) is not { } view) return;
         if (FindVisible<ListView>(view) is { } list) list.Focus();
         else if (pane.SelectedTab?.Session is { IsConnected: true } session) session.Focus();
-        else view.Focus();
+        else if (!view.Focus()) Keyboard.Focus(this); // shortcuts keep working; the active pane stays as it is
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)

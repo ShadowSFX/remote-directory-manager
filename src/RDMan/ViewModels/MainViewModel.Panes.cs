@@ -15,7 +15,7 @@ namespace RDMan.ViewModels;
 public sealed partial class MainViewModel
 {
     public const double MinPaneWidth = 380; // identity band: name + Files|Desktop switch + actions
-    public const double MinPaneHeight = 180;
+    public const double MinPaneHeight = 240; // tab strip + identity band + toolbar + a usable content area
 
     private readonly ObservableCollection<BrowserTabViewModel> _liveTabs = new();
     private readonly List<PaneViewModel> _mru = new(); // most recent first
@@ -185,6 +185,41 @@ public sealed partial class MainViewModel
     {
         if (ReferenceEquals(tab.Pane, target) && target.Tabs.Count == 1) return; // nothing would be left behind
         SplitPane(target, side, pane => MoveTab(tab, pane, 0));
+    }
+
+    /// <summary>
+    /// A server or group dropped from the tree onto a pane: the middle opens it as a new tab there, an edge opens it
+    /// in a new pane on that side. A server whose desktop is already open elsewhere just shows that session.
+    /// </summary>
+    public void OpenNodeAt(NodeViewModel node, PaneViewModel pane, DropSide side)
+    {
+        if (!Panes.Contains(pane)) return;
+        if (node is ServerNodeViewModel { DefaultAction: Core.Models.ServerAction.Desktop, HasDesktop: true } desktop
+            && FindTab(t => t.Current is DesktopLocation d && d.ServerId == desktop.Model.Id) is not null)
+        {
+            OpenDesktop(desktop, OpenTarget.Current);
+            return;
+        }
+        if (side == DropSide.Center)
+        {
+            Activate(pane);
+            OpenNodeHere(node, OpenTarget.NewTab);
+            return;
+        }
+        SplitPane(pane, side, p =>
+        {
+            Activate(p);
+            OpenNodeHere(node, OpenTarget.Current);
+        });
+    }
+
+    private void OpenNodeHere(NodeViewModel node, OpenTarget target)
+    {
+        switch (node)
+        {
+            case ServerNodeViewModel s: OpenServer(s, target); break;
+            case GroupNodeViewModel g: OpenGroup(g, target); break;
+        }
     }
 
     /// <summary>F3 / "Split right|down": a new pane showing the same place (a desktop's files, since a server has one session).</summary>

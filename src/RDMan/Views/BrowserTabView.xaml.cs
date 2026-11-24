@@ -22,6 +22,7 @@ public partial class BrowserTabView : UserControl
         InitializeComponent();
         List.SizeChanged += (_, _) => AdjustColumns();
         SizeChanged += (_, e) => ApplyWidth(e.NewSize.Width);
+        ContentArea.SizeChanged += (_, e) => ApplyContentHeight(e.NewSize.Height);
         CrumbHost.SizeChanged += (_, _) => KeepCurrentCrumbVisible();
         Crumbs.SizeChanged += (_, _) => KeepCurrentCrumbVisible();
         DataContextChanged += (_, e) =>
@@ -80,6 +81,14 @@ public partial class BrowserTabView : UserControl
         IdentityExplorer.MaxWidth = narrow ? 0 : double.PositiveInfinity;
         LatencyText.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
         FilterBox.Width = narrow ? 120 : 200;
+    }
+
+    /// <summary>Short panes: the "not connected" card drops its illustration, then its explanation, never the Connect button.</summary>
+    private void ApplyContentHeight(double height)
+    {
+        IdleIcon.Visibility = height < 300 ? Visibility.Collapsed : Visibility.Visible;
+        IdleBody.Visibility = height < 190 ? Visibility.Collapsed : Visibility.Visible;
+        IdlePanel.Margin = height < 300 ? new Thickness(16) : new Thickness(32);
     }
 
     /// <summary>Like Explorer: when the path doesn't fit, show its end (the current folder), clipping the start.</summary>
