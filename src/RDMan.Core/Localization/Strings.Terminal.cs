@@ -170,6 +170,30 @@ public static partial class Strings
         T("Snippets.NeedsTerminal", "Abre una terminal conectada para usar fragmentos", "Open a connected terminal to use snippets");
         T("Snippets.Ask", "Valor para {{{0}}}", "Value for {{{0}}}");
 
+        T("Menu.SshKeys", "Llaves SSH…", "SSH keys…");
+        T("Menu.Snippets", "Fragmentos de terminal…", "Terminal snippets…");
+        T("Menu.ImportSshConfig", "Importar de ~/.ssh/config…", "Import from ~/.ssh/config…");
+        T("SshKeys.Title", "Llaves SSH", "SSH keys");
+        T("SshKeys.Intro", "Llaves privadas guardadas en RDMan (por ejemplo, los .pem de AWS). Se usan desde el inicio de sesión de cada servidor o grupo.", "Private keys saved in RDMan (for example AWS .pem files). Servers and groups use them from their sign-in settings.");
+        T("SshKeys.Empty", "Aún no hay llaves. Importa un .pem, .key, .ppk o una llave de OpenSSH.", "No keys yet. Import a .pem, .key, .ppk or OpenSSH key.");
+        T("SshKeys.Unused", "Sin usar", "Not used");
+        T("SshKeys.UsedOne", "Usada en {0} lugar", "Used in {0} place");
+        T("SshKeys.UsedMany", "Usada en {0} lugares", "Used in {0} places");
+        T("SshKeys.PassphraseSaved", "frase guardada", "passphrase saved");
+        T("SshKeys.Certificate", "con certificado", "with certificate");
+        T("SshKeys.Missing", "sin la llave (exportada sin secretos): vuelve a importarla", "key missing (exported without secrets): import it again");
+        T("SshKeys.ConfirmDelete", "Se eliminará la llave {0} de RDMan. El archivo original no se toca.", "The key {0} will be removed from RDMan. The original file isn't touched.");
+        T("SshKeys.ConfirmDeleteUsed", "Se eliminará la llave {0}. Los {1} servidores o grupos que la usan volverán a heredar su inicio de sesión.", "The key {0} will be removed. The {1} servers or groups using it will go back to inheriting their sign-in.");
+        T("SshImport.Title", "Importar de ~/.ssh/config", "Import from ~/.ssh/config");
+        T("SshImport.Intro", "Crea una conexión de terminal por cada Host de tu configuración de OpenSSH, como si escribieras «ssh alias».", "Creates a terminal connection for each Host in your OpenSSH config, as if you typed “ssh alias”.");
+        T("SshImport.Empty", "Tu ~/.ssh/config no declara hosts concretos (solo patrones con * o no existe).", "Your ~/.ssh/config declares no concrete hosts (only * patterns, or it doesn't exist).");
+        T("SshImport.Exists", "ya está en tus conexiones", "already in your connections");
+        T("SshImport.Group", "Añadir al grupo", "Add to group");
+        T("SshImport.Live", "Usuario, llave, puerto y servidor intermedio se leen del archivo en cada conexión: si lo editas, RDMan lo sigue.", "User, key, port and jump host are read from the file on every connection: edit it and RDMan follows.");
+        T("SshImport.Do", "Importar", "Import");
+        T("SshImport.DoneOne", "Se importó {0} conexión", "{0} connection imported");
+        T("SshImport.DoneMany", "Se importaron {0} conexiones", "{0} connections imported");
+
         T("Tree.Ctx.OpenTerminal", "Abrir terminal", "Open terminal");
         T("Tree.Ctx.NewTerminal", "Nueva terminal", "New terminal");
         T("Tree.Ctx.CopySsh", "Copiar comando ssh", "Copy ssh command");

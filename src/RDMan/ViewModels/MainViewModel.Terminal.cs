@@ -189,6 +189,46 @@ public sealed partial class MainViewModel
     }
 
     [RelayCommand]
+    private void ManageSshKeys() => Views.Dialogs.Show(new Views.SshKeysWindow(new SshKeysViewModel(this)), Owner);
+
+    [RelayCommand]
+    private void ImportSshConfig()
+    {
+        var dlg = new Views.SshConfigImportWindow(new SshConfigImportViewModel(this));
+        if (Views.Dialogs.Show(dlg, Owner) == true && dlg.Imported > 0)
+            Toasts.Show(Loc.F(dlg.Imported == 1 ? "SshImport.DoneOne" : "SshImport.DoneMany", dlg.Imported), ToastKind.Success);
+    }
+
+    /// <summary>
+    /// Creates terminal-only servers named after ~/.ssh/config hosts. They keep resolving through the config at connect
+    /// time (edit the config and RDMan follows), exactly like typing <c>ssh alias</c>.
+    /// </summary>
+    public int AddSshConfigHosts(IReadOnlyList<string> aliases, GroupNodeViewModel? parent)
+    {
+        ServerNodeViewModel? last = null;
+        foreach (var alias in aliases)
+        {
+            var node = new Core.Models.ServerNode
+            {
+                Name = alias,
+                Host = alias,
+                Files = false,
+                Terminal = new Core.Models.SshEndpoint { UseSshConfig = true },
+                DefaultAction = Core.Models.ServerAction.Terminal,
+                Color = parent?.ColorKey,
+            };
+            last = (ServerNodeViewModel)CreateVm(node, parent);
+            Insert(last, parent);
+            CheckHealth(last);
+        }
+        if (last is null) return 0;
+        Changed();
+        if (parent is not null) parent.IsExpanded = true;
+        SelectInTree(last);
+        return aliases.Count;
+    }
+
+    [RelayCommand]
     private void ManageSnippets()
     {
         Views.Dialogs.Show(new Views.SnippetsWindow(new SnippetsViewModel(this)), Owner);

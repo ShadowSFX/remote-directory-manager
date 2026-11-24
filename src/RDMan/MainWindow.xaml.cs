@@ -485,10 +485,13 @@ public partial class MainWindow : Window
         menu.Items.Add(Item("Menu.BulkAdd", "", _vm.BulkAddCommand));
         menu.Items.Add(Item("Menu.NewGroup", "", _vm.NewGroupCommand, "Ctrl+Shift+G"));
         menu.Items.Add(Item("Menu.Profiles", "", _vm.ManageProfilesCommand));
+        menu.Items.Add(Item("Menu.SshKeys", "", _vm.ManageSshKeysCommand));
+        menu.Items.Add(Item("Menu.Snippets", "", _vm.ManageSnippetsCommand));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Menu.ImportNetUse", "", _vm.ImportFromWindowsCommand));
         menu.Items.Add(Item("Menu.ImportFile", "", _vm.ImportFileCommand));
         menu.Items.Add(Item("Menu.ImportRdg", "", _vm.ImportRdgCommand));
+        menu.Items.Add(Item("Menu.ImportSshConfig", "", _vm.ImportSshConfigCommand));
         menu.Items.Add(Item("Menu.ExportFile", "", _vm.ExportFileCommand));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Menu.OpenDataFolder", "", _vm.OpenDataFolderCommand));
