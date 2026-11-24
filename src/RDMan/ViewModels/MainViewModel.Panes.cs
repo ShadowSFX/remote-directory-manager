@@ -187,9 +187,19 @@ public sealed partial class MainViewModel
         if (ReferenceEquals(source.SelectedTab, tab) && source.Tabs.Count > 1)
             source.SelectedTab = source.Tabs[from == source.Tabs.Count - 1 ? from - 1 : from + 1];
         source.Tabs.RemoveAt(from);
-        tab.Pane = target;
-        target.Tabs.Insert(Math.Clamp(index, 0, target.Tabs.Count), tab);
-        target.SelectedTab = tab;
+        // A pane needs only one start page: a moved "Home" (e.g. the one a split pane started with) merges into the
+        // target's own instead of becoming a second one.
+        if (tab.Current is HomeLocation && target.Tabs.FirstOrDefault(t => t.Current is HomeLocation) is { } home)
+        {
+            ReleaseTab(tab);
+            target.SelectedTab = home;
+        }
+        else
+        {
+            tab.Pane = target;
+            target.Tabs.Insert(Math.Clamp(index, 0, target.Tabs.Count), tab);
+            target.SelectedTab = tab;
+        }
         Activate(target);
         if (source.Tabs.Count == 0) ClosePane(source);
         else source.NotifyLayout();

@@ -971,6 +971,12 @@ public sealed partial class MainViewModel : ObservableObject
             if (loc is GroupLocation g && FindGroup(g.GroupId) is null) loc = new HomeLocation();
             if (loc is DesktopLocation d && FindTab(t => t.Current is DesktopLocation o && o.ServerId == d.ServerId) is not null)
                 loc = new HomeLocation(); // one session per server
+            // One start page per pane, even when several saved tabs fell back to it.
+            if (loc is HomeLocation && pane.Tabs.FirstOrDefault(t => t.Current is HomeLocation) is { } home)
+            {
+                if (i == saved.ActiveIndex) active = home;
+                continue;
+            }
             // Only the active tab loads right away; the others load when first shown to avoid connecting to every server at startup.
             var tab = pane.AddTab(loc, select: i == saved.ActiveIndex);
             if (i == saved.ActiveIndex) active = tab;
