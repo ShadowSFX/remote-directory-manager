@@ -36,6 +36,10 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private (string User, string? ProtectedPassword, string Basis)? _sessionCredential;
     private bool _promptedAfterFailure;
     private bool _disposed;
+    private readonly System.Windows.Threading.DispatcherTimer _sizeWatch = new();
+    private int _resizeAttempts;
+    private bool _resizeConfirmed; // the server applied a live resolution change at least once this session
+    private (int W, int H)? _connectSize;
 
     public RdpSessionViewModel(MainViewModel main, ServerNodeViewModel server)
     {
@@ -43,6 +47,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         _svc = main.Services;
         Server = server;
         Loc.Instance.LanguageChanged += OnLanguageChanged;
+        _sizeWatch.Tick += SizeWatch_Tick;
     }
 
     public ServerNodeViewModel Server { get; }
@@ -99,6 +104,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         control.OnDisconnected += _disconnectedHandler;
         control.RdpClientConfigured += OnClientConfigured;
         control.Enter += OnControlEnter;
+        control.SizeChanged += OnControlSizeChanged;
         _control = control;
 
         var host = new WindowsFormsHost { Child = control, Focusable = true };
@@ -305,6 +311,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     {
         if (_disposed) return;
         State = DesktopState.Connected;
+        _resizeConfirmed = false;
+        _connectSize = RemoteSize();
+        WatchSize();
         _promptedAfterFailure = false;
         Server.Server.LastConnected = DateTimeOffset.Now;
         _svc.State.MarkDirty();
@@ -433,8 +442,60 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private void OnLanguageChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(ConnectingText));
 
     // ───────────── Lifetime ─────────────
+    // ───────────── Remote resolution watchdog ─────────────
+    // The server ignores a resolution change while it shows a secure desktop (Ctrl+Alt+Del, UAC, sign-in), so a
+    // resize that happened meanwhile (leaving full screen, splitting) would leave the old size with scrollbars.
+    // While the sizes differ, keep asking until the server applies it.
+    private void OnControlSizeChanged(object? sender, EventArgs e)
+    {
+        if (IsConnected) WatchSize();
+    }
+
+    private void WatchSize()
+    {
+        _resizeAttempts = 0;
+        _sizeWatch.Interval = TimeSpan.FromSeconds(1);
+        _sizeWatch.Start();
+    }
+
+    private (int W, int H)? RemoteSize()
+    {
+        try { return _control?.RdpClient is { } c ? (c.DesktopWidth, c.DesktopHeight) : null; }
+        catch (COMException) { return null; }
+    }
+
+    private void SizeWatch_Tick(object? sender, EventArgs e)
+    {
+        if (!IsConnected || _control is null)
+        {
+            _sizeWatch.Stop();
+            return;
+        }
+        if (Host is not { IsVisible: true }) return; // hidden tab: check again when shown
+        if (RemoteSize() is not { } remote) return;
+        var local = _control.ClientSize;
+        // The server rounds widths to even pixels; a few pixels of difference is "the same size".
+        if (Math.Abs(remote.W - local.Width) <= 4 && Math.Abs(remote.H - local.Height) <= 4)
+        {
+            if (_connectSize is { } first && remote != first) _resizeConfirmed = true;
+            _sizeWatch.Stop();
+            return;
+        }
+        // Servers without live resolution changes (2008 R2 and older) never match: stop asking after a few tries.
+        if (!_resizeConfirmed && _resizeAttempts >= 10)
+        {
+            _sizeWatch.Stop();
+            return;
+        }
+        _resizeAttempts++;
+        if (_resizeAttempts == 10) _sizeWatch.Interval = TimeSpan.FromSeconds(3);
+        try { _control.UpdateClientSize(); }
+        catch (COMException ex) { App.Log(ex); }
+    }
+
     private void TearDown()
     {
+        _sizeWatch.Stop();
         var control = _control;
         var host = Host;
         _control = null;
@@ -444,6 +505,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             if (_disconnectedHandler is not null) control.OnDisconnected -= _disconnectedHandler;
             control.RdpClientConfigured -= OnClientConfigured;
             control.Enter -= OnControlEnter;
+            control.SizeChanged -= OnControlSizeChanged;
             try
             {
                 if (control.RdpClient?.ConnectionState is RoyalApps.Community.Rdp.WinForms.Controls.Clients.ConnectionState.Connected
