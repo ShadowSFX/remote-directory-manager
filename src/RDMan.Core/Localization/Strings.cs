@@ -372,6 +372,7 @@ public static partial class Strings
         T("Update.NotWritable", "Hay una versión nueva ({0}) pero la carpeta de RDMan es de solo lectura. Descárgala desde GitHub.", "A new version ({0}) is available but RDMan's folder is read-only. Download it from GitHub.");
         T("Update.Download", "Abrir descarga", "Open download");
         T("Update.HashMismatch", "La descarga no coincide con su suma SHA-256 y se descartó.", "The download didn't match its SHA-256 checksum and was discarded.");
-        T("Update.WhatsNew", "Novedades de la versión {0}", "What's new in version {0}");
+        T("Update.WhatsNew", "RDMan se actualizó a la versión {0}", "RDMan was updated to version {0}");
+        T("Update.SeeNotes", "Ver novedades", "What's new");
     }
 }

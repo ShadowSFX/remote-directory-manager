@@ -168,7 +168,8 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="Glyph" Text="{Binding Glyph}" FontFamily="{StaticResource Font.Icons}" FontSize="14" Foreground="#FFB9C2FF"
                                        VerticalAlignment="Top" Margin="0,2,12,0" />
-                            <TextBlock Grid.Column="1" Text="{Binding Message}" Foreground="#FFF1F3F8" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="19" />
+                            <TextBlock Grid.Column="1" Text="{Binding Message}" Foreground="#FFF1F3F8" TextWrapping="Wrap" VerticalAlignment="Center" LineHeight="19"
+                                       MinWidth="170" />
                             <Button Grid.Column="2" Content="{Binding ActionText}" Style="{StaticResource Btn.Base}" Foreground="#FFB9C2FF" FontWeight="SemiBold"
                                     Height="28" Padding="10,0" Margin="8,0,0,0" VerticalAlignment="Center"
                                     Visibility="{Binding HasAction, Converter={StaticResource Vis}}"
