@@ -25,7 +25,16 @@ public partial class SidebarView : UserControl
         => Ui.FindAncestor<System.Windows.Controls.Primitives.ToggleButton>(source as DependencyObject) is not null;
 
     private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        => Vm.TreeSelection = e.NewValue as NodeViewModel;
+    {
+        Vm.TreeSelection = e.NewValue as NodeViewModel;
+    }
+
+    /// <summary>A node selected from code (new or imported node, the active tab's server) scrolls into view.</summary>
+    private void TreeItem_Selected(object sender, RoutedEventArgs e)
+    {
+        if (!ReferenceEquals(e.OriginalSource, sender) || sender is not TreeViewItem item) return;
+        Dispatcher.BeginInvoke(() => item.BringIntoView(), System.Windows.Threading.DispatcherPriority.Background);
+    }
 
     // ───────────── Click to open ─────────────
     private void Tree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)

@@ -733,6 +733,34 @@ public sealed partial class MainViewModel : ObservableObject
         return group;
     }
 
+    /// <summary>Adds a whole imported group (keeping its own credentials and settings) at the top of the tree.</summary>
+    public GroupNodeViewModel AddImportedGroup(GroupNode group, IEnumerable<SmartGroup> smartGroups)
+    {
+        var vm = (GroupNodeViewModel)CreateVm(group, null);
+        Insert(vm, null);
+        foreach (var g in smartGroups)
+        {
+            State.Document.SmartGroups.Add(g);
+            SmartGroups.Add(new SmartGroupViewModel(g));
+        }
+        Changed();
+        foreach (var s in vm.AllServers()) CheckHealth(s);
+        SelectInTree(vm);
+        OpenGroup(vm, OpenTarget.NewTab); // show what arrived
+        return vm;
+    }
+
+    [RelayCommand]
+    private void ImportRdg()
+    {
+        var dlg = new OpenFileDialog { Filter = "Remote Desktop Connection Manager (*.rdg)|*.rdg", CheckFileExists = true };
+        if (dlg.ShowDialog(Owner) != true) return;
+        if (RdgImportViewModel.Load(this, dlg.FileName) is not { } preview) return;
+        if (Dialogs.ShowRdgImport(Owner, preview) != true) return;
+        var count = preview.Apply();
+        Toasts.Show(Loc.F("Toast.Imported", count), ToastKind.Success);
+    }
+
     [RelayCommand]
     private void ImportFile()
     {
@@ -751,6 +779,12 @@ public sealed partial class MainViewModel : ObservableObject
         var name = Path.GetFileNameWithoutExtension(dlg.FileName);
         var count = TreeIndex.AllServers(doc.Root).Count();
         AddImported(name, doc.Root.Children);
+        foreach (var g in doc.SmartGroups)
+        {
+            State.Document.SmartGroups.Add(g);
+            SmartGroups.Add(new SmartGroupViewModel(g));
+        }
+        RefreshViewCounts();
         Toasts.Show(Loc.F("Toast.Imported", count), ToastKind.Success);
     }
 

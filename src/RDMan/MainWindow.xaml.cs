@@ -487,6 +487,7 @@ public partial class MainWindow : Window
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Menu.ImportNetUse", "", _vm.ImportFromWindowsCommand));
         menu.Items.Add(Item("Menu.ImportFile", "", _vm.ImportFileCommand));
+        menu.Items.Add(Item("Menu.ImportRdg", "", _vm.ImportRdgCommand));
         menu.Items.Add(Item("Menu.ExportFile", "", _vm.ExportFileCommand));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Menu.OpenDataFolder", "", _vm.OpenDataFolderCommand));

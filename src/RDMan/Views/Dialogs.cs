@@ -32,7 +32,9 @@ public static class Dialogs
 
     public static bool? ShowSmartGroupEditor(Window? owner, SmartGroupEditorViewModel vm) => Show(new SmartGroupWindow(vm), owner);
 
-    public static bool? ShowImport(Window? owner, ImportViewModel vm) => Show(new ImportWindow(vm), owner);
+    public static bool? ShowRdgImport(Window? owner, RdgImportViewModel vm) => Show(new RdgImportWindow(vm), owner);
+
+        public static bool? ShowImport(Window? owner, ImportViewModel vm) => Show(new ImportWindow(vm), owner);
 
     public static void ShowAbout(Window? owner) => Show(new AboutWindow(), owner);
 

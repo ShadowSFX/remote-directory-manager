@@ -31,7 +31,7 @@
 - **Estado en vivo.** Cada servidor muestra si responden sus archivos (puerto 445) y su escritorio (puerto RDP), con la latencia real; los grupos se ven como tarjetas.
 - **`Ctrl+K`** para saltar a cualquier servidor por nombre, IP, etiqueta o grupo.
 - **Vistas**: Favoritos (marca la estrella de un servidor), Recientes y Conectados, más **grupos inteligentes**: búsquedas guardadas por nombre, dirección, etiqueta, grupo o notas que se actualizan solas.
-- **Importa** las conexiones que Windows ya conoce (`net use`) o una colección `.rdm`.
+- **Importa** tus archivos de **RDCMan (`.rdg`)** —grupos, servidores, credenciales (las contraseñas se recuperan si las guardaste con tu usuario), opciones y grupos inteligentes—, los escritorios remotos que Windows ya tiene guardados, las conexiones de `net use` o una colección `.rdm`.
 - **Errores SMB explicados**: invitado bloqueado por Windows 11, sesión con otro usuario (error 1219), puerto 445 bloqueado, credenciales incorrectas… con la acción para resolverlos.
 - **Portable.** Un solo `.exe`. La configuración vive en `RDMan.data\` junto al ejecutable (o en `%APPDATA%\RDMan` si la carpeta es de solo lectura). Las contraseñas se cifran con DPAPI y solo funcionan con tu usuario en ese equipo.
 - **Se actualiza solo.** Descarga cada versión nueva desde GitHub Releases, verifica su SHA‑256 y la instala al reiniciar.

@@ -8,6 +8,7 @@
         <Style x:Key="TreeItem" TargetType="TreeViewItem">
             <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
             <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <EventSetter Event="Selected" Handler="TreeItem_Selected" />
             <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">

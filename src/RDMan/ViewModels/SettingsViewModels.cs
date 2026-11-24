@@ -215,20 +215,38 @@ public sealed partial class ProfilesViewModel : ObservableObject
 
 public sealed partial class ImportRowViewModel : ObservableObject
 {
+    /// <summary>An SMB share Windows knows (net use).</summary>
     public ImportRowViewModel(SmbTarget target, string? drive, bool alreadyAdded)
     {
         Target = target;
+        Host = target.Host;
         Drive = drive;
         AlreadyAdded = alreadyAdded;
         _isSelected = !alreadyAdded;
     }
 
-    public SmbTarget Target { get; }
+    /// <summary>A Remote Desktop target Windows saved a credential for (TERMSRV/host). Only the name and user are read.</summary>
+    public ImportRowViewModel(string host, string? user, bool alreadyAdded)
+    {
+        Host = host;
+        User = user;
+        IsDesktop = true;
+        AlreadyAdded = alreadyAdded;
+        _isSelected = !alreadyAdded;
+    }
+
+    public SmbTarget? Target { get; }
+    public string Host { get; }
+    public string? User { get; }
+    public bool IsDesktop { get; }
     public string? Drive { get; }
     public bool AlreadyAdded { get; }
     public bool CanSelect => !AlreadyAdded;
-    public string Path => Target.FullPath;
-    public string Detail => AlreadyAdded ? Loc.T("Import.AlreadyAdded") : Drive is null ? "" : Loc.F("Import.Drive", Drive);
+    public string Glyph => IsDesktop ? "\uE7F4" : "\uE8B7";
+    public string Path => IsDesktop ? Host : Target!.FullPath;
+    public string Detail => AlreadyAdded ? Loc.T("Import.AlreadyAdded")
+        : IsDesktop ? (string.IsNullOrEmpty(User) ? Loc.T("Import.Desktop") : Loc.F("Import.DesktopUser", User))
+        : Drive is null ? "" : Loc.F("Import.Drive", Drive);
 
     [ObservableProperty] private bool _isSelected;
 }
@@ -249,14 +267,26 @@ public sealed partial class ImportViewModel : ObservableObject
             var key = new SmbTarget(t.Host, t.Share, null).FullPath;
             if (!seen.Add(key)) continue;
             var exists = main.AllServers().Any(s => UncPath.SameHost(s.Host, t.Host) && string.Equals(s.Share ?? "", t.Share, StringComparison.OrdinalIgnoreCase));
-            var row = new ImportRowViewModel(new SmbTarget(t.Host, t.Share, null), c.LocalName, exists);
-            row.PropertyChanged += (_, _) =>
-            {
-                OnPropertyChanged(nameof(ConfirmText));
-                OnPropertyChanged(nameof(HasSelection));
-            };
-            Rows.Add(row);
+            Add(new ImportRowViewModel(new SmbTarget(t.Host, t.Share, null), c.LocalName, exists));
         }
+        // Remote desktops Windows saved credentials for ("Remember me" in mstsc): name and user only, never the secret.
+        var hosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (host, user) in Interop.WindowsCredentialLookup.SavedRemoteDesktopTargets())
+        {
+            if (!hosts.Add(host)) continue;
+            var exists = main.AllServers().Any(s => s.HasDesktop && UncPath.SameHost(s.Host, host));
+            Add(new ImportRowViewModel(host, user, exists));
+        }
+    }
+
+    private void Add(ImportRowViewModel row)
+    {
+        row.PropertyChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(ConfirmText));
+            OnPropertyChanged(nameof(HasSelection));
+        };
+        Rows.Add(row);
     }
 
     public ObservableCollection<ImportRowViewModel> Rows { get; } = new();
@@ -267,13 +297,25 @@ public sealed partial class ImportViewModel : ObservableObject
 
     public int Apply()
     {
-        var nodes = Rows.Where(r => r.IsSelected && r.CanSelect).Select(r => (TreeNode)new ServerNode
+        var selected = Rows.Where(r => r.IsSelected && r.CanSelect).ToList();
+        var shares = selected.Where(r => !r.IsDesktop).Select(r => new ServerNode
         {
-            Name = $"{r.Target.Share} · {r.Target.Host}",
+            Name = $"{r.Target!.Share} · {r.Target.Host}",
             Host = r.Target.Host,
             Share = r.Target.Share,
             Credentials = new CredentialSettings { Mode = CredentialMode.Inherit },
         }).ToList();
+        var nodes = new List<TreeNode>(shares);
+        foreach (var d in selected.Where(r => r.IsDesktop))
+        {
+            // Same host as an imported share: one server offering both views.
+            var sameHost = shares.FirstOrDefault(s => UncPath.SameHost(s.Host, d.Host));
+            var target = sameHost ?? new ServerNode { Name = d.Host, Host = d.Host, Files = false, DefaultAction = ServerAction.Desktop };
+            target.Desktop = new DesktopEndpoint { Enabled = true };
+            // Use the credential Windows saved for this target (CredSSP; RDMan never reads it).
+            target.DesktopCredentials = new CredentialSettings { Mode = CredentialMode.CurrentUser };
+            if (sameHost is null) nodes.Add(target);
+        }
         if (nodes.Count == 0) return 0;
         _main.AddImported(Loc.T("Import.GroupName"), nodes);
         return nodes.Count;
