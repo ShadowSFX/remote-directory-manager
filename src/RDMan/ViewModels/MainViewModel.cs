@@ -38,7 +38,12 @@ public sealed partial class MainViewModel : ObservableObject
             if (e.PropertyName == nameof(UpdateService.Status)) OnUpdateStatusChanged();
         };
         GroupNodeViewModel.ExpansionChanged += (_, _) => Services.State.MarkDirty();
-        Loc.Instance.LanguageChanged += (_, _) => BuildLocalPlaces();
+        Loc.Instance.LanguageChanged += (_, _) =>
+        {
+            BuildLocalPlaces();
+            OnPropertyChanged(nameof(UpdateReadyText));
+            OnPropertyChanged(nameof(DataLocationText));
+        };
     }
 
     public AppServices Services { get; }
@@ -624,9 +629,12 @@ public sealed partial class MainViewModel : ObservableObject
         catch (System.ComponentModel.Win32Exception) { }
     }
 
+    public string UpdateReadyText => Updates.ReadyRelease is { } r ? Loc.F("Update.Ready", r.Version) : "";
+
     private void OnUpdateStatusChanged()
     {
         IsUpdateBannerVisible = Updates.Status == UpdateStatus.Ready;
+        OnPropertyChanged(nameof(UpdateReadyText));
         if (Updates.Status == UpdateStatus.NotWritable && Updates.AvailableRelease is { } r)
             Toasts.Show(Loc.F("Update.NotWritable", r.Version), ToastKind.Info, Loc.T("Update.Download"), () => OpenReleasesCommand.Execute(null));
         if (Updates.Status == UpdateStatus.Failed && Updates.LastError == "SHA-256 mismatch")

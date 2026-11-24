@@ -54,11 +54,11 @@ public sealed partial class ToastService
 
     public ObservableCollection<ToastViewModel> Items { get; } = new();
 
-    public void Show(string message, ToastKind kind = ToastKind.Info, string? actionText = null, Action? action = null)
+    public void Show(string message, ToastKind kind = ToastKind.Info, string? actionText = null, Action? action = null, TimeSpan? duration = null)
     {
         if (!_dispatcher.CheckAccess())
         {
-            _dispatcher.BeginInvoke(() => Show(message, kind, actionText, action));
+            _dispatcher.BeginInvoke(() => Show(message, kind, actionText, action, duration));
             return;
         }
         // Collapse identical consecutive messages instead of stacking duplicates.
@@ -66,7 +66,7 @@ public sealed partial class ToastService
         var toast = new ToastViewModel(message, kind, actionText, action);
         Items.Add(toast);
         while (Items.Count > 4) Items.RemoveAt(0);
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(kind == ToastKind.Error ? 9 : action is null ? 3.5 : 7) };
+        var timer = new DispatcherTimer { Interval = duration ?? TimeSpan.FromSeconds(kind == ToastKind.Error ? 9 : action is null ? 3.5 : 7) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();

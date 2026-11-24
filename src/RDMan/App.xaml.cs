@@ -89,7 +89,8 @@ public partial class App : Application
         var current = UpdateService.CurrentVersionText;
         if (settings.LastRunVersion is not null && settings.LastRunVersion != current && UpdateService.CurrentVersion.Prerelease is null)
         {
-            Services.Toasts.Show(Loc.F("Update.WhatsNew", current), ToastKind.Success, Loc.T("About.Repo"), () => _main.OpenReleasesCommand.Execute(null));
+            Services.Toasts.Show(Loc.F("Update.WhatsNew", current), ToastKind.Success, Loc.T("About.Repo"),
+                () => _main.OpenReleasesCommand.Execute(null), TimeSpan.FromSeconds(15));
         }
         if (settings.LastRunVersion != current)
         {

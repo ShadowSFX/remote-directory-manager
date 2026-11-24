@@ -136,9 +136,8 @@
                         Visibility="{Binding IsUpdateBannerVisible, Converter={StaticResource Vis}}">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE896;" Style="{StaticResource Icon}" FontSize="11" Foreground="{DynamicResource Accent.Text}" />
-                        <TextBlock Margin="6,0,8,0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource Accent.Text}">
-                            <Run Text="{Binding Updates.ReadyRelease.Version, Mode=OneWay}" /><Run Text=" · " /><Run Text="{ui:Tr Update.ReadyBody}" />
-                        </TextBlock>
+                        <TextBlock Margin="6,0,8,0" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource Accent.Text}"
+                                   Text="{Binding UpdateReadyText}" ToolTip="{ui:Tr Update.ReadyBody}" />
                         <Button Style="{StaticResource Btn.Base}" Height="18" Padding="8,0" FontSize="12" FontWeight="SemiBold"
                                 Foreground="{DynamicResource Fg.OnAccent}" Background="{DynamicResource Accent}" Content="{ui:Tr Update.Restart}"
                                 Command="{Binding RestartToUpdateCommand}" ui:Ui.CornerRadius="3" />
