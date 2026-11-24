@@ -58,6 +58,10 @@ public sealed class AppState
 
     public EffectiveCredential ResolveCredential(TreeNode node) => CredentialResolver.Resolve(node, Index, Document.Profiles);
 
+    public EffectiveCredential ResolveDesktopCredential(TreeNode node) => CredentialResolver.ResolveDesktop(node, Index, Document.Profiles);
+
+    public Core.Rdp.EffectiveRdpSettings ResolveRdpSettings(TreeNode node) => Core.Rdp.RdpSettingsResolver.Resolve(node, Index);
+
     public void SaveNow()
     {
         _saveTimer.Stop();

@@ -12,6 +12,8 @@ public partial class PaneView : UserControl
     public PaneView()
     {
         InitializeComponent();
+        // Keep the session layer exactly over the active tab's content area.
+        LayoutUpdated += (_, _) => PositionSessionLayer();
         DataContextChanged += (_, e) =>
         {
             if (e.OldValue is PaneViewModel old) old.PropertyChanged -= OnPanePropertyChanged;
@@ -24,6 +26,22 @@ public partial class PaneView : UserControl
     }
 
     private PaneViewModel? Pane => DataContext as PaneViewModel;
+
+    private Thickness _layerMargin = new(double.NaN);
+
+    private void PositionSessionLayer()
+    {
+        if (TabView.ContentArea is not { IsLoaded: true } area || !TabArea.IsLoaded) return;
+        Point topLeft;
+        try { topLeft = area.TranslatePoint(new Point(0, 0), TabArea); }
+        catch (InvalidOperationException) { return; }
+        var margin = new Thickness(topLeft.X, topLeft.Y,
+            Math.Max(0, TabArea.ActualWidth - topLeft.X - area.ActualWidth),
+            Math.Max(0, TabArea.ActualHeight - topLeft.Y - area.ActualHeight));
+        if (margin == _layerMargin) return;
+        _layerMargin = margin;
+        SessionLayer.Margin = margin;
+    }
     private static MainViewModel? Main => Application.Current.MainWindow?.DataContext as MainViewModel;
 
     private void OnPanePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

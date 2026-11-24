@@ -77,7 +77,7 @@ public partial class App : Application
         if (!string.IsNullOrWhiteSpace(pathArg))
             _main.OpenInNewTab(new FolderLocation(pathArg), _main.Left);
 
-        Services.Health.Start(() => _main.AllServers().Select(s => s.Host), settings.HealthCheckIntervalSeconds);
+        Services.Health.Start(() => _main.AllServers().SelectMany(s => s.Endpoints()), settings.HealthCheckIntervalSeconds);
         Services.Updates.StartBackgroundChecks(() => state.Settings.AutoUpdate);
 
         switch (docResult.Outcome)

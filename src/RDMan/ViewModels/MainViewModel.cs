@@ -157,7 +157,7 @@ public sealed partial class MainViewModel : ObservableObject
         var svm = (ServerNodeViewModel)CreateVm(node, vm.SelectedParent?.Group);
         Insert(svm, vm.SelectedParent?.Group);
         Changed();
-        _ = Services.Health.CheckAsync(node.Host);
+        CheckHealth(svm);
         OpenServer(svm, OpenTarget.Current);
         SelectInTree(svm);
     }
@@ -200,7 +200,8 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 Services.Connections.Invalidate(oldHost);
                 Services.Connections.Invalidate(s.Server.Host);
-                _ = Services.Health.CheckAsync(s.Server.Host);
+                s.Refresh();
+                CheckHealth(s);
             }
         }
         else
@@ -311,9 +312,95 @@ public sealed partial class MainViewModel : ObservableObject
         node.IsSelected = true;
     }
 
+    public void CheckHealth(ServerNodeViewModel server)
+    {
+        foreach (var (host, port) in server.Endpoints()) _ = Services.Health.CheckAsync(host, port);
+    }
+
     // ───────────── Opening ─────────────
+    /// <summary>Plain click: the server's default view (files or desktop).</summary>
     public void OpenServer(ServerNodeViewModel server, OpenTarget target)
-        => Open(new FolderLocation(server.RootPath), target);
+    {
+        if (server.DefaultAction == ServerAction.Desktop) OpenDesktop(server, target);
+        else OpenFiles(server, target);
+    }
+
+    public void OpenFiles(ServerNodeViewModel server, OpenTarget target)
+    {
+        if (!server.HasFiles)
+        {
+            OpenDesktop(server, target);
+            return;
+        }
+        Open(new FolderLocation(server.RootPath), target);
+    }
+
+    public void OpenDesktop(ServerNodeViewModel server, OpenTarget target)
+    {
+        if (!server.HasDesktop)
+        {
+            Toasts.Show(Loc.F("Desktop.NotEnabled", server.Name), ToastKind.Info, Loc.T("Tree.Ctx.Properties"), () => EditNode(server));
+            return;
+        }
+        // One session per server: a second embedded session with the same account would take over the first
+        // (Windows: "replaced by another connection"), so an existing desktop tab is reused.
+        var existing = FindTab(t => t.Current is DesktopLocation d && d.ServerId == server.Model.Id);
+        if (existing is { } hit)
+        {
+            Activate(hit.Pane);
+            hit.Pane.SelectedTab = hit.Tab;
+            if (hit.Tab.Session is { IsConnected: false, IsBusy: false } idle) idle.Connect();
+            else hit.Tab.Session?.Focus();
+            return;
+        }
+        var location = new DesktopLocation(server.Model.Id);
+        switch (target)
+        {
+            case OpenTarget.NewTab:
+                OpenInNewTab(location, ActivePane, t => t.RequestConnect());
+                break;
+            case OpenTarget.OtherPane:
+                OpenInOtherPane(location, ActivePane, t => t.RequestConnect());
+                break;
+            default:
+                if (ActiveTab is null || ActiveTab.Session is { IsConnected: true })
+                    OpenInNewTab(location, ActivePane, t => t.RequestConnect());
+                else
+                {
+                    ActiveTab.RequestConnect();
+                    _ = ActiveTab.NavigateAsync(location);
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// The identity band's Files | Desktop switch: jump to the tab showing the other view of the same server
+    /// (or open it next to this one). Never tears down the view you came from.
+    /// </summary>
+    public void OpenCompanion(BrowserTabViewModel from, ServerAction view)
+    {
+        if (from.Server is not { } server) return;
+        var pane = from.Pane;
+        var tab = view == ServerAction.Desktop
+            ? pane.Tabs.FirstOrDefault(t => t.Current is DesktopLocation d && d.ServerId == server.Model.Id)
+            : pane.Tabs.FirstOrDefault(t => !ReferenceEquals(t, from) && t.Current is FolderLocation { IsUnc: true } && ReferenceEquals(t.Server, server));
+        if (tab is not null)
+        {
+            pane.SelectedTab = tab;
+            return;
+        }
+        if (view == ServerAction.Desktop) OpenDesktop(server, OpenTarget.NewTab);
+        else OpenInNewTab(new FolderLocation(server.RootPath), pane);
+    }
+
+    private (PaneViewModel Pane, BrowserTabViewModel Tab)? FindTab(Func<BrowserTabViewModel, bool> match)
+    {
+        foreach (var pane in new[] { Left, Right })
+            foreach (var t in pane.Tabs)
+                if (match(t)) return (pane, t);
+        return null;
+    }
 
     public void OpenGroup(GroupNodeViewModel group, OpenTarget target)
         => Open(new GroupLocation(group.Model.Id), target);
@@ -329,25 +416,32 @@ public sealed partial class MainViewModel : ObservableObject
                 OpenInOtherPane(location, ActivePane);
                 break;
             default:
+                // Never replace a live remote desktop just to look at something else: use a new tab.
                 if (ActiveTab is null) ActivePane.AddTab(location);
+                else if (ActiveTab.Session is { IsConnected: true } && location is not DesktopLocation) OpenInNewTab(location, ActivePane);
                 else _ = ActiveTab.NavigateAsync(location);
                 break;
         }
     }
 
-    public void OpenInNewTab(Location location, PaneViewModel pane)
+    public void OpenInNewTab(Location location, PaneViewModel pane, Action<BrowserTabViewModel>? configure = null)
     {
         var index = pane.SelectedTab is null ? pane.Tabs.Count : pane.Tabs.IndexOf(pane.SelectedTab) + 1;
-        pane.AddTab(location, index: index);
+        pane.AddTab(location, index: index, configure: configure);
         Activate(pane);
     }
 
-    public void OpenInOtherPane(Location location, PaneViewModel from)
+    public void OpenInOtherPane(Location location, PaneViewModel from, Action<BrowserTabViewModel>? configure = null)
     {
         if (!IsSplit) ToggleSplit();
         var other = ReferenceEquals(from, Left) ? Right : Left;
-        if (other.SelectedTab is null) other.AddTab(location);
-        else _ = other.SelectedTab.NavigateAsync(location);
+        if (other.SelectedTab is null || other.SelectedTab.Session is { IsConnected: true })
+            other.AddTab(location, index: other.SelectedTab is null ? null : other.Tabs.IndexOf(other.SelectedTab) + 1, configure: configure);
+        else
+        {
+            configure?.Invoke(other.SelectedTab);
+            _ = other.SelectedTab.NavigateAsync(location);
+        }
         Activate(other);
     }
 
@@ -557,7 +651,7 @@ public sealed partial class MainViewModel : ObservableObject
             Insert(vm, group);
         }
         Changed();
-        foreach (var s in group.AllServers()) _ = Services.Health.CheckAsync(s.Host);
+        foreach (var s in group.AllServers()) CheckHealth(s);
         return group;
     }
 

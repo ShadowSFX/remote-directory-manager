@@ -94,25 +94,41 @@ public sealed partial class GroupNodeViewModel : NodeViewModel
 
 public sealed partial class ServerNodeViewModel : NodeViewModel
 {
-    private HostHealth _health;
+    private HostHealth _filesHealth;
+    private HostHealth? _desktopHealth;
 
     public ServerNodeViewModel(ServerNode model, GroupNodeViewModel? parent, HealthMonitor monitor) : base(model, parent)
     {
         Monitor = monitor;
-        _health = monitor.Get(model.Host);
-        _health.PropertyChanged += OnHealthChanged;
+        _filesHealth = monitor.Get(model.Host);
+        _filesHealth.PropertyChanged += OnHealthChanged;
+        AttachDesktopHealth();
         Loc.Instance.LanguageChanged += OnLanguageChanged;
     }
 
     private HealthMonitor Monitor { get; }
 
     public ServerNode Server => (ServerNode)Model;
-    public HostHealth Health => _health;
     public string Host => Server.Host;
     public string? Share => Server.Share;
 
+    public bool HasFiles => Server.HasFiles;
+    public bool HasDesktop => Server.HasDesktop;
+    public bool HasBoth => HasFiles && HasDesktop;
+    public int DesktopPort => Server.Desktop?.Port ?? DesktopEndpoint.DefaultPort;
+    public ServerAction DefaultAction => Server.EffectiveDefaultAction;
+
+    /// <summary>Reachability of the SMB port (445).</summary>
+    public HostHealth FilesHealth => _filesHealth;
+
+    /// <summary>Reachability of the RDP port, or null when the server has no desktop.</summary>
+    public HostHealth? DesktopHealth => _desktopHealth;
+
+    /// <summary>The status shown on the dot: the service a plain click opens.</summary>
+    public HostHealth Health => DefaultAction == ServerAction.Desktop && _desktopHealth is not null ? _desktopHealth : _filesHealth;
+
     /// <summary>"10.0.0.5\www" — what the user would have typed before.</summary>
-    public string Address => Server.Share is null ? Server.Host : $@"{Server.Host}\{Server.Share}";
+    public string Address => Server.Share is null || !HasFiles ? Server.Host : $@"{Server.Host}\{Server.Share}";
 
     public string RootPath
     {
@@ -125,9 +141,25 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
 
     public string ShareRootPath => new SmbTarget(Server.Host, Server.Share, null).FullPath;
 
-    public string StatusText => Health.State switch
+    public string StatusText
     {
-        HealthState.Online => Loc.F("Health.Online", Health.LatencyMs ?? 0),
+        get
+        {
+            var parts = new List<string>();
+            if (HasFiles) parts.Add(Describe(_filesHealth, desktop: false));
+            if (_desktopHealth is not null) parts.Add(Describe(_desktopHealth, desktop: true));
+            return string.Join("  ·  ", parts);
+        }
+    }
+
+    /// <summary>Short status of the primary service, for cards.</summary>
+    public string PrimaryStatusText => Describe(Health, desktop: ReferenceEquals(Health, _desktopHealth), compact: true);
+
+    private static string Describe(HostHealth h, bool desktop, bool compact = false) => h.State switch
+    {
+        HealthState.Online when compact => Loc.F("Health.Online", h.LatencyMs ?? 0),
+        HealthState.Online => Loc.F(desktop ? "Health.Desktop.Online" : "Health.Files.Online", h.LatencyMs ?? 0),
+        HealthState.Offline when desktop => Loc.F("Health.Desktop.Offline", h.Port),
         HealthState.Offline => Loc.T("Health.Offline"),
         _ => Loc.T("Health.Unknown"),
     };
@@ -142,33 +174,51 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
         if (e.PropertyName is nameof(HostHealth.State) or nameof(HostHealth.LatencyMs))
         {
             OnPropertyChanged(nameof(StatusText));
+            OnPropertyChanged(nameof(PrimaryStatusText));
             if (e.PropertyName == nameof(HostHealth.State)) Parent?.NotifyCounts();
         }
     }
 
+    private void AttachDesktopHealth()
+    {
+        if (_desktopHealth is not null) _desktopHealth.PropertyChanged -= OnHealthChanged;
+        _desktopHealth = HasDesktop ? Monitor.Get(Server.Host, DesktopPort) : null;
+        if (_desktopHealth is not null) _desktopHealth.PropertyChanged += OnHealthChanged;
+    }
+
     public override void Refresh()
     {
-        // Host may have changed → re-attach to the right health record.
-        var next = Monitor.Get(Server.Host);
-        if (!ReferenceEquals(next, _health))
+        // Host, port or capabilities may have changed → re-attach to the right health records.
+        var nextFiles = Monitor.Get(Server.Host);
+        if (!ReferenceEquals(nextFiles, _filesHealth))
         {
-            _health.PropertyChanged -= OnHealthChanged;
-            _health = next;
-            _health.PropertyChanged += OnHealthChanged;
+            _filesHealth.PropertyChanged -= OnHealthChanged;
+            _filesHealth = nextFiles;
+            _filesHealth.PropertyChanged += OnHealthChanged;
         }
+        AttachDesktopHealth();
         base.Refresh();
     }
 
     private void OnLanguageChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(PrimaryStatusText));
         OnPropertyChanged(nameof(LastConnectedText));
     }
 
     public void Detach()
     {
-        _health.PropertyChanged -= OnHealthChanged;
+        _filesHealth.PropertyChanged -= OnHealthChanged;
+        if (_desktopHealth is not null) _desktopHealth.PropertyChanged -= OnHealthChanged;
         Loc.Instance.LanguageChanged -= OnLanguageChanged;
+    }
+
+    /// <summary>Endpoints the health monitor should probe for this server.</summary>
+    public IEnumerable<(string Host, int Port)> Endpoints()
+    {
+        if (HasFiles) yield return (Server.Host, ConnectionService.SmbPort);
+        if (HasDesktop) yield return (Server.Host, DesktopPort);
     }
 }
 

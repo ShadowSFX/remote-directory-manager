@@ -8,15 +8,17 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RDMan.Core.Credentials;
+using RDMan.Core.Models;
 using RDMan.Core.Search;
 using RDMan.Core.Smb;
 using RDMan.Infrastructure;
 using RDMan.Interop;
 using RDMan.Services;
+using RDMan.Views;
 
 namespace RDMan.ViewModels;
 
-public enum TabMode { Dashboard, Folder, Error }
+public enum TabMode { Dashboard, Folder, Error, Desktop }
 
 public sealed record BreadcrumbSegment(string Label, Location Target, bool IsServer, Brush? Color);
 
@@ -133,6 +135,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         FolderLocation f when f.IsServerRoot => Server?.Name ?? f.DisplayLeaf,
         FolderLocation f when f.Target is { SubPath: null or "" } && Server is { Share: not null } => Server.Name,
         FolderLocation f => f.DisplayLeaf,
+        DesktopLocation => Server?.Name ?? Loc.T("Cap.Desktop"),
         _ => "",
     };
 
@@ -142,14 +145,43 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         GroupLocation => "",
         ThisPcLocation => "",
         FolderLocation { IsUnc: true } => "",
+        DesktopLocation => "",
         _ => "",
     };
 
     public Brush? IdentityBrush => Server?.ColorBrush;
     public bool HasIdentity => Server is not null || Folder is { IsUnc: true };
+    public bool IsDesktop => Current is DesktopLocation;
+
+    /// <summary>The server offers both views: the identity band shows the Files | Desktop switch.</summary>
+    public bool ShowViewSwitch => Server is { HasBoth: true } && (IsDesktop || Folder is { IsUnc: true });
     public string IdentityName => Server?.Name ?? Folder?.Target?.Host ?? "";
-    public string IdentityAddress => Folder?.Target is { } t ? (t.Share is null ? t.ServerRoot : t.ShareRoot!) : "";
-    public HostHealth? Health => Folder?.Target is { } t ? _svc.Health.Get(t.Host) : null;
+    public string IdentityAddress => Current is DesktopLocation && Server is { } ds
+        ? $"{ds.Host}:{ds.DesktopPort}"
+        : Folder?.Target is { } t ? (t.Share is null ? t.ServerRoot : t.ShareRoot!) : "";
+
+    public HostHealth? Health => Current is DesktopLocation ? Server?.DesktopHealth : Folder?.Target is { } t ? _svc.Health.Get(t.Host) : null;
+
+    /// <summary>The embedded remote desktop of this tab (only in Desktop mode).</summary>
+    [ObservableProperty] private RdpSessionViewModel? _session;
+    private bool _connectOnLoad;
+
+    /// <summary>Next load of a desktop location connects right away (explicit "open desktop"); restored tabs wait for a click.</summary>
+    public void RequestConnect() => _connectOnLoad = true;
+
+    /// <summary>The native session surface is shown only for the selected tab of its pane, in desktop mode, while connecting/connected.</summary>
+    public bool IsSessionVisible => Mode == TabMode.Desktop && ReferenceEquals(Pane.SelectedTab, this) && Session is { IsSurfaceVisible: true };
+
+    public void NotifySessionVisibility() => OnPropertyChanged(nameof(IsSessionVisible));
+
+    /// <summary>Raised when the user releases the keyboard from the session (Ctrl+Alt+←/→).</summary>
+    public event EventHandler? SessionFocusReleased;
+
+    [RelayCommand]
+    private void ShowFiles() => _main.OpenCompanion(this, ServerAction.Files);
+
+    [RelayCommand]
+    private void ShowDesktop() => _main.OpenCompanion(this, ServerAction.Desktop);
 
     public string StatusText
     {
@@ -167,6 +199,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     // ───────────── Navigation ─────────────
     public Task NavigateAsync(Location target, bool pushHistory = true)
     {
+        if (!Equals(target, Current) && !ConfirmLeaveDesktop()) return Task.CompletedTask;
         if (pushHistory && !Equals(target, Current))
         {
             _back.Push(Current);
@@ -180,7 +213,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task Back()
     {
-        if (_back.Count == 0) return;
+        if (_back.Count == 0 || !ConfirmLeaveDesktop()) return;
         _forward.Push(Current);
         Current = _back.Pop();
         await LoadAsync();
@@ -189,7 +222,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task Forward()
     {
-        if (_forward.Count == 0) return;
+        if (_forward.Count == 0 || !ConfirmLeaveDesktop()) return;
         _back.Push(Current);
         Current = _forward.Pop();
         await LoadAsync();
@@ -211,8 +244,16 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     {
         FolderLocation f => f.Parent() is { } p ? p : ServerGroupFor(f),
         GroupLocation g => _main.FindGroup(g.GroupId)?.Parent is { } pg ? new GroupLocation(pg.Model.Id) : new HomeLocation(),
+        DesktopLocation => Server?.Parent is { } sg ? new GroupLocation(sg.Model.Id) : new HomeLocation(),
         _ => null,
     };
+
+    /// <summary>Leaving a connected desktop ends that session: ask first (RDCMan silently keeps or drops it).</summary>
+    public bool ConfirmLeaveDesktop()
+    {
+        if (Session is not { IsConnected: true } s) return true;
+        return Dialogs.Confirm(_main.Owner, Loc.T("Desktop.Disconnect"), Loc.F("Desktop.ConfirmLeave", s.Server.Name), Loc.T("Desktop.Disconnect"), danger: false);
+    }
 
     private Location? ServerGroupFor(FolderLocation f)
     {
@@ -293,12 +334,39 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         UpdateSelectionText();
         _sessionUp = false;
         Server = ResolveServer();
+        if (Current is not DesktopLocation) EndSession();
         UpdateConnectedAs();
         RebuildBreadcrumb();
         NotifyChrome();
 
         switch (Current)
         {
+            case DesktopLocation:
+                if (Server is null)
+                {
+                    // The server was deleted from the tree.
+                    Current = new HomeLocation();
+                    await LoadAsync();
+                    return;
+                }
+                Dashboard = null;
+                ReplaceItems([]);
+                if (Session is null || !ReferenceEquals(Session.Server, Server))
+                {
+                    EndSession();
+                    Session = new RdpSessionViewModel(_main, Server);
+                    Session.PropertyChanged += OnSessionChanged;
+                    Session.FocusReleased += OnSessionFocusReleased;
+                }
+                Mode = TabMode.Desktop;
+                EndLoading();
+                if (_connectOnLoad && !Session.IsConnected && !Session.IsBusy)
+                {
+                    _connectOnLoad = false;
+                    Session.Connect();
+                }
+                UpdateConnectedAs();
+                return;
             case HomeLocation:
                 ShowDashboard(new DashboardViewModel(Loc.T("Home.Title"), null, _main.RootNodes));
                 return;
@@ -558,8 +626,34 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         return LoadAsync();
     }
 
+    private void EndSession()
+    {
+        if (Session is null) return;
+        Session.PropertyChanged -= OnSessionChanged;
+        Session.FocusReleased -= OnSessionFocusReleased;
+        Session.Dispose();
+        Session = null;
+    }
+
+    private void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(RdpSessionViewModel.State) or nameof(RdpSessionViewModel.ConnectedAs))
+        {
+            NotifySessionVisibility();
+            UpdateConnectedAs();
+            _main.NotifyActiveTabChrome(this);
+        }
+    }
+
+    private void OnSessionFocusReleased(object? sender, EventArgs e) => SessionFocusReleased?.Invoke(this, EventArgs.Empty);
+
+    partial void OnModeChanged(TabMode value) => NotifySessionVisibility();
+
+    partial void OnSessionChanged(RdpSessionViewModel? value) => NotifySessionVisibility();
+
     private ServerNodeViewModel? ResolveServer()
     {
+        if (Current is DesktopLocation d) return _main.FindServer(d.ServerId);
         if (Folder is not { IsUnc: true } f) return null;
         var node = _svc.State.FindServerForPath(f.Path);
         return node is null ? null : _main.FindServer(node.Id);
@@ -575,6 +669,11 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     private void UpdateConnectedAs()
     {
+        if (Current is DesktopLocation)
+        {
+            ConnectedAs = Session is { State: DesktopState.Connected or DesktopState.Connecting } s ? s.ConnectedAs : "";
+            return;
+        }
         if (Folder is not { IsUnc: true })
         {
             ConnectedAs = "";
@@ -668,6 +767,8 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IdentityAddress));
         OnPropertyChanged(nameof(Health));
         OnPropertyChanged(nameof(IsLocal));
+        OnPropertyChanged(nameof(IsDesktop));
+        OnPropertyChanged(nameof(ShowViewSwitch));
         BackCommand.NotifyCanExecuteChanged();
         _main.NotifyActiveTabChrome(this);
     }
@@ -1049,6 +1150,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         _loadCts?.Dispose();
         _loadCts = null;
         StopWatcher();
+        EndSession();
         _loadingDelay.Stop();
         _watchDebounce.Stop();
         _svc.Clipboard.Changed -= OnClipboardChanged;

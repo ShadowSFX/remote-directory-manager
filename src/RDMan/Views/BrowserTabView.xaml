@@ -102,7 +102,8 @@
         <DataTemplate x:Key="ServerCard" DataType="{x:Type vm:ServerNodeViewModel}">
             <Button x:Name="Card" Width="268" Height="124" Margin="0,0,12,12" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                     Style="{StaticResource Btn.Base}" Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
-                    ui:Ui.CornerRadius="8" Click="Card_Click" MouseDown="Card_MouseDown" Tag="{Binding}" ContextMenuOpening="Card_ContextMenuOpening">
+                    ui:Ui.CornerRadius="8" Click="Card_Click" MouseDown="Card_MouseDown" Tag="{Binding}" ContextMenuOpening="Card_ContextMenuOpening"
+                    AutomationProperties.Name="{Binding Name}">
                 <Button.ContextMenu>
                     <ContextMenu />
                 </Button.ContextMenu>
@@ -119,14 +120,24 @@
                             <RowDefinition Height="*" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg.Primary}" />
+                        <Grid>
+                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg.Primary}"
+                                       Margin="0,0,56,0" />
+                            <!-- What this server offers; each is a direct shortcut when it has both -->
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-6,0">
+                                <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE8B7;" FontSize="12" Click="CardFiles_Click" Tag="{Binding}"
+                                        ToolTip="{ui:Tr Files.Open}" Visibility="{Binding HasFiles, Converter={StaticResource Vis}}" />
+                                <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE7F4;" FontSize="12" Click="CardDesktop_Click" Tag="{Binding}"
+                                        ToolTip="{ui:Tr Desktop.Open}" Visibility="{Binding HasDesktop, Converter={StaticResource Vis}}" Margin="2,0,0,0" />
+                            </StackPanel>
+                        </Grid>
                         <TextBlock Grid.Row="1" Text="{Binding Address}" Style="{StaticResource Text.Mono}" Margin="0,3,0,0" />
                         <TextBlock Grid.Row="2" Text="{Binding Description}" Style="{StaticResource Text.Caption}" TextTrimming="CharacterEllipsis" Margin="0,6,0,0"
                                    Visibility="{Binding Description, Converter={StaticResource VisIfAny}}" />
                         <Grid Grid.Row="3">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <Ellipse Style="{StaticResource StatusDot}" />
-                                <TextBlock Text="{Binding StatusText}" Style="{StaticResource Text.Caption}" Margin="7,0,0,0" />
+                                <TextBlock Text="{Binding PrimaryStatusText}" Style="{StaticResource Text.Caption}" Margin="7,0,0,0" ToolTip="{Binding StatusText}" />
                             </StackPanel>
                             <TextBlock Text="{Binding TagsText}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Right" MaxWidth="110" TextTrimming="CharacterEllipsis"
                                        Foreground="{DynamicResource Accent.Text}" />
@@ -185,15 +196,58 @@
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center">
-                    <Button Style="{StaticResource Btn.Icon}" Content="&#xEC50;" ToolTip="{ui:Tr Nav.OpenExplorer}" Command="{Binding OpenInExplorerCommand}" />
+                    <!-- Same server, other view: jumps to (or opens) the companion tab; never tears this one down -->
+                    <Border Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="2" Margin="0,0,10,0"
+                            Visibility="{Binding ShowViewSwitch, Converter={StaticResource Vis}}">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowFilesCommand}"
+                                    ui:Ui.IsOn="{Binding IsDesktop, Converter={StaticResource Not}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock Text="{ui:Tr Cap.Files}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowDesktopCommand}" ui:Ui.IsOn="{Binding IsDesktop}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock Text="{ui:Tr Cap.Desktop}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+                    <Button Style="{StaticResource Btn.Icon}" Content="&#xEC50;" ToolTip="{ui:Tr Nav.OpenExplorer}" Command="{Binding OpenInExplorerCommand}"
+                            Visibility="{Binding IsDesktop, Converter={StaticResource Vis}, ConverterParameter=invert}" />
                     <Button Style="{StaticResource Btn.Icon}" Content="&#xE70F;" ToolTip="{ui:Tr Tree.Ctx.Properties}" Click="EditServer_Click"
                             Visibility="{Binding Server, Converter={StaticResource VisIfAny}}" />
                 </StackPanel>
             </Grid>
         </Border>
 
+        <!-- ═══════════ Desktop toolbar ═══════════ -->
+        <Grid Grid.Row="1" Height="46" Margin="8,0,8,0" Visibility="{Binding IsDesktop, Converter={StaticResource Vis}}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE72B;" Command="{Binding BackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip="{ui:Tr Nav.Back}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE72A;" Command="{Binding ForwardCommand}" IsEnabled="{Binding CanGoForward}" ToolTip="{ui:Tr Nav.Forward}" />
+                <Border Width="1" Height="18" Background="{DynamicResource Line}" Margin="6,0" />
+                <Button x:Name="DesktopFocusTarget" Style="{StaticResource Btn.Icon}" Content="&#xE72C;" Command="{Binding Session.ReconnectCommand}" ToolTip="{ui:Tr Desktop.Reconnect}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE765;" Command="{Binding Session.SendCtrlAltDelCommand}" ToolTip="{ui:Tr Desktop.CtrlAltDel}"
+                        IsEnabled="{Binding Session.IsConnected}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE740;" Command="{Binding Session.FullScreenCommand}" ToolTip="{ui:Tr Desktop.FullScreen}"
+                        IsEnabled="{Binding Session.IsConnected}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE7E8;" Command="{Binding Session.DisconnectCommand}" ToolTip="{ui:Tr Desktop.Disconnect}"
+                        IsEnabled="{Binding Session.IsConnected}" />
+            </StackPanel>
+            <TextBlock Grid.Column="2" Text="{ui:Tr Desktop.FocusHint}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Visibility="{Binding Session.IsConnected, Converter={StaticResource Vis}}" />
+        </Grid>
+
         <!-- ═══════════ Toolbar ═══════════ -->
-        <Grid Grid.Row="1" Height="46" Margin="8,0,8,0">
+        <Grid Grid.Row="1" Height="46" Margin="8,0,8,0" Visibility="{Binding IsDesktop, Converter={StaticResource Vis}, ConverterParameter=invert}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -268,7 +322,46 @@
         <Border Grid.Row="2" Height="1" Background="{DynamicResource Line}" Visibility="{Binding ShowSpinner, Converter={StaticResource Vis}, ConverterParameter=invert}" />
 
         <!-- ═══════════ Content ═══════════ -->
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="3" x:Name="ContentArea">
+            <!-- Desktop: not connected -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460" Margin="32"
+                        Visibility="{Binding Session.ShowIdle, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
+                <Border Width="64" Height="64" CornerRadius="32" Background="{DynamicResource Accent.Subtle}" HorizontalAlignment="Center">
+                    <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="26" Foreground="{DynamicResource Accent.Text}" />
+                </Border>
+                <TextBlock Style="{StaticResource Text.Title}" HorizontalAlignment="Center" Margin="0,18,0,8" TextAlignment="Center" TextWrapping="Wrap"
+                           Text="{Binding Session.Server.Name}" />
+                <TextBlock Text="{ui:Tr Desktop.Idle.Body}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" />
+                <Button Style="{StaticResource Btn.Primary}" HorizontalAlignment="Center" Margin="0,20,0,0" MinWidth="140" Height="36"
+                        Command="{Binding Session.ConnectCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                        <TextBlock Text="{ui:Tr Desktop.Connect}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Desktop: error -->
+            <ContentControl Content="{Binding Session.Error}" Visibility="{Binding Session.Error, Converter={StaticResource VisIfAny}}" Focusable="False">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate DataType="{x:Type vm:ErrorInfo}">
+                        <StackPanel MaxWidth="480" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32">
+                            <Border Width="52" Height="52" CornerRadius="26" Background="{DynamicResource Danger.Subtle}" HorizontalAlignment="Left">
+                                <TextBlock Text="&#xE7BA;" Style="{StaticResource Icon}" FontSize="22" Foreground="{DynamicResource Danger}" />
+                            </Border>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Title}" Margin="0,18,0,8" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Detail}" Style="{StaticResource Text.Secondary}" FontSize="14" LineHeight="21" />
+                            <TextBlock Text="{Binding CodeText}" Style="{StaticResource Text.Mono}" FontSize="11.5" Foreground="{DynamicResource Fg.Tertiary}"
+                                       Margin="0,12,0,0" TextWrapping="Wrap" TextTrimming="None" />
+                            <StackPanel Orientation="Horizontal" Margin="0,22,0,0">
+                                <Button Style="{StaticResource Btn.Primary}" Content="{Binding PrimaryText}"
+                                        Command="{Binding DataContext.Session.ErrorPrimaryCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+
             <!-- File list -->
             <ListView x:Name="List" ItemsSource="{Binding Items}" Background="Transparent" BorderThickness="0" Padding="0,2,0,6"
                       SelectionMode="Extended" ItemContainerStyle="{StaticResource FileRow}" AllowDrop="True"

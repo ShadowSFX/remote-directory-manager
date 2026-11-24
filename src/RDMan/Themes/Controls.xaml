@@ -224,6 +224,22 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Segment of a segmented switch driven by commands (state comes from the view model via ui:Ui.IsOn) -->
+    <Style x:Key="Btn.Segment" TargetType="Button" BasedOn="{StaticResource Btn.Base}">
+        <Setter Property="Height" Value="26" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Foreground" Value="{DynamicResource Fg.Secondary}" />
+        <Setter Property="ui:Ui.CornerRadius" Value="5" />
+        <Style.Triggers>
+            <Trigger Property="ui:Ui.IsOn" Value="True">
+                <Setter Property="Background" Value="{DynamicResource Bg.Raised}" />
+                <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <Style x:Key="Toggle.Icon" TargetType="ToggleButton" BasedOn="{StaticResource Btn.Icon}">
         <Style.Triggers>
             <Trigger Property="IsChecked" Value="True">

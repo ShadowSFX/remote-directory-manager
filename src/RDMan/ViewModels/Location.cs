@@ -11,6 +11,7 @@ public abstract record Location
     {
         "group" when t.NodeId is { } id => new GroupLocation(id),
         "thispc" => new ThisPcLocation(),
+        "desktop" when t.NodeId is { } sid => new DesktopLocation(sid),
         "folder" when !string.IsNullOrWhiteSpace(t.Path) => new FolderLocation(t.Path!),
         _ => new HomeLocation(),
     };
@@ -26,6 +27,12 @@ public sealed record HomeLocation : Location
 public sealed record GroupLocation(Guid GroupId) : Location
 {
     public override SavedTab ToSaved() => new() { Kind = "group", NodeId = GroupId };
+}
+
+/// <summary>The remote desktop (RDP) of a server in the tree.</summary>
+public sealed record DesktopLocation(Guid ServerId) : Location
+{
+    public override SavedTab ToSaved() => new() { Kind = "desktop", NodeId = ServerId };
 }
 
 public sealed record ThisPcLocation : Location

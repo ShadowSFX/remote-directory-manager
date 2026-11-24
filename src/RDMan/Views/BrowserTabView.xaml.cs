@@ -28,12 +28,14 @@ public partial class BrowserTabView : UserControl
                 old.RequestRename -= OnRequestRename;
                 old.RequestSelect -= OnRequestSelect;
                 old.RequestFocusList -= OnRequestFocusList;
+                old.SessionFocusReleased -= OnSessionFocusReleased;
             }
             if (e.NewValue is BrowserTabViewModel tab)
             {
                 tab.RequestRename += OnRequestRename;
                 tab.RequestSelect += OnRequestSelect;
                 tab.RequestFocusList += OnRequestFocusList;
+                tab.SessionFocusReleased += OnSessionFocusReleased;
             }
         };
     }
@@ -74,6 +76,10 @@ public partial class BrowserTabView : UserControl
     {
         Dispatcher.BeginInvoke(() => List.ScrollIntoView(item), System.Windows.Threading.DispatcherPriority.Background);
     }
+
+    /// <summary>Ctrl+Alt+←/→ inside a session hands the keyboard back to RDMan: land on the desktop toolbar.</summary>
+    private void OnSessionFocusReleased(object? sender, EventArgs e)
+        => Dispatcher.BeginInvoke(() => { DesktopFocusTarget.Focus(); Keyboard.Focus(DesktopFocusTarget); }, System.Windows.Threading.DispatcherPriority.Input);
 
     private void OnRequestFocusList(object? sender, EventArgs e) => Dispatcher.BeginInvoke(FocusList, System.Windows.Threading.DispatcherPriority.Input);
 
@@ -565,6 +571,20 @@ public partial class BrowserTabView : UserControl
     {
         if (sender is FrameworkElement { Tag: ServerNodeViewModel s })
             Main?.OpenServer(s, (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current);
+    }
+
+    private void CardFiles_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true; // don't also trigger the card's default action
+        if (sender is FrameworkElement { Tag: ServerNodeViewModel s })
+            Main?.OpenFiles(s, (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current);
+    }
+
+    private void CardDesktop_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is FrameworkElement { Tag: ServerNodeViewModel s })
+            Main?.OpenDesktop(s, (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current);
     }
 
     private void Card_MouseDown(object sender, MouseButtonEventArgs e)

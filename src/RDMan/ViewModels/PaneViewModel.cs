@@ -26,12 +26,14 @@ public sealed partial class PaneViewModel : ObservableObject
     partial void OnSelectedTabChanged(BrowserTabViewModel? value)
     {
         value?.EnsureStarted(); // background tabs load lazily on first view
+        foreach (var t in Tabs) t.NotifySessionVisibility();
         _main.OnPaneTabChanged(this);
     }
 
-    public BrowserTabViewModel AddTab(Location location, bool select = true, int? index = null)
+    public BrowserTabViewModel AddTab(Location location, bool select = true, int? index = null, Action<BrowserTabViewModel>? configure = null)
     {
         var tab = new BrowserTabViewModel(_main, this, location);
+        configure?.Invoke(tab); // before selection: selecting starts the tab
         if (index is { } i && i >= 0 && i <= Tabs.Count) Tabs.Insert(i, tab);
         else Tabs.Add(tab);
         if (select) SelectedTab = tab;
@@ -52,10 +54,12 @@ public sealed partial class PaneViewModel : ObservableObject
         if (tab is null) return;
         var index = Tabs.IndexOf(tab);
         if (index < 0) return;
+        if (!tab.ConfirmLeaveDesktop()) return;
         if (Tabs.Count == 1)
         {
             // Never leave a pane empty: closing the last tab resets it to Home (like a browser's new-tab page).
             if (tab.Current is HomeLocation) return;
+            tab.Session?.Disconnect(); // already confirmed above; don't ask twice
             _ = tab.NavigateAsync(new HomeLocation());
             return;
         }

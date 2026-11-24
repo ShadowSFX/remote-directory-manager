@@ -41,8 +41,13 @@ public sealed class ConnectionService
 
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2.5);
 
-    /// <summary>TCP connect to port 445. Returns latency in ms, or null when unreachable.</summary>
-    public static async Task<int?> ProbeAsync(string host, TimeSpan timeout, CancellationToken ct)
+    public const int SmbPort = 445;
+
+    /// <summary>TCP connect to port 445 (SMB). Returns latency in ms, or null when unreachable.</summary>
+    public static Task<int?> ProbeAsync(string host, TimeSpan timeout, CancellationToken ct) => ProbeAsync(host, SmbPort, timeout, ct);
+
+    /// <summary>TCP connect to <paramref name="port"/>. Returns latency in ms, or null when unreachable.</summary>
+    public static async Task<int?> ProbeAsync(string host, int port, TimeSpan timeout, CancellationToken ct)
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
@@ -51,7 +56,7 @@ public sealed class ConnectionService
         {
             // Dual-mode socket: handles IPv4, IPv6 and host names (all resolved addresses are tried).
             using var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            await socket.ConnectAsync(host, 445, cts.Token).ConfigureAwait(false);
+            await socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
             return (int)Math.Max(1, sw.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
