@@ -119,6 +119,20 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     public ServerAction DefaultAction => Server.EffectiveDefaultAction;
     public bool IsFavorite => Server.IsFavorite;
 
+    private System.Windows.Media.ImageSource? _thumbnail;
+
+    /// <summary>Last picture of this server's remote desktop while connected (null otherwise).</summary>
+    public System.Windows.Media.ImageSource? Thumbnail
+    {
+        get => _thumbnail;
+        set
+        {
+            if (ReferenceEquals(_thumbnail, value)) return;
+            _thumbnail = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Reachability of the SMB port (445).</summary>
     public HostHealth FilesHealth => _filesHealth;
 

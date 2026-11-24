@@ -173,6 +173,17 @@ public partial class SidebarView : UserControl
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Tree.Ctx.NewServerHere", "\uE710", Vm.NewServerCommand, node));
             menu.Items.Add(Item("Tree.Ctx.NewGroupHere", "\uE8F4", Vm.NewGroupCommand, node));
+            menu.Items.Add(Item("Tree.Ctx.BulkAddHere", "", Vm.BulkAddCommand, node));
+            if (node is GroupNodeViewModel group)
+            {
+                var desktops = group.AllServers().Count(x => x.HasDesktop);
+                var live = Vm.ConnectedDesktops(group);
+                if (desktops > 0 || live > 0) menu.Items.Add(new Separator());
+                if (desktops > 0)
+                    menu.Items.Add(new MenuItem { Header = Loc.F("Tree.Ctx.ConnectDesktops", desktops), Tag = "", Command = Vm.ConnectGroupDesktopsCommand, CommandParameter = group });
+                if (live > 0)
+                    menu.Items.Add(new MenuItem { Header = Loc.F("Tree.Ctx.DisconnectDesktops", live), Tag = "", Command = Vm.DisconnectGroupDesktopsCommand, CommandParameter = group });
+            }
         }
         menu.Items.Add(Item("Tree.Ctx.MoveUp", "\uE74A", Vm.MoveUpCommand, node, "Alt+↑"));
         menu.Items.Add(Item("Tree.Ctx.MoveDown", "\uE74B", Vm.MoveDownCommand, node, "Alt+↓"));

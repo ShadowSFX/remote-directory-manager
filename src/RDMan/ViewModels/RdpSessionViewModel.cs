@@ -37,6 +37,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private bool _promptedAfterFailure;
     private bool _disposed;
     private readonly System.Windows.Threading.DispatcherTimer _sizeWatch = new();
+    private readonly System.Windows.Threading.DispatcherTimer _thumbTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private int _resizeAttempts;
     private bool _resizeConfirmed; // the server applied a live resolution change at least once this session
     private (int W, int H)? _connectSize;
@@ -48,6 +49,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         Server = server;
         Loc.Instance.LanguageChanged += OnLanguageChanged;
         _sizeWatch.Tick += SizeWatch_Tick;
+        _thumbTimer.Tick += (_, _) => CaptureThumbnail();
     }
 
     public ServerNodeViewModel Server { get; }
@@ -319,6 +321,17 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         _connectSize = RemoteSize();
         WatchSize();
         _promptedAfterFailure = false;
+        _thumbTimer.Start();
+    }
+
+    /// <summary>
+    /// Refreshes the server's thumbnail (Connected view) while the session is on screen; a hidden session isn't
+    /// rendered by Windows, so the last picture stays until it's shown again.
+    /// </summary>
+    private void CaptureThumbnail()
+    {
+        if (!IsConnected || _control is null || Host is not { IsVisible: true }) return;
+        if (Services.WindowSnapshot.Capture(_control.Handle, 480) is { } picture) Server.Thumbnail = picture;
     }
 
     private void OnDisconnected(RoyalApps.Community.Rdp.WinForms.Controls.Events.DisconnectedEventArgs e)
@@ -516,6 +529,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private void TearDown()
     {
         _sizeWatch.Stop();
+        _thumbTimer.Stop();
+        Server.Thumbnail = null;
         var control = _control;
         var host = Host;
         _control = null;

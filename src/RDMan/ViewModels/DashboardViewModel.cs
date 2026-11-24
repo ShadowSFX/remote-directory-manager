@@ -28,10 +28,11 @@ public sealed partial class DashboardViewModel : ObservableObject
 
     /// <summary>A flat list of servers (a view or a smart group), each card captioned with its group.</summary>
     public DashboardViewModel(string title, DashboardKind kind, IReadOnlyList<ServerNodeViewModel> servers, string emptyTitle, string emptyBody,
-        SmartGroupViewModel? smart = null)
+        SmartGroupViewModel? smart = null, bool thumbnails = false)
     {
         Title = title;
         Kind = kind;
+        ShowThumbnails = thumbnails;
         Smart = smart;
         EmptyTitle = emptyTitle;
         EmptyBody = emptyBody;
@@ -78,6 +79,8 @@ public sealed partial class DashboardViewModel : ObservableObject
     public bool CanEdit => Kind is DashboardKind.Group or DashboardKind.Smart;
     /// <summary>When empty, the onboarding card carries "New server" instead.</summary>
     public bool ShowNewServer => IsTreeDashboard && !IsEmpty;
+    /// <summary>Connected view: big cards with a picture of each remote desktop.</summary>
+    public bool ShowThumbnails { get; }
     public string EmptyTitle { get; }
     public string EmptyBody { get; }
     public ObservableCollection<DashboardSection> Sections { get; }

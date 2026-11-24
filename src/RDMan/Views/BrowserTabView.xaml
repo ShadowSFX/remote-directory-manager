@@ -166,6 +166,52 @@
                 </Grid>
             </Button>
         </DataTemplate>
+        <!-- Connected view: a picture of the remote desktop (refreshed while it's on screen) above the identity -->
+        <DataTemplate x:Key="SessionCard" DataType="{x:Type vm:ServerNodeViewModel}">
+            <Button Width="320" Height="246" Margin="0,0,12,12" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                    Style="{StaticResource Btn.Base}" Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+                    ui:Ui.CornerRadius="8" Click="SessionCard_Click" Tag="{Binding}" AutomationProperties.Name="{Binding Name}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="180" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Border CornerRadius="7,7,0,0" Background="{DynamicResource Bg.Base}" ClipToBounds="True">
+                        <Grid>
+                            <!-- No picture yet (or files only): what the server offers -->
+                            <TextBlock FontSize="28" Foreground="{DynamicResource Fg.Tertiary}"
+                                       Visibility="{Binding Thumbnail, Converter={StaticResource VisIfAny}, ConverterParameter=invert}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                        <Setter Property="Text" Value="&#xE7F4;" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasDesktop}" Value="False">
+                                                <Setter Property="Text" Value="&#xE8B7;" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" VerticalAlignment="Top" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Grid>
+                    </Border>
+                    <Grid Grid.Row="1" Margin="0,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="4" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border CornerRadius="0,0,0,7" Background="{Binding ColorBrush, Converter={StaticResource BrushOr}, ConverterParameter=Line.Strong}" />
+                        <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg.Primary}" />
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                                <Ellipse Style="{StaticResource StatusDot}" />
+                                <TextBlock Text="{Binding PrimaryStatusText}" Style="{StaticResource Text.Caption}" Margin="7,0,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Button>
+        </DataTemplate>
     </UserControl.Resources>
 
     <Grid x:Name="RootGrid">
@@ -609,7 +655,17 @@
                                 <StackPanel Margin="0,0,0,14">
                                     <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Section}" FontSize="12.5" Margin="0,0,0,10"
                                                Visibility="{Binding HasTitle, Converter={StaticResource Vis}}" />
-                                    <ItemsControl ItemsSource="{Binding Servers}" ItemTemplate="{StaticResource ServerCard}">
+                                    <ItemsControl ItemsSource="{Binding Servers}">
+                                        <ItemsControl.Style>
+                                            <Style TargetType="ItemsControl">
+                                                <Setter Property="ItemTemplate" Value="{StaticResource ServerCard}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding DataContext.Dashboard.ShowThumbnails, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="True">
+                                                        <Setter Property="ItemTemplate" Value="{StaticResource SessionCard}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ItemsControl.Style>
                                         <ItemsControl.ItemsPanel>
                                             <ItemsPanelTemplate>
                                                 <WrapPanel />

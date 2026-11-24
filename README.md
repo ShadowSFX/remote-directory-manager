@@ -30,6 +30,7 @@
 - **Paneles como VS Code.** Arrastra una pestaña (o un servidor del árbol) al borde de un panel para dividirlo a ese lado, al centro para moverla ahí, o a una tira de pestañas para reordenar. Tantos paneles como quepan, en filas y columnas; un escritorio remoto se mueve entre paneles sin desconectarse. `F3` divide a la derecha y el diseño se recuerda al reabrir.
 - **Estado en vivo.** Cada servidor muestra si responden sus archivos (puerto 445) y su escritorio (puerto RDP), con la latencia real; los grupos se ven como tarjetas.
 - **`Ctrl+K`** para saltar a cualquier servidor por nombre, IP, etiqueta o grupo.
+- **Agregar varios servidores a la vez** con patrones (`web[1-5]`, `db[01-10]`, `10.0.0.[20-24]`, `{api,auth}.corp.local`) y vista previa; **conectar o desconectar todos los escritorios de un grupo** desde su menú; la vista **Conectados** muestra una miniatura de cada escritorio.
 - **Vistas**: Favoritos (marca la estrella de un servidor), Recientes y Conectados, más **grupos inteligentes**: búsquedas guardadas por nombre, dirección, etiqueta, grupo o notas que se actualizan solas.
 - **Importa** tus archivos de **RDCMan (`.rdg`)** —grupos, servidores, credenciales (las contraseñas se recuperan si las guardaste con tu usuario), opciones y grupos inteligentes—, los escritorios remotos que Windows ya tiene guardados, las conexiones de `net use` o una colección `.rdm`.
 - **Errores SMB explicados**: invitado bloqueado por Windows 11, sesión con otro usuario (error 1219), puerto 445 bloqueado, credenciales incorrectas… con la acción para resolverlos.

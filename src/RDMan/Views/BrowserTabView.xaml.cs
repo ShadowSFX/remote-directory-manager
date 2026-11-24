@@ -678,6 +678,14 @@ public partial class BrowserTabView : UserControl
         menu.Items.Add(Item("Tree.Ctx.Properties", "", main.EditCommand));
     }
 
+    /// <summary>Connected view: jump to the live desktop when there is one, otherwise open the server as usual.</summary>
+    private void SessionCard_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ServerNodeViewModel s } || Main is not { } main) return;
+        if (s.Thumbnail is not null && s.HasDesktop) main.OpenDesktop(s, OpenTarget.Current);
+        else main.OpenServer(s, OpenTarget.Current);
+    }
+
     private void CardStar_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: ServerNodeViewModel s }) Main?.ToggleFavorite(s);

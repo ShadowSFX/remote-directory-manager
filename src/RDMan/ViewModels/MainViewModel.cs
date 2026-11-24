@@ -733,6 +733,44 @@ public sealed partial class MainViewModel : ObservableObject
         return group;
     }
 
+    /// <summary>Opens the remote desktop of every server in a group (one tab each, reusing open ones).</summary>
+    [RelayCommand]
+    private void ConnectGroupDesktops(GroupNodeViewModel? group)
+    {
+        if (group is null) return;
+        var servers = group.AllServers().Where(s => s.HasDesktop).ToList();
+        if (servers.Count == 0) return;
+        if (servers.Count > 8 && !Dialogs.Confirm(Owner, Loc.T("Group.ConnectDesktops"), Loc.F("Group.ConfirmConnectMany", servers.Count, group.Name),
+                Loc.T("Desktop.Connect"), danger: false))
+            return;
+        foreach (var s in servers) OpenDesktop(s, OpenTarget.NewTab);
+    }
+
+    /// <summary>Disconnects every live desktop session of a group's servers (after one confirmation).</summary>
+    [RelayCommand]
+    private void DisconnectGroupDesktops(GroupNodeViewModel? group)
+    {
+        if (group is null) return;
+        var servers = group.AllServers().ToHashSet();
+        var tabs = AllTabs.Where(t => t.Session is { IsConnected: true } s && servers.Contains(s.Server)).ToList();
+        if (tabs.Count == 0 || !ConfirmEndSessions(tabs)) return;
+        foreach (var t in tabs) t.Session?.Disconnect();
+    }
+
+    /// <summary>Live desktop sessions among a group's servers (for its context menu).</summary>
+    public int ConnectedDesktops(GroupNodeViewModel group)
+    {
+        var servers = group.AllServers().ToHashSet();
+        return AllTabs.Count(t => t.Session is { IsConnected: true } s && servers.Contains(s.Server));
+    }
+
+    [RelayCommand]
+    private void BulkAdd(GroupNodeViewModel? parent)
+    {
+        var count = Dialogs.ShowBulkAdd(Owner, new BulkAddViewModel(this, parent ?? SelectedGroupForNew()));
+        if (count > 0) Toasts.Show(Loc.F("Toast.BulkAdded", count), ToastKind.Success);
+    }
+
     /// <summary>Adds several new servers under one group (bulk add) and shows them.</summary>
     public void AddServers(GroupNodeViewModel? parent, IReadOnlyList<ServerNode> servers)
     {

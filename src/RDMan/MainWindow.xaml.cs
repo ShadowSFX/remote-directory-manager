@@ -482,6 +482,7 @@ public partial class MainWindow : Window
         MenuItem Item(string key, string glyph, ICommand cmd, string? gesture = null)
             => new() { Header = Loc.T(key), Tag = glyph, Command = cmd, InputGestureText = gesture ?? "" };
         menu.Items.Add(Item("Menu.NewServer", "", _vm.NewServerCommand, "Ctrl+N"));
+        menu.Items.Add(Item("Menu.BulkAdd", "", _vm.BulkAddCommand));
         menu.Items.Add(Item("Menu.NewGroup", "", _vm.NewGroupCommand, "Ctrl+Shift+G"));
         menu.Items.Add(Item("Menu.Profiles", "", _vm.ManageProfilesCommand));
         menu.Items.Add(new Separator());

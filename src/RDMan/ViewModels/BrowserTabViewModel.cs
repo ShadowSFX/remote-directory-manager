@@ -405,7 +405,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
                 return;
             case ViewLocation v:
                 ShowDashboard(new DashboardViewModel(MainViewModel.ViewTitle(v.View), DashboardKind.View, _main.ViewServers(v.View),
-                    Loc.T($"View.Empty.{v.View}.Title"), Loc.T($"View.Empty.{v.View}.Body")));
+                    Loc.T($"View.Empty.{v.View}.Title"), Loc.T($"View.Empty.{v.View}.Body"), thumbnails: v.View == MainViewModel.ViewConnected));
                 return;
             case SmartGroupLocation sl:
                 if (_main.FindSmartGroup(sl.SmartGroupId) is not { } smart)
