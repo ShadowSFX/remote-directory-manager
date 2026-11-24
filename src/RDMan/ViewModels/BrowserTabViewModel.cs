@@ -357,6 +357,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
                     Session = new RdpSessionViewModel(_main, Server);
                     Session.PropertyChanged += OnSessionChanged;
                     Session.FocusReleased += OnSessionFocusReleased;
+                    Session.Activated += OnSessionActivated;
                 }
                 Mode = TabMode.Desktop;
                 EndLoading();
@@ -631,6 +632,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         if (Session is null) return;
         Session.PropertyChanged -= OnSessionChanged;
         Session.FocusReleased -= OnSessionFocusReleased;
+        Session.Activated -= OnSessionActivated;
         Session.Dispose();
         Session = null;
     }
@@ -647,6 +649,12 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     private void OnSessionFocusReleased(object? sender, EventArgs e) => SessionFocusReleased?.Invoke(this, EventArgs.Empty);
 
+    // Clicks inside the remote desktop never reach WPF's mouse events: activate the pane from the session's focus.
+    private void OnSessionActivated(object? sender, EventArgs e)
+    {
+        if (!ReferenceEquals(_main.ActivePane, Pane)) _main.Activate(Pane);
+    }
+
     partial void OnModeChanged(TabMode value) => NotifySessionVisibility();
 
     partial void OnSessionChanged(RdpSessionViewModel? value) => NotifySessionVisibility();
@@ -662,6 +670,13 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     public void RefreshIdentity()
     {
         Server = ResolveServer();
+        if (Current is DesktopLocation && Server is null)
+        {
+            // The server was deleted: end its session and leave (LoadAsync sends a desktop without a server Home).
+            EndSession();
+            _ = LoadAsync();
+            return;
+        }
         UpdateConnectedAs();
         RebuildBreadcrumb();
         NotifyChrome();

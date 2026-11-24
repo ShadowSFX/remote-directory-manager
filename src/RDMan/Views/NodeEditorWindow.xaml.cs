@@ -77,4 +77,11 @@ public partial class NodeEditorWindow : DialogWindow
         }
         menu.IsOpen = true;
     }
+
+    private void AddressBox_LostFocus(object sender, RoutedEventArgs e)
+        => (AddressBox.DataContext as ServerEditorViewModel)?.CommitAddress();
+
+    /// <summary>A pasted "\host\shareolder" or "host:port" is split right away (after the text lands in the box).</summary>
+    private void AddressBox_Pasting(object sender, DataObjectPastingEventArgs e)
+        => Dispatcher.BeginInvoke(() => (AddressBox.DataContext as ServerEditorViewModel)?.CommitAddress(), System.Windows.Threading.DispatcherPriority.Input);
 }

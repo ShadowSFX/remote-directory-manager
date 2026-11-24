@@ -31,7 +31,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private RdpControl? _control;
     private EventHandler<RoyalApps.Community.Rdp.WinForms.Controls.Events.ConnectedEventArgs>? _connectedHandler;
     private EventHandler<RoyalApps.Community.Rdp.WinForms.Controls.Events.DisconnectedEventArgs>? _disconnectedHandler;
-    private PromptedCredential? _sessionCredential; // typed for this session only ("Remember" off)
+    // Typed for this session only ("Remember" off). Kept DPAPI-protected, and only while the server's configured
+    // desktop credential is still the one it replaced: editing the server/group/profile drops it.
+    private (string User, string? ProtectedPassword, string Basis)? _sessionCredential;
     private bool _promptedAfterFailure;
     private bool _disposed;
 
@@ -63,6 +65,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the user presses the release-focus hotkey inside the session (Ctrl+Alt+←/→).</summary>
     public event EventHandler? FocusReleased;
 
+    /// <summary>Raised when the session takes the keyboard (a click inside the remote desktop), so its pane becomes active.</summary>
+    public event EventHandler? Activated;
+
     // ───────────── Connect ─────────────
     [RelayCommand]
     public void Connect()
@@ -73,6 +78,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             ShowError(Loc.T("RdpErr.Generic.Title"), Loc.F("Desktop.NotEnabled", Server.Name), "", RdpErrorAction.None);
             return;
         }
+        // One session per server: a second one with the same account would kick the first ("replaced by another connection").
+        if (_main.RevealOtherSession(this)) return;
 
         var credential = BuildCredential(out var cancelled);
         if (cancelled) return;
@@ -88,9 +95,11 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         control.OnConnected += _connectedHandler;
         control.OnDisconnected += _disconnectedHandler;
         control.RdpClientConfigured += OnClientConfigured;
+        control.Enter += OnControlEnter;
         _control = control;
 
         var host = new WindowsFormsHost { Child = control, Focusable = true };
+        host.IsKeyboardFocusWithinChanged += OnHostFocusWithinChanged;
         // The ActiveX needs a window handle: connect once the host is in the visual tree.
         void OnLoaded(object? s, System.Windows.RoutedEventArgs e)
         {
@@ -121,9 +130,12 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private ConnectCredential BuildCredential(out bool cancelled)
     {
         cancelled = false;
-        if (_sessionCredential is { } typed) return Split(typed.Username, typed.Password);
-
         var eff = _svc.State.ResolveDesktopCredential(Server.Model);
+        if (_sessionCredential is { } typed)
+        {
+            if (typed.Basis == BasisOf(eff)) return Split(typed.User, _svc.State.Secrets.TryUnprotect(typed.ProtectedPassword));
+            _sessionCredential = null; // the server's credential changed since it was typed
+        }
         switch (eff.Kind)
         {
             case EffectiveCredentialKind.Explicit:
@@ -144,16 +156,23 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private static ConnectCredential Split(string user, string? password)
     {
         var (u, d) = CredentialResolver.SplitUser(user);
-        return new ConnectCredential(u, d, password);
+        // An empty password means "none": let CredSSP use the saved Windows credential for that user.
+        return new ConnectCredential(u, d, string.IsNullOrEmpty(password) ? null : password);
     }
+
+    private static string BasisOf(EffectiveCredential eff)
+        => $"{eff.Kind}|{eff.Username}|{eff.ProtectedPassword}|{eff.Profile?.Id}|{eff.SourceNode?.Id}|{eff.IsMisconfigured}";
 
     private ConnectCredential Prompt(string? user, out bool cancelled)
     {
-        var dlg = new CredentialPromptWindow(Server.Name, $"{Server.Host}:{Server.DesktopPort}", Server.ColorBrush, user);
+        // "Remember" stores the account on this server; say so when that replaces an inherited or shared one.
+        var overrides = Server.Model.DesktopCredentials.Mode != CredentialMode.Custom;
+        var dlg = new CredentialPromptWindow(Server.Name, $"{Server.Host}:{Server.DesktopPort}", Server.ColorBrush, user, overrides);
         if (Dialogs.Show(dlg, _main.Owner) != true || dlg.Result is null)
         {
             cancelled = true;
-            if (State != DesktopState.Connected) State = DesktopState.Idle;
+            // Keep an error panel if one is showing (never stack the error and idle panels).
+            if (State is DesktopState.Connecting) State = DesktopState.Idle;
             return new ConnectCredential(null, null, null);
         }
         cancelled = false;
@@ -169,7 +188,11 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             _svc.State.MarkDirty();
             _sessionCredential = null;
         }
-        else _sessionCredential = r;
+        else
+        {
+            var eff = _svc.State.ResolveDesktopCredential(Server.Model);
+            _sessionCredential = (r.Username, r.Password.Length == 0 ? null : _svc.State.Secrets.Protect(r.Password), BasisOf(eff));
+        }
         return Split(r.Username, r.Password);
     }
 
@@ -185,7 +208,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
 
         cfg.Credentials.Username = credential.User;
         cfg.Credentials.Domain = credential.Domain;
-        if (credential.Password is not null) cfg.Credentials.Password = new SensitiveString(credential.Password);
+        if (!string.IsNullOrEmpty(credential.Password)) cfg.Credentials.Password = new SensitiveString(credential.Password);
         cfg.Credentials.NetworkLevelAuthentication = s.NetworkLevelAuthentication.Value;
 
         // Fixes RDCMan's biggest pain: resizing the tab/window changes the remote resolution, no reconnect.
@@ -234,6 +257,13 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             ax.OnFocusReleased += (_, _) => FocusReleased?.Invoke(this, EventArgs.Empty);
     }
 
+    private void OnControlEnter(object? sender, EventArgs e) => Activated?.Invoke(this, EventArgs.Empty);
+
+    private void OnHostFocusWithinChanged(object? sender, System.Windows.DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is true) Activated?.Invoke(this, EventArgs.Empty);
+    }
+
     // ───────────── Events ─────────────
     private void OnConnected(RoyalApps.Community.Rdp.WinForms.Controls.Events.ConnectedEventArgs e)
     {
@@ -250,7 +280,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         var t = RdpErrorTranslator.Translate(e.DisconnectCode, e.ExtendedDisconnectReasonCode ?? 0);
         if (!t.IsError || e.UserInitiated)
         {
+            // Signed out / closed on the server: release the ActiveX now instead of keeping it until the tab closes.
             State = DesktopState.Idle;
+            TearDown();
             return;
         }
 
@@ -259,16 +291,15 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         {
             _promptedAfterFailure = true;
             _sessionCredential = null;
+            // Show the error underneath right away; the prompt may be cancelled.
+            ShowTranslated(t, e.Description);
             System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
             {
+                // The tab may have been closed, or the user already reconnected, while this was queued.
+                if (_disposed || State != DesktopState.Error) return;
                 var user = _svc.State.ResolveDesktopCredential(Server.Model).Username ?? WindowsCredentialLookup.FindUser(Server.Host);
-                var cred = Prompt(user, out var cancelled);
-                if (cancelled) ShowTranslated(t, e.Description);
-                else
-                {
-                    _sessionCredential ??= new PromptedCredential(cred.Domain is null ? cred.User! : $@"{cred.Domain}\{cred.User}", cred.Password ?? "", false);
-                    Connect();
-                }
+                Prompt(user, out var cancelled);
+                if (!cancelled) Connect(); // Prompt stored the account (on the server, or for this session)
             });
             return;
         }
@@ -305,8 +336,6 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     public void Disconnect()
     {
         if (_control is null) return;
-        try { _control.Disconnect(); }
-        catch (COMException ex) { App.Log(ex); }
         State = DesktopState.Idle;
         TearDown();
     }
@@ -314,6 +343,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Reconnect()
     {
+        // The toolbar's Reconnect is where the keyboard lands after Ctrl+Alt+←: never drop a live session on a stray Enter.
+        if (IsConnected && !Dialogs.Confirm(_main.Owner, Loc.T("Desktop.Reconnect"), Loc.F("Desktop.ConfirmReconnect", Server.Name), Loc.T("Desktop.Reconnect"), danger: false))
+            return;
         _promptedAfterFailure = false;
         Connect();
     }
@@ -328,7 +360,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             Prompt(user, out var cancelled);
             if (cancelled) return;
         }
-        Reconnect();
+        _promptedAfterFailure = false;
+        Connect();
     }
 
     /// <summary>Sends Ctrl+Alt+Del to the server (scancodes: Ctrl 0x1D, Alt 0x38, Del 0x53 extended).</summary>
@@ -376,6 +409,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             if (_connectedHandler is not null) control.OnConnected -= _connectedHandler;
             if (_disconnectedHandler is not null) control.OnDisconnected -= _disconnectedHandler;
             control.RdpClientConfigured -= OnClientConfigured;
+            control.Enter -= OnControlEnter;
             try
             {
                 if (control.RdpClient?.ConnectionState is RoyalApps.Community.Rdp.WinForms.Controls.Clients.ConnectionState.Connected
@@ -384,6 +418,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             }
             catch (COMException ex) { App.Log(ex); }
         }
+        if (host is not null) host.IsKeyboardFocusWithinChanged -= OnHostFocusWithinChanged;
         Host = null;
         // Dispose after the host left the visual tree, so WPF never renders a dead HWND.
         System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>

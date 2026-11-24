@@ -9,7 +9,7 @@ public sealed record PromptedCredential(string Username, string Password, bool R
 /// <summary>"Sign in to …" — asked when a desktop has no usable credential, or Windows rejected the saved one.</summary>
 public partial class CredentialPromptWindow : DialogWindow
 {
-    public CredentialPromptWindow(string serverName, string address, Brush? identity, string? username)
+    public CredentialPromptWindow(string serverName, string address, Brush? identity, string? username, bool rememberOverrides = false)
     {
         InitializeComponent();
         Title = Loc.F("CredPrompt.Title", serverName);
@@ -19,6 +19,7 @@ public partial class CredentialPromptWindow : DialogWindow
         if (identity is not null) IdentityBar.Background = identity;
         else IdentityBar.SetResourceReference(BackgroundProperty, "Line.Strong");
         UserBox.Text = username ?? "";
+        if (rememberOverrides) StoredText.Text = Loc.T("CredPrompt.RememberOverrides") + " " + Loc.T("Cred.Stored");
         Loaded += (_, _) =>
         {
             if (string.IsNullOrEmpty(UserBox.Text)) UserBox.Focus();

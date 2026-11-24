@@ -264,6 +264,11 @@ public sealed partial class MainViewModel : ObservableObject
             Description = s.Server.Description,
             Tags = s.Server.Tags.ToList(),
             Credentials = s.Server.Credentials.Clone(),
+            Files = s.Server.Files,
+            Desktop = s.Server.Desktop is { } d ? new DesktopEndpoint { Enabled = d.Enabled, Port = d.Port } : null,
+            DefaultAction = s.Server.DefaultAction,
+            DesktopCredentials = s.Server.DesktopCredentials.Clone(),
+            Rdp = s.Server.Rdp.Clone(),
         };
         var vm = CreateVm(copy, s.Parent);
         Insert(vm, s.Parent, ChildrenOf(s.Parent).IndexOf(s) + 1);
@@ -347,8 +352,7 @@ public sealed partial class MainViewModel : ObservableObject
         var existing = FindTab(t => t.Current is DesktopLocation d && d.ServerId == server.Model.Id);
         if (existing is { } hit)
         {
-            Activate(hit.Pane);
-            hit.Pane.SelectedTab = hit.Tab;
+            Reveal(hit.Pane, hit.Tab);
             if (hit.Tab.Session is { IsConnected: false, IsBusy: false } idle) idle.Connect();
             else hit.Tab.Session?.Focus();
             return;
@@ -393,6 +397,41 @@ public sealed partial class MainViewModel : ObservableObject
         if (view == ServerAction.Desktop) OpenDesktop(server, OpenTarget.NewTab);
         else OpenInNewTab(new FolderLocation(server.RootPath), pane);
     }
+
+    /// <summary>Shows a tab wherever it lives — reopening the split view if the tab sits in the hidden right pane.</summary>
+    private void Reveal(PaneViewModel pane, BrowserTabViewModel tab)
+    {
+        if (ReferenceEquals(pane, Right) && !IsSplit) ToggleSplit();
+        Activate(pane);
+        pane.SelectedTab = tab;
+    }
+
+    /// <summary>
+    /// One session per server: if another tab already has a session with this server connecting or connected,
+    /// show that tab instead of starting a second session (it would sign the first one out).
+    /// </summary>
+    public bool RevealOtherSession(RdpSessionViewModel session)
+    {
+        var hit = FindTab(t => t.Session is { State: DesktopState.Connecting or DesktopState.Connected } s
+                               && !ReferenceEquals(s, session) && ReferenceEquals(s.Server, session.Server));
+        if (hit is not { } h) return false;
+        Reveal(h.Pane, h.Tab);
+        Toasts.Show(Loc.F("Desktop.AlreadyOpen", session.Server.Name));
+        return true;
+    }
+
+    /// <summary>Asks once before ending the connected desktop sessions among <paramref name="tabs"/>.</summary>
+    public bool ConfirmEndSessions(IEnumerable<BrowserTabViewModel> tabs)
+    {
+        var live = tabs.Where(t => t.Session is { IsConnected: true }).ToList();
+        if (live.Count == 0) return true;
+        var message = live.Count == 1
+            ? Loc.F("Desktop.ConfirmLeave", live[0].Session!.Server.Name)
+            : Loc.F("Desktop.ConfirmLeaveMany", live.Count);
+        return Dialogs.Confirm(Owner, Loc.T("Desktop.Disconnect"), message, Loc.T("Desktop.Disconnect"), danger: false);
+    }
+
+    public IEnumerable<BrowserTabViewModel> AllTabs => Left.Tabs.Concat(Right.Tabs);
 
     private (PaneViewModel Pane, BrowserTabViewModel Tab)? FindTab(Func<BrowserTabViewModel, bool> match)
     {
@@ -602,7 +641,7 @@ public sealed partial class MainViewModel : ObservableObject
             {
                 var saved = State.Settings.Panes.ElementAtOrDefault(1);
                 if (State.Settings.RestoreTabs && saved is { Tabs.Count: > 0 }) Restore(Right, saved);
-                else Right.AddTab(ActiveTab?.Current ?? new HomeLocation());
+                else Right.AddTab(ActiveTab?.Current is { } cur and not DesktopLocation ? cur : new HomeLocation());
             }
             Activate(Right);
         }
@@ -763,6 +802,8 @@ public sealed partial class MainViewModel : ObservableObject
             Toasts.Show(Loc.T("Update.Busy"));
             return;
         }
+        if (!ConfirmEndSessions(AllTabs)) return;
+        SessionsEndConfirmed = true;
         // Persist tabs/settings first (the relaunched instance restores them), but keep the app fully alive
         // until the swap succeeded: on failure the user simply keeps working.
         SaveSession();
@@ -825,6 +866,8 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var loc = Location.FromSaved(saved.Tabs[i]);
             if (loc is GroupLocation g && FindGroup(g.GroupId) is null) loc = new HomeLocation();
+            if (loc is DesktopLocation d && FindTab(t => t.Current is DesktopLocation o && o.ServerId == d.ServerId) is not null)
+                loc = new HomeLocation(); // one session per server
             // Only the active tab loads right away; the others load when first shown to avoid connecting to every server at startup.
             var tab = pane.AddTab(loc, select: i == saved.ActiveIndex);
             if (i == saved.ActiveIndex) active = tab;
@@ -840,6 +883,9 @@ public sealed partial class MainViewModel : ObservableObject
         s.SplitView = IsSplit;
         State.Flush();
     }
+
+    /// <summary>Set once the user agreed to end the open desktop sessions (so closing doesn't ask twice).</summary>
+    public bool SessionsEndConfirmed { get; set; }
 
     public void PrepareShutdown()
     {

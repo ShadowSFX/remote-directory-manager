@@ -120,6 +120,15 @@ public partial class App : Application
         _main.PrepareShutdown();
     }
 
+    /// <summary>True while Windows is signing out/shutting down: never block that with a confirmation.</summary>
+    public static bool IsWindowsSessionEnding { get; private set; }
+
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        IsWindowsSessionEnding = true;
+        base.OnSessionEnding(e);
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         PrepareShutdown();

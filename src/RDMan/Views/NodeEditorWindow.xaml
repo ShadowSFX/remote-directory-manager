@@ -148,6 +148,7 @@
                     <StackPanel Style="{StaticResource Field}" DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
                         <TextBlock Text="{ui:Tr Server.Address}" Style="{StaticResource Text.Label}" />
                         <TextBox x:Name="AddressBox" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}"
+                                 LostFocus="AddressBox_LostFocus" DataObject.Pasting="AddressBox_Pasting"
                                  ui:Ui.Hint="10.0.0.12" />
                         <TextBlock Text="{ui:Tr Server.AddressHint}" Style="{StaticResource Text.Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
                     </StackPanel>

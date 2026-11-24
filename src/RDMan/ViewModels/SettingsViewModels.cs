@@ -142,6 +142,7 @@ public sealed partial class ProfilesViewModel : ObservableObject
         void Walk(TreeNode n)
         {
             if (n.Credentials.Mode == CredentialMode.Profile && n.Credentials.ProfileId == id) count++;
+            if (n.DesktopCredentials.Mode == CredentialMode.Profile && n.DesktopCredentials.ProfileId == id) count++;
             if (n is GroupNode g) foreach (var c in g.Children) Walk(c);
         }
         foreach (var c in _main.State.Document.Root.Children) Walk(c);
@@ -206,6 +207,8 @@ public sealed partial class ProfilesViewModel : ObservableObject
     {
         if (node.Credentials.Mode == CredentialMode.Profile && node.Credentials.ProfileId == id)
             node.Credentials = new CredentialSettings { Mode = CredentialMode.Inherit };
+        if (node.DesktopCredentials.Mode == CredentialMode.Profile && node.DesktopCredentials.ProfileId == id)
+            node.DesktopCredentials = new CredentialSettings { Mode = CredentialMode.Inherit };
         if (node is GroupNode g) foreach (var c in g.Children) ClearReferences(c, id);
     }
 }

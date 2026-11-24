@@ -437,24 +437,32 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
 
     public override string Title => IsNew ? Loc.T("Server.TitleNew") : Loc.T("Server.TitleEdit");
 
-    /// <summary>Pasting "\\10.0.0.5\www\sub" fills host, share and start folder; "host:3390" turns on the desktop on that port.</summary>
     partial void OnAddressChanged(string value)
     {
         TestResult = null;
+        CheckDuplicate();
+    }
+
+    /// <summary>
+    /// "\\10.0.0.5\www\sub" fills host, share and start folder; "host:3390" turns on the desktop on that port.
+    /// Runs on paste, when the field loses focus and before testing/saving — never per keystroke, or typing
+    /// "10.0.0.5:3390" would split at "10.0.0.5:3".
+    /// </summary>
+    public void CommitAddress()
+    {
+        var value = Address;
         if (value.Contains('\\') || value.Contains('/') || value.StartsWith("smb:", StringComparison.OrdinalIgnoreCase))
         {
             if (UncPath.TryParse(value, out var t, out _) && t is not null)
             {
-                _address = t.Host;
-                OnPropertyChanged(nameof(Address));
+                Address = t.Host;
                 if (t.Share is not null) Share = t.Share;
                 if (t.SubPath is not null) StartFolder = t.SubPath;
             }
         }
         else if (value.Contains(':') && HostPort.TryParse(value, out var host, out var port) && port is { } p)
         {
-            _address = host;
-            OnPropertyChanged(nameof(Address));
+            Address = host;
             DesktopEnabled = true;
             DesktopPort = p.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
@@ -494,6 +502,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
 
     public override bool TryApply()
     {
+        CommitAddress();
         ValidationError = null;
         if (string.IsNullOrWhiteSpace(Name)) return Fail(Loc.T("Server.Validation.Name"), EditorSection.General);
         if (!UncPath.TryParse(Address, out var t, out var err) || t is null)
@@ -532,6 +541,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
     [RelayCommand]
     private async Task Test()
     {
+        CommitAddress();
         ValidationError = null;
         if (!UncPath.TryParse(Address, out var t, out _) || t is null)
         {

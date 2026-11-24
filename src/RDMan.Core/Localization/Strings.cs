@@ -375,6 +375,9 @@ public static partial class Strings
         T("Desktop.Idle.Title", "Escritorio de {0}", "{0} desktop");
         T("Desktop.Idle.Body", "La sesión no está conectada. Al conectar, el escritorio se ajusta solo al tamaño de esta pestaña.", "The session isn't connected. Once connected, the desktop resizes itself to this tab.");
         T("Desktop.ConfirmLeave", "La sesión con {0} sigue conectada. ¿Desconectarla?", "The session with {0} is still connected. Disconnect it?");
+        T("Desktop.ConfirmLeaveMany", "Hay {0} sesiones de escritorio conectadas. ¿Desconectarlas?", "{0} desktop sessions are still connected. Disconnect them?");
+        T("Desktop.ConfirmReconnect", "La sesión con {0} está conectada. ¿Reconectarla? Los programas abiertos en el servidor siguen ahí.", "The session with {0} is connected. Reconnect it? Programs open on the server stay open.");
+        T("Desktop.AlreadyOpen", "{0} ya tiene una sesión abierta en esta pestaña.", "{0} already has a session open in this tab.");
         T("Desktop.SavedWindowsCredential", "la credencial guardada de Windows", "Windows' saved credential");
         T("Desktop.NotEnabled", "{0} no tiene el escritorio remoto activado. Actívalo en Propiedades.", "{0} doesn't have remote desktop turned on. Turn it on in Properties.");
         T("Desktop.Port", "Puerto RDP {0}", "RDP port {0}");
@@ -442,6 +445,7 @@ public static partial class Strings
         T("CredPrompt.Title", "Iniciar sesión en {0}", "Sign in to {0}");
         T("CredPrompt.Body", "Escribe una cuenta de Windows de {0}.", "Enter a Windows account on {0}.");
         T("CredPrompt.Remember", "Recordar para este servidor", "Remember for this server");
+        T("CredPrompt.RememberOverrides", "Al recordarla, este servidor usará esta cuenta en lugar de la que hereda.", "If remembered, this server uses this account instead of the one it inherits.");
         T("CredPrompt.Connect", "Conectar", "Connect");
 
         T("RdpErr.Replaced.Title", "Alguien más abrió esta sesión", "Someone else took over this session");

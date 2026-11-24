@@ -265,6 +265,16 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        // Closing ends every embedded desktop session: ask once (not when Windows itself is signing out).
+        if (!App.IsWindowsSessionEnding && !_vm.SessionsEndConfirmed)
+        {
+            if (!_vm.ConfirmEndSessions(_vm.AllTabs))
+            {
+                e.Cancel = true;
+                return;
+            }
+            _vm.SessionsEndConfirmed = true;
+        }
         var p = _vm.State.Settings.Window;
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
         if (!bounds.IsEmpty)

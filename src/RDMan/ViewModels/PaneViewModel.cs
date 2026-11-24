@@ -73,7 +73,9 @@ public sealed partial class PaneViewModel : ObservableObject
     private void CloseOtherTabs(BrowserTabViewModel? keep)
     {
         keep ??= SelectedTab;
-        foreach (var t in Tabs.Where(t => !ReferenceEquals(t, keep)).ToList())
+        var others = Tabs.Where(t => !ReferenceEquals(t, keep)).ToList();
+        if (!_main.ConfirmEndSessions(others)) return;
+        foreach (var t in others)
         {
             Tabs.Remove(t);
             t.Dispose();
@@ -86,7 +88,11 @@ public sealed partial class PaneViewModel : ObservableObject
     {
         tab ??= SelectedTab;
         if (tab is null) return;
-        AddTab(tab.Current, index: Tabs.IndexOf(tab) + 1);
+        // A second session with the same server would sign the first one out: duplicate its files view instead.
+        var location = tab.Current is DesktopLocation
+            ? tab.Server is { HasFiles: true } s ? new FolderLocation(s.RootPath) : new HomeLocation()
+            : tab.Current;
+        AddTab(location, index: Tabs.IndexOf(tab) + 1);
     }
 
     public void SelectNext(int delta)
