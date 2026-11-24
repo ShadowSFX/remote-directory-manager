@@ -152,13 +152,34 @@ public sealed partial class SshEditorViewModel : ObservableObject
         _startupCommand = p.StartupCommand ?? "";
         BuildOptions(p);
         RefreshInherited();
+        _loaded = true;
     }
 
     public bool IsServer => _isServer;
 
     // ───────────── Capability (servers) ─────────────
 
+    /// <summary>False while the constructor fills the fields: loading a server must never change its capabilities.</summary>
+    private readonly bool _loaded;
+    /// <summary>The user switched the terminal off during this edit: sign-in edits no longer turn it back on.</summary>
+    private bool _turnedOff;
+    /// <summary>The key list is being refilled: a different selection isn't the user's choice.</summary>
+    private bool _rebuildingKeys;
+
     [ObservableProperty] private bool _enabled;
+
+    // Only the user switches it off (CommitAddress and EnableForSignIn only turn it on).
+    partial void OnEnabledChanged(bool value) => _turnedOff = !value;
+
+    /// <summary>
+    /// Sign-in edited on a server whose terminal is off: without the capability those settings are saved but never
+    /// used (no SSH badge, nothing to open), so the edit itself turns the terminal on.
+    /// </summary>
+    private void EnableForSignIn()
+    {
+        if (_isServer && _loaded && !Enabled && !_turnedOff) Enabled = true;
+    }
+
     [ObservableProperty] private string _port;
     [ObservableProperty] private bool _useSshConfig;
     [ObservableProperty] private string? _configPreview;
@@ -169,7 +190,11 @@ public sealed partial class SshEditorViewModel : ObservableObject
 
     partial void OnUseSshConfigChanged(bool value) => UpdatePreview();
     partial void OnPortChanged(string value) => UpdatePreview();
-    partial void OnUsernameChanged(string value) => UpdatePreview();
+    partial void OnUsernameChanged(string value)
+    {
+        UpdatePreview();
+        if (!string.IsNullOrWhiteSpace(value)) EnableForSignIn();
+    }
 
     public void UpdatePreview()
     {
@@ -242,6 +267,11 @@ public sealed partial class SshEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsInherit), nameof(IsAuto), nameof(IsKey), nameof(IsPassword), nameof(IsAgent))]
     private SshAuthMode _authMode;
 
+    partial void OnAuthModeChanged(SshAuthMode value)
+    {
+        if (value != SshAuthMode.Inherit) EnableForSignIn();
+    }
+
     public bool IsInherit { get => AuthMode == SshAuthMode.Inherit; set { if (value) AuthMode = SshAuthMode.Inherit; } }
     public bool IsAuto { get => AuthMode == SshAuthMode.Auto; set { if (value) AuthMode = SshAuthMode.Auto; } }
     public bool IsKey { get => AuthMode == SshAuthMode.Key; set { if (value) AuthMode = SshAuthMode.Key; } }
@@ -253,19 +283,41 @@ public sealed partial class SshEditorViewModel : ObservableObject
     [ObservableProperty] private string? _inheritText;
 
     /// <summary>Typed in the editor's PasswordBox (null = keep the stored one).</summary>
-    public string? NewPassword { get; set; }
+    public string? NewPassword
+    {
+        get => _newPassword;
+        set
+        {
+            _newPassword = value;
+            if (!string.IsNullOrEmpty(value)) EnableForSignIn();
+        }
+    }
+    private string? _newPassword;
 
     [ObservableProperty] private bool _hasStoredPassword;
 
     public ObservableCollection<KeyChoice> Keys { get; } = new();
     [ObservableProperty] private KeyChoice? _selectedKey;
 
+    partial void OnSelectedKeyChanged(KeyChoice? value)
+    {
+        if (value is not null && IsKey && !_rebuildingKeys) EnableForSignIn();
+    }
+
     private void RebuildKeys(Guid? select)
     {
-        Keys.Clear();
-        foreach (var k in _main.State.Document.SshKeys.OrderBy(k => k.Name, StringComparer.CurrentCultureIgnoreCase))
-            Keys.Add(new KeyChoice(k, k.Name, $"{Fingerprint.ShortType(k.Algorithm)} {k.Bits} · {k.Fingerprint}"));
-        SelectedKey = Keys.FirstOrDefault(k => k.Key?.Id == select) ?? (Keys.Count > 0 ? Keys[0] : null);
+        _rebuildingKeys = true;
+        try
+        {
+            Keys.Clear();
+            foreach (var k in _main.State.Document.SshKeys.OrderBy(k => k.Name, StringComparer.CurrentCultureIgnoreCase))
+                Keys.Add(new KeyChoice(k, k.Name, $"{Fingerprint.ShortType(k.Algorithm)} {k.Bits} · {k.Fingerprint}"));
+            SelectedKey = Keys.FirstOrDefault(k => k.Key?.Id == select) ?? (Keys.Count > 0 ? Keys[0] : null);
+        }
+        finally
+        {
+            _rebuildingKeys = false;
+        }
         OnPropertyChanged(nameof(HasKeys));
     }
 
@@ -286,6 +338,7 @@ public sealed partial class SshEditorViewModel : ObservableObject
         {
             RebuildKeys(entry.Id);
             AuthMode = SshAuthMode.Key;
+            EnableForSignIn(); // also when the mode already was Key (no change, no OnAuthModeChanged)
         }
     }
 
