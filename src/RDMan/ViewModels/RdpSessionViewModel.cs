@@ -312,6 +312,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         State = DesktopState.Connected;
         _resizeConfirmed = false;
+        _scaledView = false;
         _connectSize = RemoteSize();
         WatchSize();
         _promptedAfterFailure = false;
@@ -454,7 +455,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private void WatchSize()
     {
         _resizeAttempts = 0;
-        _sizeWatch.Interval = TimeSpan.FromSeconds(1);
+        // Check soon after a resize: the scaled view should replace scrollbars almost immediately.
+        _sizeWatch.Interval = TimeSpan.FromMilliseconds(400);
         _sizeWatch.Start();
     }
 
@@ -462,6 +464,19 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     {
         try { return _control?.RdpClient is { } c ? (c.DesktopWidth, c.DesktopHeight) : null; }
         catch (COMException) { return null; }
+    }
+
+    private bool _scaledView;
+
+    private void SetScaledView(bool on)
+    {
+        if (_scaledView == on || _control?.RdpClient is not { } client) return;
+        try
+        {
+            client.SmartSizing = on;
+            _scaledView = on;
+        }
+        catch (COMException ex) { App.Log(ex); }
     }
 
     private void SizeWatch_Tick(object? sender, EventArgs e)
@@ -478,17 +493,21 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         if (Math.Abs(remote.W - local.Width) <= 4 && Math.Abs(remote.H - local.Height) <= 4)
         {
             if (_connectSize is { } first && remote != first) _resizeConfirmed = true;
+            SetScaledView(false);
             _sizeWatch.Stop();
             return;
         }
-        // Servers without live resolution changes (2008 R2 and older) never match: stop asking after a few tries.
+        // Until the server takes the new size (it refuses while showing a secure desktop: Ctrl+Alt+Del, UAC, sign-in),
+        // show the whole remote screen scaled to the tab instead of a cropped view with scrollbars.
+        SetScaledView(true);
+        // Servers without live resolution changes (2008 R2 and older) never match: stay scaled and stop asking.
         if (!_resizeConfirmed && _resizeAttempts >= 10)
         {
             _sizeWatch.Stop();
             return;
         }
         _resizeAttempts++;
-        if (_resizeAttempts == 10) _sizeWatch.Interval = TimeSpan.FromSeconds(3);
+        _sizeWatch.Interval = TimeSpan.FromSeconds(_resizeAttempts >= 10 ? 3 : 1);
         try { _control.UpdateClientSize(); }
         catch (COMException ex) { App.Log(ex); }
     }
