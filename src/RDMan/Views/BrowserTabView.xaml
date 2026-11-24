@@ -99,88 +99,157 @@
             <Setter Property="ui:Ui.CornerRadius" Value="5" />
         </Style>
 
-        <!-- ───── Server card (dashboard) ───── -->
+        <!-- ───── Server cards (dashboard) ───── -->
+        <!-- Card surface: content stretches to the full card (Btn.Base centers it), the outline firms up on hover. -->
+        <Style x:Key="CardButton" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource Bg.Raised}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+            <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+            <Setter Property="FontFamily" Value="{StaticResource Font.UI}" />
+            <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+            <Setter Property="Margin" Value="0,0,12,12" />
+            <Setter Property="Cursor" Value="Arrow" />
+            <Setter Property="FocusVisualStyle" Value="{StaticResource Focus.Ring}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                                CornerRadius="8" SnapsToDevicePixels="True">
+                            <Grid>
+                                <Border x:Name="Overlay" Background="Transparent" CornerRadius="7" />
+                                <ContentPresenter />
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Line.Strong}" />
+                                <Setter TargetName="Overlay" Property="Background" Value="{DynamicResource Bg.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Overlay" Property="Background" Value="{DynamicResource Bg.Pressed}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Same identity mark as a sidebar row: the server's color tag and its live status dot -->
+        <DataTemplate x:Key="CardIdentity" DataType="{x:Type vm:ServerNodeViewModel}">
+            <Grid Width="18" Height="16">
+                <Border Width="4" CornerRadius="2" HorizontalAlignment="Left"
+                        Background="{Binding ColorBrush, Converter={StaticResource BrushOr}, ConverterParameter=Line.Strong}" />
+                <Ellipse Style="{StaticResource StatusDot}" HorizontalAlignment="Right" />
+            </Grid>
+        </DataTemplate>
+
         <DataTemplate x:Key="ServerCard" DataType="{x:Type vm:ServerNodeViewModel}">
-            <Button x:Name="Card" Width="268" Height="124" Margin="0,0,12,12" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                    Style="{StaticResource Btn.Base}" Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
-                    ui:Ui.CornerRadius="8" Click="Card_Click" MouseDown="Card_MouseDown" Tag="{Binding}" ContextMenuOpening="Card_ContextMenuOpening"
-                    AutomationProperties.Name="{Binding Name}">
+            <Button x:Name="Card" Style="{StaticResource CardButton}" Width="268" Height="120" Click="Card_Click" MouseDown="Card_MouseDown" Tag="{Binding}"
+                    ContextMenuOpening="Card_ContextMenuOpening" AutomationProperties.Name="{Binding TreeLabel}">
                 <Button.ContextMenu>
                     <ContextMenu />
                 </Button.ContextMenu>
-                <Grid>
+                <Grid Margin="14">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="4" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <Border CornerRadius="7,0,0,7" Background="{Binding ColorBrush, Converter={StaticResource BrushOr}, ConverterParameter=Line.Strong}" />
-                    <Grid Grid.Column="1" Margin="14,12,14,12">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-                        <Grid>
-                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg.Primary}"
-                                       Margin="0,0,80,0" />
-                            <!-- What this server offers; each is a direct shortcut when it has both -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-6,0">
-                                <Button x:Name="Star" FontSize="12" Click="CardStar_Click" Tag="{Binding}" Margin="0,0,2,0">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource Btn.IconSmall}">
-                                            <Setter Property="Content" Value="&#xE734;" />
-                                            <Setter Property="ToolTip" Value="{ui:Tr Favorite.Add}" />
-                                            <Setter Property="Opacity" Value="0" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=Card}" Value="True">
-                                                    <Setter Property="Opacity" Value="1" />
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
-                                                    <Setter Property="Content" Value="&#xE735;" />
-                                                    <Setter Property="Foreground" Value="{DynamicResource Status.Warn}" />
-                                                    <Setter Property="ToolTip" Value="{ui:Tr Favorite.Remove}" />
-                                                    <Setter Property="Opacity" Value="1" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                                <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE8B7;" FontSize="12" Click="CardFiles_Click" Tag="{Binding}"
-                                        ToolTip="{ui:Tr Files.Open}" Visibility="{Binding HasBoth, Converter={StaticResource Vis}}" />
-                                <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE7F4;" FontSize="12" Click="CardDesktop_Click" Tag="{Binding}"
-                                        ToolTip="{ui:Tr Desktop.Open}" Visibility="{Binding HasDesktop, Converter={StaticResource Vis}}" Margin="2,0,0,0" />
-                            </StackPanel>
-                        </Grid>
-                        <TextBlock Grid.Row="1" Text="{Binding Address}" Style="{StaticResource Text.Mono}" Margin="0,3,0,0" />
-                        <TextBlock Grid.Row="2" Text="{Binding Description}" Style="{StaticResource Text.Caption}" TextTrimming="CharacterEllipsis" Margin="0,6,0,0"
-                                   Visibility="{Binding Description, Converter={StaticResource VisIfAny}}" />
-                        <Grid Grid.Row="3">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <Ellipse Style="{StaticResource StatusDot}" />
-                                <TextBlock Text="{Binding PrimaryStatusText}" Style="{StaticResource Text.Caption}" Margin="7,0,0,0" ToolTip="{Binding StatusText}" />
-                            </StackPanel>
-                            <TextBlock Text="{Binding TagsText}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Right" MaxWidth="110" TextTrimming="CharacterEllipsis"
-                                       Foreground="{DynamicResource Accent.Text}" />
-                        </Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource CardIdentity}" Margin="0,0,8,0" VerticalAlignment="Center" />
+
+                    <!-- Name; the star sits in the corner (shown on hover/focus, always when it's a favorite) -->
+                    <Grid Grid.Column="1">
+                        <TextBlock Text="{Binding TreeLabel}" FontSize="{StaticResource Size.BodyLarge}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                   VerticalAlignment="Center" Margin="0,0,22,0" ToolTip="{Binding TreeLabel}" ToolTipService.InitialShowDelay="900" />
+                        <Button x:Name="Star" FontSize="12" Click="CardStar_Click" Tag="{Binding}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                Margin="0,-4,-6,-4">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource Btn.IconSmall}">
+                                    <Setter Property="Content" Value="&#xE734;" />
+                                    <Setter Property="ToolTip" Value="{ui:Tr Favorite.Add}" />
+                                    <Setter Property="Opacity" Value="0" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=Card}" Value="True">
+                                            <Setter Property="Opacity" Value="1" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsKeyboardFocusWithin, ElementName=Card}" Value="True">
+                                            <Setter Property="Opacity" Value="1" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                            <Setter Property="Content" Value="&#xE735;" />
+                                            <Setter Property="Foreground" Value="{DynamicResource Status.Warn}" />
+                                            <Setter Property="ToolTip" Value="{ui:Tr Favorite.Remove}" />
+                                            <Setter Property="Opacity" Value="1" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </Grid>
+
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Address}" Style="{StaticResource Text.Mono}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+
+                    <!-- Notes and tags share one line -->
+                    <DockPanel Grid.Row="2" Grid.Column="1" Margin="0,6,0,0" LastChildFill="True">
+                        <!-- Tags follow the notes on the right; without notes they start the line instead of floating at the edge -->
+                        <TextBlock Text="{Binding TagsText}" Foreground="{DynamicResource Accent.Text}" MaxWidth="110" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding HasTags, Converter={StaticResource Vis}}">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Caption}">
+                                    <Setter Property="DockPanel.Dock" Value="Right" />
+                                    <Setter Property="Margin" Value="10,0,0,0" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Description}" Value="{x:Null}">
+                                            <Setter Property="DockPanel.Dock" Value="Left" />
+                                            <Setter Property="Margin" Value="0" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding Description}" Style="{StaticResource Text.Caption}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Description}"
+                                   ToolTipService.InitialShowDelay="900" Visibility="{Binding Description, Converter={StaticResource VisIfAny}}" />
+                    </DockPanel>
+
+                    <!-- Live status, and what the server offers (each opens that view) -->
+                    <Grid Grid.Row="4" Grid.Column="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding PrimaryStatusText}" Style="{StaticResource Text.Caption}" Foreground="{DynamicResource Fg.Secondary}"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                            <Button Style="{StaticResource CapButton.Smb}" Content="SMB" Click="CardFiles_Click" Tag="{Binding}" ToolTip="{ui:Tr Tree.Ctx.OpenFiles}"
+                                    ui:Ui.IsOn="{Binding FilesIsDefault}" Visibility="{Binding HasFiles, Converter={StaticResource Vis}}" />
+                            <Button Style="{StaticResource CapButton.Rdp}" Content="RDP" Click="CardDesktop_Click" Tag="{Binding}" ToolTip="{ui:Tr Tree.Ctx.OpenDesktop}"
+                                    ui:Ui.IsOn="{Binding DesktopIsDefault}" Visibility="{Binding HasDesktop, Converter={StaticResource Vis}}" />
+                            <Button Style="{StaticResource CapButton.Ssh}" Content="SSH" Click="CardTerminal_Click" Tag="{Binding}" ToolTip="{ui:Tr Tree.Ctx.OpenTerminal}"
+                                    ui:Ui.IsOn="{Binding TerminalIsDefault}" Visibility="{Binding HasTerminal, Converter={StaticResource Vis}}" />
+                        </StackPanel>
                     </Grid>
                 </Grid>
             </Button>
         </DataTemplate>
+
         <!-- Connected view: a picture of the remote desktop (refreshed while it's on screen) above the identity -->
         <DataTemplate x:Key="SessionCard" DataType="{x:Type vm:ServerNodeViewModel}">
-            <Button Width="320" Height="246" Margin="0,0,12,12" Padding="0" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
-                    Style="{StaticResource Btn.Base}" Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
-                    ui:Ui.CornerRadius="8" Click="SessionCard_Click" Tag="{Binding}" AutomationProperties.Name="{Binding Name}">
+            <Button Style="{StaticResource CardButton}" Width="320" Height="246" Click="SessionCard_Click" Tag="{Binding}" AutomationProperties.Name="{Binding TreeLabel}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="180" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-                    <Border CornerRadius="7,7,0,0" Background="{DynamicResource Bg.Base}" ClipToBounds="True">
+                    <Border CornerRadius="7,7,0,0" Background="{DynamicResource Bg.Base}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1">
                         <Grid>
-                            <!-- No picture yet (or files only): what the server offers -->
-                            <TextBlock FontSize="28" Foreground="{DynamicResource Fg.Tertiary}"
+                            <!-- No picture yet (or no desktop): what the server offers -->
+                            <TextBlock FontSize="28" Foreground="{DynamicResource Fg.Tertiary}" HorizontalAlignment="Center" VerticalAlignment="Center"
                                        Visibility="{Binding Thumbnail, Converter={StaticResource VisIfAny}, ConverterParameter=invert}">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
@@ -189,25 +258,35 @@
                                             <DataTrigger Binding="{Binding HasDesktop}" Value="False">
                                                 <Setter Property="Text" Value="&#xE8B7;" />
                                             </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding HasDesktop}" Value="False" />
+                                                    <Condition Binding="{Binding HasFiles}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Text" Value="&#xE756;" />
+                                            </MultiDataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" VerticalAlignment="Top" RenderOptions.BitmapScalingMode="HighQuality" />
+                            <!-- A brush (not an Image) so the picture follows the card's rounded corners -->
+                            <Border CornerRadius="7,7,0,0" RenderOptions.BitmapScalingMode="HighQuality">
+                                <Border.Background>
+                                    <ImageBrush ImageSource="{Binding Thumbnail}" Stretch="UniformToFill" AlignmentY="Top" />
+                                </Border.Background>
+                            </Border>
                         </Grid>
                     </Border>
-                    <Grid Grid.Row="1" Margin="0,0,0,0">
+                    <Grid Grid.Row="1" Margin="14,0" VerticalAlignment="Center">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="4" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Border CornerRadius="0,0,0,7" Background="{Binding ColorBrush, Converter={StaticResource BrushOr}, ConverterParameter=Line.Strong}" />
-                        <StackPanel Grid.Column="1" Margin="14,0" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg.Primary}" />
-                            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                                <Ellipse Style="{StaticResource StatusDot}" />
-                                <TextBlock Text="{Binding PrimaryStatusText}" Style="{StaticResource Text.Caption}" Margin="7,0,0,0" />
-                            </StackPanel>
+                        <ContentPresenter Content="{Binding}" ContentTemplate="{StaticResource CardIdentity}" Margin="0,2,8,0" VerticalAlignment="Top" />
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding TreeLabel}" FontSize="{StaticResource Size.BodyLarge}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding PrimaryStatusText}" Style="{StaticResource Text.Caption}" Foreground="{DynamicResource Fg.Secondary}" Margin="0,2,0,0"
+                                       TextTrimming="CharacterEllipsis" ToolTip="{Binding StatusText}" />
                         </StackPanel>
                     </Grid>
                 </Grid>

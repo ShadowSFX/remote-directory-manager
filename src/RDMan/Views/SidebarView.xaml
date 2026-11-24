@@ -91,54 +91,6 @@
             </Setter>
         </Style>
 
-        <!-- Protocol badge on a server row: tinted in its protocol's color; ui:Ui.IsOn (the one a click opens) adds a solid outline -->
-        <Style x:Key="CapBadge" TargetType="Border">
-            <Setter Property="Height" Value="16" />
-            <Setter Property="MinWidth" Value="30" />
-            <Setter Property="Padding" Value="4,0" />
-            <Setter Property="Margin" Value="4,0,0,0" />
-            <Setter Property="CornerRadius" Value="3" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="BorderBrush" Value="Transparent" />
-            <Setter Property="SnapsToDevicePixels" Value="True" />
-            <Setter Property="TextElement.FontFamily" Value="{StaticResource Font.Mono}" />
-            <Setter Property="TextElement.FontSize" Value="9.5" />
-            <Setter Property="TextElement.FontWeight" Value="SemiBold" />
-            <Style.Resources>
-                <Style TargetType="TextBlock">
-                    <Setter Property="HorizontalAlignment" Value="Center" />
-                    <Setter Property="VerticalAlignment" Value="Center" />
-                </Style>
-            </Style.Resources>
-        </Style>
-        <Style x:Key="CapBadge.Smb" TargetType="Border" BasedOn="{StaticResource CapBadge}">
-            <Setter Property="Background" Value="{DynamicResource Proto.Smb.Subtle}" />
-            <Setter Property="TextElement.Foreground" Value="{DynamicResource Proto.Smb}" />
-            <Style.Triggers>
-                <Trigger Property="ui:Ui.IsOn" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Proto.Smb}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="CapBadge.Rdp" TargetType="Border" BasedOn="{StaticResource CapBadge}">
-            <Setter Property="Background" Value="{DynamicResource Proto.Rdp.Subtle}" />
-            <Setter Property="TextElement.Foreground" Value="{DynamicResource Proto.Rdp}" />
-            <Style.Triggers>
-                <Trigger Property="ui:Ui.IsOn" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Proto.Rdp}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-        <Style x:Key="CapBadge.Ssh" TargetType="Border" BasedOn="{StaticResource CapBadge}">
-            <Setter Property="Background" Value="{DynamicResource Proto.Ssh.Subtle}" />
-            <Setter Property="TextElement.Foreground" Value="{DynamicResource Proto.Ssh}" />
-            <Style.Triggers>
-                <Trigger Property="ui:Ui.IsOn" Value="True">
-                    <Setter Property="BorderBrush" Value="{DynamicResource Proto.Ssh}" />
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
         <HierarchicalDataTemplate DataType="{x:Type vm:GroupNodeViewModel}" ItemsSource="{Binding Children}">
             <Grid Background="Transparent" ToolTip="{Binding Description}" ToolTipService.IsEnabled="{Binding Description, Converter={StaticResource NotNull}}">
                 <Grid.ColumnDefinitions>

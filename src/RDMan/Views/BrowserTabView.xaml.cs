@@ -661,6 +661,13 @@ public partial class BrowserTabView : UserControl
             Main?.OpenDesktop(s, (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current);
     }
 
+    private void CardTerminal_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (sender is FrameworkElement { Tag: ServerNodeViewModel s })
+            Main?.OpenTerminal(s, (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current);
+    }
+
     private void Card_MouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton == MouseButton.Middle && sender is FrameworkElement { Tag: ServerNodeViewModel s })
