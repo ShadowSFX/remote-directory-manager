@@ -84,7 +84,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private void RefreshTabs()
     {
-        foreach (var t in _main.Left.Tabs.Concat(_main.Right.Tabs).Where(t => t.Mode == TabMode.Folder))
+        foreach (var t in _main.AllTabs.Where(t => t.Mode == TabMode.Folder))
             _ = t.Refresh();
     }
 

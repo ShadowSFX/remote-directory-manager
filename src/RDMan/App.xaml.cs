@@ -75,7 +75,7 @@ public partial class App : Application
 
         // "RDMan.exe \\host\share" (or a local folder) opens it in a new tab.
         if (!string.IsNullOrWhiteSpace(pathArg))
-            _main.OpenInNewTab(new FolderLocation(pathArg), _main.Left);
+            _main.OpenInNewTab(new FolderLocation(pathArg), _main.ActivePane);
 
         Services.Health.Start(() => _main.AllServers().SelectMany(s => s.Endpoints()), settings.HealthCheckIntervalSeconds);
         Services.Updates.StartBackgroundChecks(() => state.Settings.AutoUpdate);

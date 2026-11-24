@@ -21,6 +21,9 @@ public partial class BrowserTabView : UserControl
     {
         InitializeComponent();
         List.SizeChanged += (_, _) => AdjustColumns();
+        SizeChanged += (_, e) => ApplyWidth(e.NewSize.Width);
+        CrumbHost.SizeChanged += (_, _) => KeepCurrentCrumbVisible();
+        Crumbs.SizeChanged += (_, _) => KeepCurrentCrumbVisible();
         DataContextChanged += (_, e) =>
         {
             if (e.OldValue is BrowserTabViewModel old)
@@ -58,6 +61,35 @@ public partial class BrowserTabView : UserControl
     }
 
     private BrowserTabViewModel? Tab => DataContext as BrowserTabViewModel;
+
+    // ───────────── Narrow panes ─────────────
+    // Panes in the editor grid can be narrow: secondary things step aside so the server name, the switch and the
+    // navigation stay usable instead of being squeezed until unreadable.
+    private const double MediumWidth = 620;
+    private const double NarrowWidth = 480;
+
+    private void ApplyWidth(double width)
+    {
+        var medium = width < MediumWidth;
+        var narrow = width < NarrowWidth;
+        FilesLabel.Visibility = DesktopLabel.Visibility = medium ? Visibility.Collapsed : Visibility.Visible;
+        FilesIcon.Margin = DesktopIcon.Margin = medium ? new Thickness(0) : new Thickness(0, 0, 6, 0);
+        IdentityUser.Visibility = medium ? Visibility.Collapsed : Visibility.Visible; // also in the status bar
+        // These two have Visibility bindings of their own (connected / files view): squeeze them with MaxWidth instead.
+        DesktopHint.MaxWidth = medium ? 0 : double.PositiveInfinity;
+        IdentityExplorer.MaxWidth = narrow ? 0 : double.PositiveInfinity;
+        LatencyText.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        FilterBox.Width = narrow ? 120 : 200;
+    }
+
+    /// <summary>Like Explorer: when the path doesn't fit, show its end (the current folder), clipping the start.</summary>
+    private void KeepCurrentCrumbVisible()
+    {
+        Crumbs.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var overflow = Crumbs.DesiredSize.Width > CrumbHost.ActualWidth;
+        var align = overflow ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        if (Crumbs.HorizontalAlignment != align) Crumbs.HorizontalAlignment = align;
+    }
     private MainViewModel? Main => Window.GetWindow(this)?.DataContext as MainViewModel;
 
     /// <summary>
@@ -536,8 +568,16 @@ public partial class BrowserTabView : UserControl
                 menu.Items.Add(Item("File.Paste", "", async () => { var dest = sel[0].FullPath; var files = App.Services.Clipboard.Get(); if (files is not null) { var done = await tab.TransferAsync(files.Paths, dest, files.Intent == Services.ClipboardIntent.Move); if (files.Intent == Services.ClipboardIntent.Move && done) App.Services.Clipboard.ClearAfterMove(); } }, "Ctrl+V"));
             if (real.Count > 0 && tab.CanUseOtherPane)
             {
-                menu.Items.Add(Item("File.CopyToOther", "", () => _ = tab.CopyToOtherPaneCommand.ExecuteAsync(null)));
-                menu.Items.Add(Item("File.MoveToOther", "", () => _ = tab.MoveToOtherPaneCommand.ExecuteAsync(null)));
+                // With several panes, name the target (the pane used before this one) so it's never a guess.
+                var copy = Item("File.CopyToOther", "", () => _ = tab.CopyToOtherPaneCommand.ExecuteAsync(null));
+                var move = Item("File.MoveToOther", "", () => _ = tab.MoveToOtherPaneCommand.ExecuteAsync(null));
+                if (tab.OtherPaneTitle.Length > 0)
+                {
+                    copy.Header = Loc.F("File.CopyToPane", tab.OtherPaneTitle);
+                    move.Header = Loc.F("File.MoveToPane", tab.OtherPaneTitle);
+                }
+                menu.Items.Add(copy);
+                menu.Items.Add(move);
             }
             menu.Items.Add(Item("File.CopyPath", "", () => tab.CopyPathCommand.Execute(null), "Ctrl+Shift+C"));
             if (real.Count > 0)

@@ -69,8 +69,84 @@ public partial class MainWindow : Window
         // Give the keyboard a home at startup so shortcuts (Ctrl+K, Ctrl+T…) work before the first click.
         ContentRendered += (_, _) => Dispatcher.BeginInvoke(FocusContent, System.Windows.Threading.DispatcherPriority.Input);
         SidebarColumn.Width = new GridLength(vm.State.Settings.SidebarWidth);
-        UpdateSplitColumns();
         UpdateMaximizeState();
+        // Editor grid + window-level session overlay.
+        LayoutHost.Rebuilt += (_, _) => UpdateMinimumSize();
+        LayoutHost.Attach(vm);
+        vm.CanSplitPane = CanSplitPane;
+        vm.RequestFocusPane += (_, pane) => Dispatcher.BeginInvoke(() => FocusPane(pane), System.Windows.Threading.DispatcherPriority.Input);
+        LayoutUpdated += (_, _) => PositionSessions();
+        InitPaneDrag();
+    }
+
+    // ───────────── Editor grid ─────────────
+
+    /// <summary>
+    /// Places every tab's remote-desktop surface over its pane's content area. The surfaces stay in one ItemsControl
+    /// for their whole life (never re-parented); only their Canvas rectangle and visibility change. Rectangles are
+    /// clipped to the panes area and snapped to device pixels: a native window ignores WPF clipping and would paint
+    /// over splitters or the status bar.
+    /// </summary>
+    private void PositionSessions()
+    {
+        if (!SessionOverlay.IsLoaded) return;
+        var bounds = new Rect(0, 0, SessionOverlay.ActualWidth, SessionOverlay.ActualHeight);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        foreach (var tab in _vm.LiveTabs)
+        {
+            if (SessionOverlay.ItemContainerGenerator.ContainerFromItem(tab) is not FrameworkElement container) continue;
+            var rect = Rect.Empty;
+            if (tab.Session is not null && LayoutHost.ViewFor(tab.Pane) is { IsLoaded: true } view && view.ContentArea is { IsLoaded: true, ActualWidth: > 0 } area)
+            {
+                try
+                {
+                    rect = new Rect(area.TranslatePoint(new Point(0, 0), SessionOverlay), new Size(area.ActualWidth, area.ActualHeight));
+                    rect.Intersect(bounds);
+                }
+                catch (InvalidOperationException) { rect = Rect.Empty; } // not in the same tree (being rebuilt)
+            }
+            if (rect.IsEmpty || rect.Width < 1 || rect.Height < 1)
+            {
+                if (container.Visibility != Visibility.Collapsed) container.Visibility = Visibility.Collapsed;
+                continue;
+            }
+            double Snap(double v, double scale) => Math.Round(v * scale) / scale;
+            var x = Snap(rect.X, dpi.DpiScaleX);
+            var y = Snap(rect.Y, dpi.DpiScaleY);
+            var w = Snap(rect.Right, dpi.DpiScaleX) - x;
+            var h = Snap(rect.Bottom, dpi.DpiScaleY) - y;
+            if (container.Visibility != Visibility.Visible) container.Visibility = Visibility.Visible;
+            if (Canvas.GetLeft(container) != x) Canvas.SetLeft(container, x);
+            if (Canvas.GetTop(container) != y) Canvas.SetTop(container, y);
+            if (container.Width != w) container.Width = w;
+            if (container.Height != h) container.Height = h;
+        }
+    }
+
+    /// <summary>A split must leave both halves at least the minimum pane size.</summary>
+    private bool CanSplitPane(PaneViewModel pane, Core.Layout.DropSide side)
+    {
+        if (LayoutHost.ViewFor(pane) is not { ActualWidth: > 0 } view) return true;
+        return side is Core.Layout.DropSide.Left or Core.Layout.DropSide.Right
+            ? (view.ActualWidth - Views.PaneLayoutHost.SplitterSize) / 2 >= MainViewModel.MinPaneWidth
+            : (view.ActualHeight - Views.PaneLayoutHost.SplitterSize) / 2 >= MainViewModel.MinPaneHeight;
+    }
+
+    /// <summary>The window can't shrink below what the grid needs (panes keep their minimum size).</summary>
+    private void UpdateMinimumSize()
+    {
+        var grid = LayoutHost.MinimumSize;
+        MinWidth = Math.Max(760, SidebarColumn.ActualWidth + 6 + grid.Width + 2);
+        MinHeight = Math.Max(460, 40 + 28 + grid.Height + 2);
+    }
+
+    /// <summary>Gives the keyboard to a pane's content (its file list, else the pane itself).</summary>
+    private void FocusPane(PaneViewModel pane)
+    {
+        if (LayoutHost.ViewFor(pane) is not { } view) return;
+        if (FindVisible<ListView>(view) is { } list) list.Focus();
+        else if (pane.SelectedTab?.Session is { IsConnected: true } session) session.Focus();
+        else view.Focus();
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -114,15 +190,13 @@ public partial class MainWindow : Window
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.IsSplit)) UpdateSplitColumns();
         if (e.PropertyName == nameof(MainViewModel.FullScreenTab)) ApplyFullScreen();
     }
 
     // ───────────── Full screen (desktop sessions) ─────────────
     // RDMan itself covers the monitor and hides every piece of chrome around the session, so the remote resolution
     // follows the monitor through the normal resize path (the ActiveX's own full screen keeps the old resolution).
-    private sealed record FullScreenRestore(WindowState State, Rect Bounds, GridLength Sidebar, GridLength LeftPane, GridLength RightPane,
-        double LeftMin, double RightMin, GridLength PaneSplitter);
+    private sealed record FullScreenRestore(WindowState State, Rect Bounds, GridLength Sidebar);
 
     private FullScreenRestore? _restore;
     private NativeMethods.RECT _monitorPx;
@@ -137,7 +211,8 @@ public partial class MainWindow : Window
         if (tab is not null && _restore is null)
         {
             _restore = new FullScreenRestore(WindowState, WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds,
-                SidebarColumn.Width, LeftPaneColumn.Width, RightPaneColumn.Width, LeftPaneColumn.MinWidth, RightPaneColumn.MinWidth, PaneSplitterColumn.Width);
+                SidebarColumn.Width);
+            LayoutHost.Zoom(tab.Pane); // only the full-screen pane is shown
             TitleBar.Visibility = Visibility.Collapsed;
             StatusBar.Visibility = Visibility.Collapsed;
             Sidebar.Visibility = Visibility.Collapsed;
@@ -182,21 +257,8 @@ public partial class MainWindow : Window
             Height = r.Bounds.Height;
             if (r.State == WindowState.Maximized) WindowState = WindowState.Maximized;
             UpdateMaximizeState();
-            LeftPaneColumn.MinWidth = r.LeftMin;
-            LeftPaneColumn.Width = r.LeftPane;
-            RightPaneColumn.MinWidth = r.RightMin;
-            RightPaneColumn.Width = r.RightPane;
-            PaneSplitterColumn.Width = r.PaneSplitter;
-            return;
+            LayoutHost.Zoom(null);
         }
-        if (tab is null) return;
-        // Only the full-screen tab's pane is shown.
-        var left = ReferenceEquals(tab.Pane, _vm.Left);
-        LeftPaneColumn.MinWidth = 0;
-        RightPaneColumn.MinWidth = 0;
-        LeftPaneColumn.Width = left ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-        RightPaneColumn.Width = left ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
-        PaneSplitterColumn.Width = new GridLength(0);
     }
 
     /// <summary>Places the window exactly over its monitor (Windows then keeps the taskbar behind it).</summary>
@@ -243,23 +305,6 @@ public partial class MainWindow : Window
         if (!FullScreenBar.IsOpen || FullScreenBarCard.IsMouseOver) return;
         var linger = _barHint ? 2500 : 600;
         if ((DateTime.UtcNow - _barShownAt).TotalMilliseconds > linger) FullScreenBar.IsOpen = false;
-    }
-
-    private void UpdateSplitColumns()
-    {
-        if (_restore is not null) return; // full screen manages the columns until it ends
-        if (_vm.IsSplit)
-        {
-            PaneSplitterColumn.Width = new GridLength(5);
-            RightPaneColumn.Width = new GridLength(1, GridUnitType.Star);
-            RightPaneColumn.MinWidth = 320;
-        }
-        else
-        {
-            PaneSplitterColumn.Width = new GridLength(0);
-            RightPaneColumn.MinWidth = 0;
-            RightPaneColumn.Width = new GridLength(0);
-        }
     }
 
     // ───────────── Window chrome ─────────────

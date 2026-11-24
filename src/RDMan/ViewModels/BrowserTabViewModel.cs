@@ -63,7 +63,20 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         Loc.Instance.LanguageChanged += OnLanguageChanged;
     }
 
-    public PaneViewModel Pane { get; set; }
+    private PaneViewModel _pane = null!;
+
+    /// <summary>The pane showing this tab; changes when the tab is dragged to another pane.</summary>
+    public PaneViewModel Pane
+    {
+        get => _pane;
+        set
+        {
+            if (ReferenceEquals(_pane, value)) return;
+            _pane = value;
+            OnPropertyChanged();
+            NotifyPaneContext();
+        }
+    }
 
     // ───────────── State ─────────────
     [ObservableProperty] private Location _current;
@@ -1095,7 +1108,18 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         await TransferAsync(SelectedRealPaths(), other.Folder.Path, move);
     }
 
-    public bool CanUseOtherPane => _main.IsSplit && _main.OtherPaneTab(Pane)?.CanWrite == true;
+    public bool CanUseOtherPane => _main.OtherPaneTab(Pane)?.CanWrite == true;
+
+    /// <summary>Title of the tab "copy/move to the other pane" would target (the pane used before this one).</summary>
+    public string OtherPaneTitle => _main.OtherPaneTab(Pane)?.Title ?? "";
+
+    /// <summary>The grid or this tab's pane changed.</summary>
+    public void NotifyPaneContext()
+    {
+        OnPropertyChanged(nameof(CanUseOtherPane));
+        OnPropertyChanged(nameof(OtherPaneTitle));
+        NotifySessionVisibility();
+    }
 
     // ───────────── Watchers & events ─────────────
     private void StartWatcher(FolderLocation folder)

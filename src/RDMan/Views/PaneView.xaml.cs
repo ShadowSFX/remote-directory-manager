@@ -12,8 +12,7 @@ public partial class PaneView : UserControl
     public PaneView()
     {
         InitializeComponent();
-        // Keep the session layer exactly over the active tab's content area.
-        LayoutUpdated += (_, _) => PositionSessionLayer();
+        // The view is re-attached whenever the grid is rebuilt: subscribe while on screen only.
         Loaded += (_, _) =>
         {
             if (Main is { } main)
@@ -21,6 +20,12 @@ public partial class PaneView : UserControl
                 main.PropertyChanged -= OnMainPropertyChanged;
                 main.PropertyChanged += OnMainPropertyChanged;
             }
+            ApplyFullScreen();
+            UpdateActiveMarker();
+        };
+        Unloaded += (_, _) =>
+        {
+            if (Main is { } main) main.PropertyChanged -= OnMainPropertyChanged;
         };
         DataContextChanged += (_, e) =>
         {
@@ -35,24 +40,15 @@ public partial class PaneView : UserControl
 
     private PaneViewModel? Pane => DataContext as PaneViewModel;
 
-    private Thickness _layerMargin = new(double.NaN);
-
-    private void PositionSessionLayer()
-    {
-        if (TabView.ContentArea is not { IsLoaded: true } area || !TabArea.IsLoaded) return;
-        Point topLeft;
-        try { topLeft = area.TranslatePoint(new Point(0, 0), TabArea); }
-        catch (InvalidOperationException) { return; }
-        var margin = new Thickness(topLeft.X, topLeft.Y,
-            Math.Max(0, TabArea.ActualWidth - topLeft.X - area.ActualWidth),
-            Math.Max(0, TabArea.ActualHeight - topLeft.Y - area.ActualHeight));
-        if (margin == _layerMargin) return;
-        _layerMargin = margin;
-        SessionLayer.Margin = margin;
-    }
     private static MainViewModel? Main => Application.Current.MainWindow?.DataContext as MainViewModel;
 
-    /// <summary>Full screen: the tab area (session layer included) covers the tab strip.</summary>
+    /// <summary>The active tab's content area: remote-desktop surfaces are placed over it by the window's session overlay.</summary>
+    public FrameworkElement ContentArea => TabView.ContentArea;
+
+    /// <summary>The tab strip (drop target for reordering / moving tabs).</summary>
+    public ListBox Strip => TabStrip;
+
+    /// <summary>Full screen: the tab area covers the tab strip.</summary>
     private void ApplyFullScreen()
     {
         var full = Main?.FullScreenTab is { } t && ReferenceEquals(t.Pane, Pane);
@@ -68,7 +64,7 @@ public partial class PaneView : UserControl
 
     private void OnPanePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(PaneViewModel.IsActive)) UpdateActiveMarker();
+        if (e.PropertyName is nameof(PaneViewModel.IsActive) or nameof(PaneViewModel.CanClose)) UpdateActiveMarker();
         if (e.PropertyName == nameof(PaneViewModel.SelectedTab) && Pane?.SelectedTab is { } tab)
             TabStrip.ScrollIntoView(tab);
     }
@@ -76,7 +72,7 @@ public partial class PaneView : UserControl
     /// <summary>In split view, a thin accent line marks which pane receives keyboard commands.</summary>
     private void UpdateActiveMarker()
     {
-        var show = Pane is { IsActive: true } && Main?.IsSplit == true;
+        var show = Pane is { IsActive: true } && Main?.HasMultiplePanes == true;
         ActiveMarker.BeginAnimation(OpacityProperty, new DoubleAnimation(show ? 1 : 0, TimeSpan.FromMilliseconds(120)));
     }
 
@@ -125,6 +121,10 @@ public partial class PaneView : UserControl
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Nav.CloseTab", "", Pane.CloseTabCommand, "Ctrl+W"));
         menu.Items.Add(new MenuItem { Header = Loc.T("Nav.CloseOthers"), Tag = "", Command = Pane.CloseOtherTabsCommand, CommandParameter = tab, IsEnabled = Pane.Tabs.Count > 1 });
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = Loc.T("Pane.SplitRight"), Tag = "", Command = Pane.SplitRightCommand, CommandParameter = tab, InputGestureText = "F3" });
+        menu.Items.Add(new MenuItem { Header = Loc.T("Pane.SplitDown"), Tag = "", Command = Pane.SplitDownCommand, CommandParameter = tab });
+        if (Pane.CanClose) menu.Items.Add(new MenuItem { Header = Loc.T("Pane.Close"), Tag = "", Command = Pane.ClosePaneCommand });
     }
 
     // Hovering a dragged file over a tab switches to it, like Explorer/browsers.

@@ -25,7 +25,7 @@
         <KeyBinding Key="F4" Modifiers="Control" Command="{Binding CloseTabCommand}" />
         <KeyBinding Key="Tab" Modifiers="Control" Command="{Binding NextTabCommand}" />
         <KeyBinding Key="Tab" Modifiers="Control+Shift" Command="{Binding PreviousTabCommand}" />
-        <KeyBinding Key="F3" Command="{Binding ToggleSplitCommand}" />
+        <KeyBinding Key="F3" Command="{Binding SplitRightCommand}" />
         <KeyBinding Key="F6" Command="{Binding FocusOtherPaneCommand}" />
         <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewServerCommand}" />
         <KeyBinding Key="G" Modifiers="Control+Shift" Command="{Binding NewGroupCommand}" />
@@ -74,8 +74,8 @@
             </Button>
 
             <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0">
-                <Button Style="{StaticResource Btn.IconToggle}" Content="&#xE89F;" ui:Ui.IsOn="{Binding IsSplit}"
-                        Command="{Binding ToggleSplitCommand}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{ui:Tr Title.Split}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE89F;"
+                        Command="{Binding SplitRightCommand}" WindowChrome.IsHitTestVisibleInChrome="True" ToolTip="{ui:Tr Title.Split}" />
                 <Button x:Name="MenuButton" Style="{StaticResource Btn.Icon}" Content="&#xE712;" WindowChrome.IsHitTestVisibleInChrome="True"
                         ToolTip="{ui:Tr Title.Menu}" Click="MenuButton_Click" />
                 <Button Style="{StaticResource Btn.Icon}" Content="&#xE713;" WindowChrome.IsHitTestVisibleInChrome="True"
@@ -105,16 +105,25 @@
             <!-- Content surface: a single rounded sheet over the window backdrop -->
             <Border x:Name="ContentSheet" Grid.Column="2" Background="{DynamicResource Bg.Content}" BorderBrush="{DynamicResource Line}" BorderThickness="1,1,0,0"
                     CornerRadius="8,0,0,0" ClipToBounds="True">
-                <Grid x:Name="PanesGrid">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition x:Name="LeftPaneColumn" Width="*" MinWidth="320" />
-                        <ColumnDefinition x:Name="PaneSplitterColumn" Width="0" />
-                        <ColumnDefinition x:Name="RightPaneColumn" Width="0" />
-                    </Grid.ColumnDefinitions>
-                    <v:PaneView Grid.Column="0" DataContext="{Binding Left}" />
-                    <GridSplitter x:Name="PaneSplitter" Grid.Column="1" Style="{StaticResource Splitter}" HorizontalAlignment="Stretch"
-                                  ResizeBehavior="PreviousAndNext" Visibility="{Binding IsSplit, Converter={StaticResource Vis}}" Background="{DynamicResource Line}" />
-                    <v:PaneView Grid.Column="2" DataContext="{Binding Right}" Visibility="{Binding DataContext.IsSplit, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Vis}}" />
+                <!-- Editor grid (built from MainViewModel.Layout) plus, on top, the remote-desktop surfaces of every tab.
+                     The surfaces live here, not inside the panes, so moving a tab or rebuilding the grid never
+                     re-parents a live session; MainWindow.xaml.cs places each one over its pane's content area.
+                     Never re-template this ItemsControl or bind it to anything but LiveTabs (append/remove only). -->
+                <Grid x:Name="PanesArea" AllowDrop="True">
+                    <v:PaneLayoutHost x:Name="LayoutHost" />
+                    <ItemsControl x:Name="SessionOverlay" ItemsSource="{Binding LiveTabs}" Focusable="False">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <Canvas ClipToBounds="True" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:BrowserTabViewModel}">
+                                <ContentControl Content="{Binding Session.Host}" Focusable="False"
+                                                Visibility="{Binding IsSessionVisible, Converter={StaticResource Vis}}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </Grid>
             </Border>
         </Grid>

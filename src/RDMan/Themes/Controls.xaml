@@ -924,6 +924,56 @@
     </Style>
 
     <!-- ═══════════ GridSplitter ═══════════ -->
+    <!-- Between panes of the editor grid: an always-visible hairline in the middle of a 5px grab area, accent while
+         hovered/dragged. One style per direction so the line runs along the splitter. -->
+    <Style x:Key="Splitter.PaneColumns" TargetType="GridSplitter">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Cursor" Value="SizeWE" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Grid Background="{DynamicResource Bg.Base}">
+                        <Border x:Name="Line" Width="1" HorizontalAlignment="Center" Background="{DynamicResource Line.Strong}" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Line" Property="Background" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Line" Property="Width" Value="3" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Line" Property="Background" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Line" Property="Width" Value="3" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="Splitter.PaneRows" TargetType="GridSplitter">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Cursor" Value="SizeNS" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Grid Background="{DynamicResource Bg.Base}">
+                        <Border x:Name="Line" Height="1" VerticalAlignment="Center" Background="{DynamicResource Line.Strong}" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Line" Property="Background" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Line" Property="Height" Value="3" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="Line" Property="Background" Value="{DynamicResource Accent}" />
+                            <Setter TargetName="Line" Property="Height" Value="3" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="Splitter" TargetType="GridSplitter">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="Focusable" Value="False" />

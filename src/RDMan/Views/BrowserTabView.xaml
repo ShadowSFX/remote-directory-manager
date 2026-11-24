@@ -165,10 +165,16 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <Border Width="5" Background="{Binding IdentityBrush, Converter={StaticResource BrushOr}, ConverterParameter=Line.Strong}" />
-                <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="{Binding IdentityName}" Style="{StaticResource Text.Subtitle}" FontSize="17" />
-                        <Border Margin="12,0,0,0" Padding="8,2" CornerRadius="10" VerticalAlignment="Center" Background="{DynamicResource Bg.Hover}"
+                <StackPanel Grid.Column="1" Margin="16,0,12,0" VerticalAlignment="Center" MinWidth="60">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IdentityTitle" Text="{Binding IdentityName}" Style="{StaticResource Text.Subtitle}" FontSize="17"
+                                   TextTrimming="CharacterEllipsis" ToolTip="{Binding IdentityName}" />
+                        <Border x:Name="HealthChip" Grid.Column="1" Margin="12,0,0,0" Padding="8,2" CornerRadius="10" VerticalAlignment="Center" Background="{DynamicResource Bg.Hover}"
                                 DataContext="{Binding Health}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
                             <StackPanel Orientation="Horizontal">
                                 <Ellipse Style="{StaticResource StatusDot.Self}" Width="7" Height="7" />
@@ -189,11 +195,17 @@
                                 </TextBlock>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
-                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                        <TextBlock Text="{Binding IdentityAddress}" Style="{StaticResource Text.Mono}" />
-                        <TextBlock Text="{Binding ConnectedAs}" Style="{StaticResource Text.Caption}" Margin="14,0,0,0" VerticalAlignment="Center" />
-                    </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="IdentityAddressText" Text="{Binding IdentityAddress}" Style="{StaticResource Text.Mono}" TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding IdentityAddress}" />
+                        <TextBlock x:Name="IdentityUser" Grid.Column="1" Text="{Binding ConnectedAs}" Style="{StaticResource Text.Caption}" Margin="14,0,0,0"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    </Grid>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,10,0" VerticalAlignment="Center">
                     <!-- Same server, other view: jumps to (or opens) the companion tab; never tears this one down -->
@@ -201,21 +213,22 @@
                             Visibility="{Binding ShowViewSwitch, Converter={StaticResource Vis}}">
                         <StackPanel Orientation="Horizontal">
                             <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowFilesCommand}" AutomationProperties.Name="{ui:Tr Cap.Files}"
-                                    ui:Ui.IsOn="{Binding IsDesktop, Converter={StaticResource Not}}">
+                                    ui:Ui.IsOn="{Binding IsDesktop, Converter={StaticResource Not}}" ToolTip="{ui:Tr Cap.Files}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
-                                    <TextBlock Text="{ui:Tr Cap.Files}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="FilesIcon" Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock x:Name="FilesLabel" Text="{ui:Tr Cap.Files}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowDesktopCommand}" ui:Ui.IsOn="{Binding IsDesktop}" AutomationProperties.Name="{ui:Tr Cap.Desktop}">
+                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowDesktopCommand}" ui:Ui.IsOn="{Binding IsDesktop}" AutomationProperties.Name="{ui:Tr Cap.Desktop}"
+                                    ToolTip="{ui:Tr Cap.Desktop}">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
-                                    <TextBlock Text="{ui:Tr Cap.Desktop}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="DesktopIcon" Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock x:Name="DesktopLabel" Text="{ui:Tr Cap.Desktop}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
                         </StackPanel>
                     </Border>
-                    <Button Style="{StaticResource Btn.Icon}" Content="&#xEC50;" ToolTip="{ui:Tr Nav.OpenExplorer}" Command="{Binding OpenInExplorerCommand}"
+                    <Button x:Name="IdentityExplorer" Style="{StaticResource Btn.Icon}" Content="&#xEC50;" ToolTip="{ui:Tr Nav.OpenExplorer}" Command="{Binding OpenInExplorerCommand}"
                             Visibility="{Binding IsDesktop, Converter={StaticResource Vis}, ConverterParameter=invert}" />
                     <Button Style="{StaticResource Btn.Icon}" Content="&#xE70F;" ToolTip="{ui:Tr Tree.Ctx.Properties}" Click="EditServer_Click"
                             Visibility="{Binding Server, Converter={StaticResource VisIfAny}}" />
@@ -242,8 +255,8 @@
                 <Button Style="{StaticResource Btn.Icon}" Content="&#xE7E8;" Command="{Binding Session.DisconnectCommand}" ToolTip="{ui:Tr Desktop.Disconnect}"
                         IsEnabled="{Binding Session.IsConnected}" />
             </StackPanel>
-            <TextBlock Grid.Column="2" Text="{ui:Tr Desktop.FocusHint}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="0,0,6,0"
-                       Visibility="{Binding Session.IsConnected, Converter={StaticResource Vis}}" />
+            <TextBlock x:Name="DesktopHint" Grid.Column="2" Text="{ui:Tr Desktop.FocusHint}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="0,0,6,0"
+                       Visibility="{Binding Session.IsConnected, Converter={StaticResource Vis}}" TextTrimming="CharacterEllipsis" />
         </Grid>
 
         <!-- ═══════════ Toolbar ═══════════ -->
@@ -263,7 +276,7 @@
             <!-- Address: breadcrumb, or an editable path -->
             <Border Grid.Column="1" Margin="8,0" Height="32" CornerRadius="6" Background="{DynamicResource Bg.Input}" BorderBrush="{DynamicResource Line}"
                     BorderThickness="1" VerticalAlignment="Center" MouseLeftButtonDown="AddressBar_MouseLeftButtonDown" Cursor="IBeam">
-                <Grid>
+                <Grid x:Name="CrumbHost" ClipToBounds="True">
                     <ItemsControl x:Name="Crumbs" ItemsSource="{Binding Breadcrumb}" Margin="2,0" VerticalAlignment="Center" Cursor="Arrow"
                                   Visibility="{Binding IsEditingPath, Converter={StaticResource Vis}, ConverterParameter=invert}">
                         <ItemsControl.ItemsPanel>

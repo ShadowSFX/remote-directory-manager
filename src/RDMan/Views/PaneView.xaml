@@ -98,22 +98,6 @@
         <!-- Active tab -->
         <Grid Grid.Row="1" x:Name="TabArea">
             <v:BrowserTabView x:Name="TabView" DataContext="{Binding SelectedTab}" />
-            <!-- Remote desktop surfaces of every tab in this pane. They are never re-parented (that would kill the
-                 ActiveX session): switching tabs only toggles visibility, so sessions stay connected in background.
-                 Positioned over the tab's content area (below identity band + toolbar) by PaneView.xaml.cs. -->
-            <ItemsControl x:Name="SessionLayer" ItemsSource="{Binding Tabs}" Focusable="False" VerticalAlignment="Stretch">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <Grid />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:BrowserTabViewModel}">
-                        <ContentControl Content="{Binding Session.Host}" Focusable="False"
-                                        Visibility="{Binding IsSessionVisible, Converter={StaticResource Vis}}" />
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
         </Grid>
     </Grid>
 </UserControl>

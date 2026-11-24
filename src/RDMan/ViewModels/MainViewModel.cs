@@ -26,9 +26,7 @@ public sealed partial class MainViewModel : ObservableObject
     public MainViewModel(AppServices services)
     {
         Services = services;
-        Left = new PaneViewModel(this, "left") { IsActive = true };
-        Right = new PaneViewModel(this, "right");
-        _activePane = Left;
+        _activePane = InitPanes();
         Palette = new CommandPaletteViewModel(this);
         BuildTree();
         BuildLocalPlaces();
@@ -52,13 +50,8 @@ public sealed partial class MainViewModel : ObservableObject
     public UpdateService Updates => Services.Updates;
     public CommandPaletteViewModel Palette { get; }
 
-    public PaneViewModel Left { get; }
-    public PaneViewModel Right { get; }
-
     public ObservableCollection<NodeViewModel> RootNodes { get; } = new();
     public ObservableCollection<LocalPlace> LocalPlaces { get; } = new();
-
-    [ObservableProperty] private bool _isSplit;
 
     /// <summary>The desktop tab shown full screen, or null. MainWindow hides all chrome while this is set.</summary>
     [ObservableProperty] private BrowserTabViewModel? _fullScreenTab;
@@ -180,7 +173,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     private void RefreshDashboards()
     {
-        foreach (var tab in Left.Tabs.Concat(Right.Tabs))
+        foreach (var tab in AllTabs)
             if (tab.Mode == TabMode.Dashboard) _ = tab.StartAsync();
     }
 
@@ -253,7 +246,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (!saved) return false;
         if (!ReferenceEquals(newParent, node.Parent)) Move(node, newParent, -1);
         node.Refresh();
-        foreach (var tab in Left.Tabs.Concat(Right.Tabs)) tab.RefreshIdentity();
+        foreach (var tab in AllTabs) tab.RefreshIdentity();
         Changed();
         return true;
     }
@@ -276,7 +269,7 @@ public sealed partial class MainViewModel : ObservableObject
             if (_map.Remove(id, out var removed) && removed is ServerNodeViewModel sv) sv.Detach();
         }
         Changed();
-        foreach (var tab in Left.Tabs.Concat(Right.Tabs)) tab.RefreshIdentity();
+        foreach (var tab in AllTabs) tab.RefreshIdentity();
     }
 
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node)
@@ -423,22 +416,26 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (from.Server is not { } server) return;
         var pane = from.Pane;
-        var tab = view == ServerAction.Desktop
-            ? pane.Tabs.FirstOrDefault(t => t.Current is DesktopLocation d && d.ServerId == server.Model.Id)
-            : pane.Tabs.FirstOrDefault(t => !ReferenceEquals(t, from) && t.Current is FolderLocation { IsUnc: true } && ReferenceEquals(t.Server, server));
-        if (tab is not null)
+        // Prefer the same pane, then any other pane.
+        var hit = FindTab(t => ReferenceEquals(t.Pane, pane) && IsCompanion(t))
+                  ?? FindTab(IsCompanion);
+        if (hit is { } h)
         {
-            pane.SelectedTab = tab;
+            Reveal(h.Pane, h.Tab);
             return;
         }
         if (view == ServerAction.Desktop) OpenDesktop(server, OpenTarget.NewTab);
         else OpenInNewTab(new FolderLocation(server.RootPath), pane);
+
+        bool IsCompanion(BrowserTabViewModel t) => view == ServerAction.Desktop
+            ? t.Current is DesktopLocation d && d.ServerId == server.Model.Id
+            : !ReferenceEquals(t, from) && t.Current is FolderLocation { IsUnc: true } && ReferenceEquals(t.Server, server);
     }
 
-    /// <summary>Shows a tab wherever it lives — reopening the split view if the tab sits in the hidden right pane.</summary>
+    /// <summary>Shows a tab wherever it lives (leaving another tab's full screen first).</summary>
     private void Reveal(PaneViewModel pane, BrowserTabViewModel tab)
     {
-        if (ReferenceEquals(pane, Right) && !IsSplit) ToggleSplit();
+        if (FullScreenTab is { } fs && !ReferenceEquals(fs, tab)) ExitFullScreen();
         Activate(pane);
         pane.SelectedTab = tab;
     }
@@ -468,11 +465,9 @@ public sealed partial class MainViewModel : ObservableObject
         return Dialogs.Confirm(Owner, Loc.T("Desktop.Disconnect"), message, Loc.T("Desktop.Disconnect"), danger: false);
     }
 
-    public IEnumerable<BrowserTabViewModel> AllTabs => Left.Tabs.Concat(Right.Tabs);
-
     private (PaneViewModel Pane, BrowserTabViewModel Tab)? FindTab(Func<BrowserTabViewModel, bool> match)
     {
-        foreach (var pane in new[] { Left, Right })
+        foreach (var pane in Panes)
             foreach (var t in pane.Tabs)
                 if (match(t)) return (pane, t);
         return null;
@@ -507,10 +502,14 @@ public sealed partial class MainViewModel : ObservableObject
         Activate(pane);
     }
 
+    /// <summary>Opens in the pane used before this one; with a single pane, splits it to the right.</summary>
     public void OpenInOtherPane(Location location, PaneViewModel from, Action<BrowserTabViewModel>? configure = null)
     {
-        if (!IsSplit) ToggleSplit();
-        var other = ReferenceEquals(from, Left) ? Right : Left;
+        if (OtherPane(from) is not { } other)
+        {
+            SplitPane(from, Core.Layout.DropSide.Right, p => p.AddTab(location, configure: configure));
+            return;
+        }
         if (other.SelectedTab is null || other.SelectedTab.Session is { IsConnected: true })
             other.AddTab(location, index: other.SelectedTab is null ? null : other.Tabs.IndexOf(other.SelectedTab) + 1, configure: configure);
         else
@@ -520,9 +519,6 @@ public sealed partial class MainViewModel : ObservableObject
         }
         Activate(other);
     }
-
-    public BrowserTabViewModel? OtherPaneTab(PaneViewModel pane)
-        => !IsSplit ? null : (ReferenceEquals(pane, Left) ? Right : Left).SelectedTab;
 
     [RelayCommand]
     private void OpenLocalPlace(LocalPlace place) => Open(new FolderLocation(place.Path), OpenTarget.Current);
@@ -632,14 +628,6 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // ───────────── Panes & tabs ─────────────
-    public void Activate(PaneViewModel pane)
-    {
-        if (ReferenceEquals(ActivePane, pane)) return;
-        ActivePane.IsActive = false;
-        ActivePane = pane;
-        pane.IsActive = true;
-    }
-
     partial void OnActivePaneChanged(PaneViewModel value) => OnPaneTabChanged(value);
 
     public void OnPaneTabChanged(PaneViewModel pane)
@@ -671,26 +659,6 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
-    public void ToggleSplit()
-    {
-        ExitFullScreen();
-        IsSplit = !IsSplit;
-        if (IsSplit)
-        {
-            if (Right.Tabs.Count == 0)
-            {
-                var saved = State.Settings.Panes.ElementAtOrDefault(1);
-                if (State.Settings.RestoreTabs && saved is { Tabs.Count: > 0 }) Restore(Right, saved);
-                else Right.AddTab(ActiveTab?.Current is { } cur and not DesktopLocation ? cur : new HomeLocation());
-            }
-            Activate(Right);
-        }
-        else Activate(Left);
-        State.Settings.SplitView = IsSplit;
-        State.MarkSettingsDirty();
-    }
-
-    [RelayCommand]
     private void NewTab() => ActivePane.NewTabCommand.Execute(null);
 
     [RelayCommand]
@@ -701,12 +669,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     [RelayCommand]
     private void PreviousTab() => ActivePane.SelectNext(-1);
-
-    [RelayCommand]
-    private void FocusOtherPane()
-    {
-        if (IsSplit) Activate(ReferenceEquals(ActivePane, Left) ? Right : Left);
-    }
 
     [RelayCommand]
     private void OpenPalette() => Palette.Open();
@@ -721,7 +683,7 @@ public sealed partial class MainViewModel : ObservableObject
     public void AfterProfilesChanged()
     {
         foreach (var n in _map.Values) n.Refresh();
-        foreach (var tab in Left.Tabs.Concat(Right.Tabs)) tab.RefreshIdentity();
+        foreach (var tab in AllTabs) tab.RefreshIdentity();
         foreach (var s in AllServers()) Services.Connections.Invalidate(s.Host);
         State.MarkDirty();
     }
@@ -879,21 +841,6 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    public void RestoreTabs()
-    {
-        var s = State.Settings;
-        var panes = s.RestoreTabs ? s.Panes : new List<SavedPane>();
-        Restore(Left, panes.ElementAtOrDefault(0));
-        // The right pane is only rebuilt when it will be visible; otherwise its saved tabs are kept for later
-        // (see SaveSession) instead of connecting to servers nobody can see.
-        if (s.SplitView && panes.Count > 1 && panes[1].Tabs.Count > 0) Restore(Right, panes[1]);
-        if (s.SplitView && s.RestoreTabs)
-        {
-            IsSplit = true;
-            if (Right.Tabs.Count == 0) Right.AddTab(new HomeLocation());
-        }
-    }
-
     private void Restore(PaneViewModel pane, SavedPane? saved)
     {
         if (saved is null || saved.Tabs.Count == 0)
@@ -915,15 +862,6 @@ public sealed partial class MainViewModel : ObservableObject
         pane.SelectedTab = active ?? pane.Tabs[0];
     }
 
-    private void SaveSession()
-    {
-        var s = State.Settings;
-        var right = Right.Tabs.Count > 0 ? Right.Save() : s.Panes.ElementAtOrDefault(1) ?? new SavedPane();
-        s.Panes = new List<SavedPane> { Left.Save(), right };
-        s.SplitView = IsSplit;
-        State.Flush();
-    }
-
     /// <summary>Set once the user agreed to end the open desktop sessions (so closing doesn't ask twice).</summary>
     public bool SessionsEndConfirmed { get; set; }
 
@@ -931,8 +869,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var s = State.Settings;
         SaveSession();
-        Left.DisposeAll();
-        Right.DisposeAll();
+        foreach (var pane in Panes) pane.DisposeAll();
         if (s.DisconnectOnExit) Services.Connections.DisconnectAllOpenedByUs();
     }
 }

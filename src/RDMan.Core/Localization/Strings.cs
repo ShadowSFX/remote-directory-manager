@@ -73,7 +73,7 @@ public static partial class Strings
         T("Title.Maximize", "Maximizar", "Maximize");
         T("Title.Restore", "Restaurar", "Restore");
         T("Title.Close", "Cerrar", "Close");
-        T("Title.Split", "Dividir en dos paneles (F3)", "Split into two panes (F3)");
+        T("Title.Split", "Dividir a la derecha (F3)", "Split right (F3)");
         T("Title.Unsplit", "Volver a un panel (F3)", "Back to one pane (F3)");
         T("Title.Menu", "Menú", "Menu");
 
@@ -201,6 +201,13 @@ public static partial class Strings
         T("File.CopyPath", "Copiar ruta", "Copy path");
         T("File.CopyToOther", "Copiar al otro panel", "Copy to the other pane");
         T("File.MoveToOther", "Mover al otro panel", "Move to the other pane");
+        T("File.CopyToPane", "Copiar a «{0}»", "Copy to “{0}”");
+        T("File.MoveToPane", "Mover a «{0}»", "Move to “{0}”");
+        T("Pane.SplitRight", "Dividir a la derecha", "Split right");
+        T("Pane.SplitDown", "Dividir abajo", "Split down");
+        T("Pane.Close", "Cerrar panel", "Close pane");
+        T("Pane.NoRoom", "No hay espacio para dividir este panel: agranda la ventana o cierra otro panel.", "There's no room to split this pane: make the window bigger or close another pane.");
+        T("Pane.Max", "Ya hay {0} paneles: cierra uno para abrir otro.", "There are already {0} panes: close one to open another.");
         T("File.MoreOptions", "Más opciones de Windows", "More Windows options");
         T("File.Properties", "Propiedades", "Properties");
         T("File.NewFolder", "Nueva carpeta", "New folder");

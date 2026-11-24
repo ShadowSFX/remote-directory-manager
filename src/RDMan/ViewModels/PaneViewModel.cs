@@ -5,7 +5,7 @@ using RDMan.Core.Persistence;
 
 namespace RDMan.ViewModels;
 
-/// <summary>One side of the window: a strip of tabs, one visible at a time.</summary>
+/// <summary>One pane of the editor grid: a strip of tabs, one visible at a time.</summary>
 public sealed partial class PaneViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
@@ -36,6 +36,7 @@ public sealed partial class PaneViewModel : ObservableObject
         configure?.Invoke(tab); // before selection: selecting starts the tab
         if (index is { } i && i >= 0 && i <= Tabs.Count) Tabs.Insert(i, tab);
         else Tabs.Add(tab);
+        _main.RegisterTab(tab);
         if (select) SelectedTab = tab;
         return tab;
     }
@@ -57,14 +58,19 @@ public sealed partial class PaneViewModel : ObservableObject
         if (!tab.ConfirmLeaveDesktop()) return;
         if (Tabs.Count == 1)
         {
-            // Never leave a pane empty: closing the last tab resets it to Home (like a browser's new-tab page).
+            // Like VS Code: the last tab of a pane closes the pane, unless it's the only pane — that one resets to Home.
+            if (_main.HasMultiplePanes)
+            {
+                _main.ClosePane(this);
+                return;
+            }
             if (tab.Current is HomeLocation) return;
             tab.Session?.Disconnect(); // already confirmed above; don't ask twice
             _ = tab.NavigateAsync(new HomeLocation());
             return;
         }
         Tabs.RemoveAt(index);
-        tab.Dispose();
+        _main.ReleaseTab(tab);
         if (ReferenceEquals(SelectedTab, tab) || SelectedTab is null)
             SelectedTab = Tabs[Math.Min(index, Tabs.Count - 1)];
     }
@@ -78,7 +84,7 @@ public sealed partial class PaneViewModel : ObservableObject
         foreach (var t in others)
         {
             Tabs.Remove(t);
-            t.Dispose();
+            _main.ReleaseTab(t);
         }
         SelectedTab = keep;
     }
@@ -102,13 +108,24 @@ public sealed partial class PaneViewModel : ObservableObject
         SelectedTab = Tabs[i];
     }
 
-    public void MoveTab(BrowserTabViewModel tab, int newIndex)
+    /// <summary>Whether this pane can be closed on its own (there is another pane).</summary>
+    public bool CanClose => _main.HasMultiplePanes;
+
+    /// <summary>The grid changed (panes added/removed): refresh anything that depends on it.</summary>
+    public void NotifyLayout()
     {
-        var old = Tabs.IndexOf(tab);
-        if (old < 0) return;
-        newIndex = Math.Clamp(newIndex, 0, Tabs.Count - 1);
-        if (old != newIndex) Tabs.Move(old, newIndex);
+        OnPropertyChanged(nameof(CanClose));
+        foreach (var t in Tabs) t.NotifyPaneContext();
     }
+
+    [RelayCommand]
+    private void SplitRight(BrowserTabViewModel? tab) => _main.SplitWithCopy(this, Core.Layout.DropSide.Right, tab);
+
+    [RelayCommand]
+    private void SplitDown(BrowserTabViewModel? tab) => _main.SplitWithCopy(this, Core.Layout.DropSide.Bottom, tab);
+
+    [RelayCommand]
+    private void ClosePane() => _main.CloseWholePane(this);
 
     public SavedPane Save() => new()
     {
