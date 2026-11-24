@@ -185,6 +185,9 @@ public sealed partial class SshEditorViewModel : ObservableObject
         var port = TryPort(out var p) && p > 0 ? p : cfg?.Port ?? SshEndpoint.DefaultPort;
         var target = new SshDestination(string.IsNullOrEmpty(user) ? null : user, cfg?.EffectiveHost ?? host, port == 22 ? null : port).ToString();
         ConfigMatched = cfg is { MatchedSpecificHost: true };
+        // The user field's placeholder says what will be used when it's left empty.
+        if (string.IsNullOrWhiteSpace(Username) && cfg?.User is { Length: > 0 } cfgUser && InheritedUser() is null)
+            UsernameHint = Loc.F("Term.Editor.User.FromConfig", cfgUser);
         if (ConfigMatched)
         {
             var key = cfg!.IdentityFiles.Count > 0 ? Path.GetFileName(cfg.IdentityFiles[0]) : null;

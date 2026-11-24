@@ -1135,12 +1135,22 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
             Target = target,
             Config = _env.Config,
             Secrets = _svc.State.Secrets,
-            Prompts = this,
+            Prompts = new QuietPrompts(this),
             Password = password,
             TrustedOnce = _trustedOnce,
         };
         foreach (var (k, v) in _passphrases) request.Passphrases[k] = v;
         return request;
+    }
+
+    /// <summary>Companion connections still ask in this terminal (cards) but never print progress into the shell.</summary>
+    private sealed class QuietPrompts(ISshPrompts inner) : ISshPrompts
+    {
+        public Task<string?> AskPassphraseAsync(string keyName, CancellationToken ct) => inner.AskPassphraseAsync(keyName, ct);
+        public Task<SshPasswordAnswer?> AskPasswordAsync(string? user, bool userEditable, CancellationToken ct) => inner.AskPasswordAsync(user, userEditable, ct);
+        public Task<string[]?> AskKeyboardInteractiveAsync(string? name, string? instruction, IReadOnlyList<SshPromptField> fields, CancellationToken ct)
+            => inner.AskKeyboardInteractiveAsync(name, instruction, fields, ct);
+        public void Progress(SshProgress step, string detail) { }
     }
 
     // ───────────── Broadcast ─────────────

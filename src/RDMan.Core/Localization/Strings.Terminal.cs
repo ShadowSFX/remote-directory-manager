@@ -77,6 +77,7 @@ public static partial class Strings
         T("Term.Editor.Auth.Agent", "Solo el agente SSH", "SSH agent only");
         T("Term.Editor.Auth.AgentNote", "Las llaves cargadas en el agente de OpenSSH de Windows o en Pageant.", "The keys loaded in the Windows OpenSSH agent or Pageant.");
         T("Term.Editor.Auth.Stored", "Contraseñas y llaves se guardan cifradas para tu usuario de Windows y no se exportan salvo que lo pidas.", "Passwords and keys are stored encrypted for your Windows user and aren't exported unless you ask.");
+        T("Term.Editor.User.FromConfig", "{0} (del ~/.ssh/config)", "{0} (from ~/.ssh/config)");
         T("Term.Editor.User.Hint", "Del ~/.ssh/config, o se preguntará", "From ~/.ssh/config, or asked when connecting");
         T("Term.Editor.InheritedHint", "{0} (heredado de «{1}»)", "{0} (inherited from “{1}”)");
         T("Term.Editor.Key.None", "Aún no hay llaves en RDMan.", "No keys in RDMan yet.");

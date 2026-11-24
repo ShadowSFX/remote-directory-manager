@@ -42,7 +42,10 @@ public sealed class SftpEntry
     public bool IsHidden => Name.StartsWith('.');
     public string Glyph => IsDirectory ? "" : IsLink ? "" : "";
     public string SizeText => IsDirectory ? "" : FormatSize(Length);
-    public string ModifiedText => Modified.ToString("g", CultureInfo.CurrentCulture);
+    /// <summary>"26 sep 14:00" this year, "26 sep 2025" before (like ls -l).</summary>
+    public string ModifiedText => Modified.Year == DateTime.Now.Year
+        ? Modified.ToString("d MMM HH:mm", CultureInfo.CurrentCulture)
+        : Modified.ToString("d MMM yyyy", CultureInfo.CurrentCulture);
 
     public static string FormatSize(long bytes)
     {
