@@ -29,6 +29,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private readonly MainViewModel _main;
     private readonly AppServices _svc;
     private RdpControl? _control;
+    private EventHandler<RoyalApps.Community.Rdp.WinForms.Controls.Events.ConnectedEventArgs>? _connectedHandler;
+    private EventHandler<RoyalApps.Community.Rdp.WinForms.Controls.Events.DisconnectedEventArgs>? _disconnectedHandler;
     private PromptedCredential? _sessionCredential; // typed for this session only ("Remember" off)
     private bool _promptedAfterFailure;
     private bool _disposed;
@@ -79,8 +81,12 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         Error = null;
         var control = new RdpControl();
         Configure(control, credential);
-        control.OnConnected += OnConnected;
-        control.OnDisconnected += OnDisconnected;
+        // The library raises these with the inner ActiveX client as sender, not the RdpControl: bind each handler
+        // to *this* control so events from a control we already replaced are ignored.
+        _connectedHandler = (_, e) => { if (ReferenceEquals(_control, control)) OnConnected(e); };
+        _disconnectedHandler = (_, e) => { if (ReferenceEquals(_control, control)) OnDisconnected(e); };
+        control.OnConnected += _connectedHandler;
+        control.OnDisconnected += _disconnectedHandler;
         control.RdpClientConfigured += OnClientConfigured;
         _control = control;
 
@@ -229,18 +235,18 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     }
 
     // ───────────── Events ─────────────
-    private void OnConnected(object? sender, RoyalApps.Community.Rdp.WinForms.Controls.Events.ConnectedEventArgs e)
+    private void OnConnected(RoyalApps.Community.Rdp.WinForms.Controls.Events.ConnectedEventArgs e)
     {
-        if (!ReferenceEquals(sender, _control)) return;
+        if (_disposed) return;
         State = DesktopState.Connected;
         _promptedAfterFailure = false;
         Server.Server.LastConnected = DateTimeOffset.Now;
         _svc.State.MarkDirty();
     }
 
-    private void OnDisconnected(object? sender, RoyalApps.Community.Rdp.WinForms.Controls.Events.DisconnectedEventArgs e)
+    private void OnDisconnected(RoyalApps.Community.Rdp.WinForms.Controls.Events.DisconnectedEventArgs e)
     {
-        if (!ReferenceEquals(sender, _control) || _disposed) return;
+        if (_disposed) return;
         var t = RdpErrorTranslator.Translate(e.DisconnectCode, e.ExtendedDisconnectReasonCode ?? 0);
         if (!t.IsError || e.UserInitiated)
         {
@@ -367,8 +373,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         _control = null;
         if (control is not null)
         {
-            control.OnConnected -= OnConnected;
-            control.OnDisconnected -= OnDisconnected;
+            if (_connectedHandler is not null) control.OnConnected -= _connectedHandler;
+            if (_disconnectedHandler is not null) control.OnDisconnected -= _disconnectedHandler;
             control.RdpClientConfigured -= OnClientConfigured;
             try
             {

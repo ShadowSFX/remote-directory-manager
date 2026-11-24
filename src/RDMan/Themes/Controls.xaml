@@ -494,13 +494,18 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="8,6">
-                        <StackPanel Orientation="Horizontal">
-                            <Grid Width="18" Height="18" VerticalAlignment="Center">
+                        <!-- Grid (not a horizontal StackPanel) so long descriptions get a width and wrap -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Width="18" Height="18" VerticalAlignment="Top" Margin="0,1,0,0">
                                 <Ellipse x:Name="Ring" Stroke="{DynamicResource Fg.Tertiary}" StrokeThickness="1.5" />
                                 <Ellipse x:Name="Dot" Width="8" Height="8" Fill="{DynamicResource Fg.OnAccent}" Visibility="Collapsed" />
                             </Grid>
-                            <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
-                        </StackPanel>
+                            <ContentPresenter Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">

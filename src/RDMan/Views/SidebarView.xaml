@@ -134,8 +134,13 @@
                     <Ellipse Style="{StaticResource StatusDot}" HorizontalAlignment="Right" />
                 </Grid>
                 <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="2" Text="{Binding Host}" Style="{StaticResource Text.Mono}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}"
-                           Margin="8,0,10,0" VerticalAlignment="Center" MaxWidth="120" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="8,0,10,0" VerticalAlignment="Center">
+                    <!-- remote desktop available -->
+                    <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource Font.Icons}" FontSize="10" Foreground="{DynamicResource Fg.Tertiary}"
+                               VerticalAlignment="Center" Margin="0,1,6,0" Visibility="{Binding HasDesktop, Converter={StaticResource Vis}}" />
+                    <TextBlock Text="{Binding Host}" Style="{StaticResource Text.Mono}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}"
+                               VerticalAlignment="Center" MaxWidth="110" />
+                </StackPanel>
             </Grid>
         </DataTemplate>
 
@@ -161,7 +166,7 @@
         </Grid.RowDefinitions>
 
         <!-- Home -->
-        <Button Grid.Row="0" Style="{StaticResource PlaceButton}" Command="{Binding OpenHomeCommand}" Margin="6,4,6,2">
+        <Button Grid.Row="0" Style="{StaticResource PlaceButton}" Command="{Binding OpenHomeCommand}" Margin="6,4,6,2" AutomationProperties.Name="{ui:Tr Home.Title}">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="&#xE80F;" Style="{StaticResource Icon}" FontSize="14" Foreground="{DynamicResource Fg.Secondary}" Width="18" Margin="20,0,8,0" />
                 <TextBlock Text="{ui:Tr Home.Title}" VerticalAlignment="Center" />
@@ -245,7 +250,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate DataType="{x:Type vm:LocalPlace}">
                             <Button Style="{StaticResource PlaceButton}" Command="{Binding DataContext.OpenLocalPlaceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    CommandParameter="{Binding}" ToolTip="{Binding Path}" AllowDrop="True" Tag="{Binding Path}"
+                                    CommandParameter="{Binding}" ToolTip="{Binding Path}" AllowDrop="True" Tag="{Binding Path}" AutomationProperties.Name="{Binding Name}"
                                     DragOver="Place_DragOver" Drop="Place_Drop">
                                 <StackPanel Orientation="Horizontal">
                                     <Image Source="{Binding Icon}" Width="16" Height="16" Margin="20,0,10,0" RenderOptions.BitmapScalingMode="HighQuality" />

@@ -4,96 +4,182 @@
                 xmlns:ui="clr-namespace:RDMan.Infrastructure"
                 xmlns:v="clr-namespace:RDMan.Views"
                 xmlns:vm="clr-namespace:RDMan.ViewModels"
-                Title="{Binding Title}" Width="600">
+                Title="{Binding Title}" Width="800" Height="660" SizeToContent="Manual">
+    <v:DialogWindow.Resources>
+        <!-- One credentials block for files and for remote desktop (IsDesktop switches the wording/options) -->
+        <DataTemplate x:Key="CredentialBlock" DataType="{x:Type vm:CredentialEditorViewModel}">
+            <StackPanel>
+                <RadioButton Style="{StaticResource Radio.Option}" IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Inherit}">
+                    <StackPanel>
+                        <TextBlock x:Name="InheritLabel" Text="{ui:Tr Cred.Mode.Inherit}" />
+                        <TextBlock Text="{Binding InheritText}" Style="{StaticResource Text.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Radio.Option}" IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=CurrentUser}">
+                    <StackPanel>
+                        <TextBlock x:Name="WindowsLabel" Text="{ui:Tr Cred.Mode.CurrentUser}" />
+                        <TextBlock Text="{ui:Tr Cred.Desktop.WindowsNote}" Style="{StaticResource Text.Caption}" Margin="0,2,0,0" TextWrapping="Wrap"
+                                   Visibility="{Binding IsDesktop, Converter={StaticResource Vis}}" />
+                    </StackPanel>
+                </RadioButton>
+                <RadioButton Style="{StaticResource Radio.Option}" Content="{ui:Tr Cred.Mode.Custom}"
+                             IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Custom}" />
+                <StackPanel Margin="36,4,0,8" Visibility="{Binding IsCustom, Converter={StaticResource Vis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{ui:Tr Cred.Username}" Style="{StaticResource Text.Label}" FontWeight="Normal" Foreground="{DynamicResource Fg.Secondary}" />
+                            <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="{ui:Tr Cred.UsernameHint}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="{ui:Tr Cred.Password}" Style="{StaticResource Text.Label}" FontWeight="Normal" Foreground="{DynamicResource Fg.Secondary}" />
+                            <PasswordBox Tag="empty" ui:Ui.Hint="{Binding PasswordHint}" PasswordChanged="Password_PasswordChanged" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="{ui:Tr Cred.PasswordUnreadable}" Foreground="{DynamicResource Status.Warn}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Visibility="{Binding PasswordUnreadable, Converter={StaticResource Vis}}" />
+                </StackPanel>
+                <RadioButton Style="{StaticResource Radio.Option}" Content="{ui:Tr Cred.Mode.Profile}"
+                             IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Profile}" />
+                <StackPanel Margin="36,4,0,8" Visibility="{Binding IsProfile, Converter={StaticResource Vis}}">
+                    <ComboBox ItemsSource="{Binding Profiles}" SelectedValuePath="Id" SelectedValue="{Binding ProfileId}" DisplayMemberPath="Display"
+                              Visibility="{Binding HasProfiles, Converter={StaticResource Vis}}" />
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding HasProfiles, Converter={StaticResource Vis}, ConverterParameter=invert}">
+                        <TextBlock Text="{ui:Tr Cred.NoProfiles}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                        <Button Style="{StaticResource Btn.Link}" Content="{ui:Tr Profiles.Add}" Margin="8,0,0,0" Command="{Binding ManageProfilesCommand}" />
+                    </StackPanel>
+                </StackPanel>
+                <RadioButton Style="{StaticResource Radio.Option}" Content="{ui:Tr Cred.Mode.Guest}"
+                             IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Guest}"
+                             Visibility="{Binding IsFiles, Converter={StaticResource Vis}}" />
+                <TextBlock Text="{ui:Tr Cred.GuestNote}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" Margin="36,0,0,6"
+                           Visibility="{Binding IsGuest, Converter={StaticResource Vis}}" />
+                <Grid Margin="8,10,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE72E;" Style="{StaticResource Icon}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}" Margin="0,0,8,0" />
+                        <TextBlock Text="{ui:Tr Cred.Stored}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" MaxWidth="420" />
+                    </StackPanel>
+                    <Button Style="{StaticResource Btn.Link}" HorizontalAlignment="Right" VerticalAlignment="Top" Content="{ui:Tr Cred.ManageProfiles}"
+                            Command="{Binding ManageProfilesCommand}" />
+                </Grid>
+            </StackPanel>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsDesktop}" Value="True">
+                    <Setter TargetName="InheritLabel" Property="Text" Value="{ui:Tr Cred.Desktop.Mode.Inherit}" />
+                    <Setter TargetName="WindowsLabel" Property="Text" Value="{ui:Tr Cred.Desktop.Windows}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <Style x:Key="SectionTitle" TargetType="TextBlock" BasedOn="{StaticResource Text.Subtitle}">
+            <Setter Property="Margin" Value="0,0,0,14" />
+        </Style>
+        <Style x:Key="Panel" TargetType="Border" BasedOn="{StaticResource Surface.Card}">
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="Margin" Value="0,0,0,16" />
+        </Style>
+    </v:DialogWindow.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="196" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <ScrollViewer MaxHeight="640" VerticalScrollBarVisibility="Auto">
-            <StackPanel Style="{StaticResource Dialog.Body}">
+        <!-- ═══════════ Section navigation ═══════════ -->
+        <ListBox ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}" Margin="12,0,0,12" KeyboardNavigation.TabNavigation="Once">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="FocusVisualStyle" Value="{StaticResource Focus.Inset}" />
+                    <Setter Property="AutomationProperties.Name" Value="{Binding Label}" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ListBoxItem">
+                                <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Height="36" Margin="0,1">
+                                    <Grid>
+                                        <Border x:Name="Pill" Width="3" Height="16" CornerRadius="1.5" HorizontalAlignment="Left" Background="{DynamicResource Accent}"
+                                                Visibility="Collapsed" />
+                                        <ContentPresenter Margin="14,0,8,0" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Bg.Hover}" />
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Bg.Selected}" />
+                                        <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:SectionChoice}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="14" Foreground="{DynamicResource Fg.Secondary}" Width="18" />
+                        <TextBlock Text="{Binding Label}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
 
-                <!-- Name -->
-                <StackPanel Style="{StaticResource Field}">
-                    <TextBlock Text="{ui:Tr Server.Name}" Style="{StaticResource Text.Label}" />
-                    <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontSize="14" MinHeight="36"
-                             ui:Ui.Hint="{ui:Tr Server.NameHint}" />
-                </StackPanel>
+        <!-- ═══════════ Section content ═══════════ -->
+        <ScrollViewer x:Name="ContentScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="20,0,24,12">
+            <Grid>
+                <!-- General -->
+                <StackPanel Visibility="{Binding IsGeneralSection, Converter={StaticResource Vis}}">
+                    <StackPanel Style="{StaticResource Field}">
+                        <TextBlock Text="{ui:Tr Server.Name}" Style="{StaticResource Text.Label}" />
+                        <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontSize="14" MinHeight="36"
+                                 ui:Ui.Hint="{ui:Tr Server.NameHint}" />
+                    </StackPanel>
 
-                <!-- Server address -->
-                <StackPanel DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
+                    <StackPanel Style="{StaticResource Field}" DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
+                        <TextBlock Text="{ui:Tr Server.Address}" Style="{StaticResource Text.Label}" />
+                        <TextBox x:Name="AddressBox" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}"
+                                 ui:Ui.Hint="10.0.0.12" />
+                        <TextBlock Text="{ui:Tr Server.AddressHint}" Style="{StaticResource Text.Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                    </StackPanel>
+
                     <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="14" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
-                            <TextBlock Text="{ui:Tr Server.Address}" Style="{StaticResource Text.Label}" />
-                            <TextBox x:Name="AddressBox" Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}"
-                                     ui:Ui.Hint="10.0.0.12" />
-                            <TextBlock Text="{ui:Tr Server.AddressHint}" Style="{StaticResource Text.Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="{ui:Tr Server.Group}" Style="{StaticResource Text.Label}" />
+                            <ComboBox ItemsSource="{Binding Parents}" SelectedItem="{Binding SelectedParent}" MaxDropDownHeight="320">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:GroupChoice}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Width="{Binding Depth, Converter={StaticResource Mul}, ConverterParameter=14}" />
+                                            <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                         </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Text="{ui:Tr Server.Share}" Style="{StaticResource Text.Label}" />
-                            <Grid>
-                                <TextBox Text="{Binding Share, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="{ui:Tr Common.Optional}"
-                                         Padding="10,0,34,0" />
-                                <Button x:Name="ShareMenuButton" Style="{StaticResource Btn.IconSmall}" Content="&#xE70D;" HorizontalAlignment="Right" Margin="0,0,4,0"
-                                        ToolTip="{ui:Tr Server.PickShare}" Click="ShareMenuButton_Click"
-                                        Visibility="{Binding HasDiscoveredShares, Converter={StaticResource Vis}}" />
-                            </Grid>
-                            <TextBlock Text="{ui:Tr Server.ShareHint}" Style="{StaticResource Text.Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Grid>
-                    <Border Background="{DynamicResource Warn.Subtle}" CornerRadius="6" Padding="12,8" Margin="0,-4,0,16"
-                            Visibility="{Binding DuplicateWarning, Converter={StaticResource VisIfAny}}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE7BA;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Status.Warn}" Margin="0,0,10,0" />
-                            <TextBlock Text="{Binding DuplicateWarning}" TextWrapping="Wrap" Foreground="{DynamicResource Fg.Primary}" />
-                        </StackPanel>
-                    </Border>
-                    <Grid Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="12" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Text="{ui:Tr Server.StartFolder}" Style="{StaticResource Text.Label}" />
-                            <TextBox Text="{Binding StartFolder, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="{ui:Tr Common.Optional}" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
+                        <StackPanel Grid.Column="2" DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
                             <TextBlock Text="{ui:Tr Server.Tags}" Style="{StaticResource Text.Label}" />
                             <TextBox Text="{Binding Tags, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="{ui:Tr Server.TagsHint}" />
                         </StackPanel>
                     </Grid>
-                </StackPanel>
 
-                <!-- Group + color -->
-                <Grid Margin="0,0,0,16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Text="{ui:Tr Server.Group}" Style="{StaticResource Text.Label}" />
-                        <ComboBox ItemsSource="{Binding Parents}" SelectedItem="{Binding SelectedParent}" MaxDropDownHeight="320">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate DataType="{x:Type vm:GroupChoice}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <Border Width="{Binding Depth, Converter={StaticResource Mul}, ConverterParameter=14}" />
-                                        <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
+                    <StackPanel Style="{StaticResource Field}">
                         <TextBlock Text="{ui:Tr Server.Color}" Style="{StaticResource Text.Label}" />
-                        <ItemsControl ItemsSource="{Binding Colors}" Margin="0,2,0,0">
+                        <ItemsControl ItemsSource="{Binding Colors}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel />
@@ -102,131 +188,175 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate DataType="{x:Type vm:ColorChoice}">
                                     <RadioButton Style="{StaticResource Radio.Swatch}" GroupName="color" Background="{Binding Brush}" ToolTip="{Binding Label}"
-                                                 BorderBrush="{DynamicResource Line.Strong}" Margin="0,0,1,0" Width="25" Height="25"
-                                                 Tag="{Binding Key}" Checked="Swatch_Checked" Loaded="Swatch_Loaded" />
+                                                 BorderBrush="{DynamicResource Line.Strong}" Margin="0,0,4,0" Tag="{Binding Key}"
+                                                 Checked="Swatch_Checked" Loaded="Swatch_Loaded" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
-                </Grid>
 
-                <!-- Credentials -->
-                <Border x:Name="CredentialsSection" Style="{StaticResource Surface.Card}" Padding="16,14" Margin="0,4,0,16" DataContext="{Binding Credentials}">
-                    <StackPanel>
-                        <Grid Margin="0,0,0,8">
-                            <TextBlock Text="{ui:Tr Cred.Section}" Style="{StaticResource Text.Subtitle}" FontSize="14" />
-                            <Button Style="{StaticResource Btn.Link}" HorizontalAlignment="Right" Content="{ui:Tr Cred.ManageProfiles}" Command="{Binding ManageProfilesCommand}" />
-                        </Grid>
-                        <TextBlock Text="{ui:Tr Group.CredentialsNote}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" Margin="0,0,0,8"
-                                   Visibility="{Binding DataContext.IsServer, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Vis}, ConverterParameter=invert}" />
-
-                        <RadioButton Style="{StaticResource Radio.Option}" GroupName="cred" IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Inherit}">
-                            <StackPanel>
-                                <TextBlock Text="{ui:Tr Cred.Mode.Inherit}" />
-                                <TextBlock Text="{Binding InheritText}" Style="{StaticResource Text.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                    <!-- What a click opens, only when the server offers both -->
+                    <StackPanel Style="{StaticResource Field}" DataContext="{Binding ServerFields}"
+                                Visibility="{Binding HasBoth, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
+                        <TextBlock Text="{ui:Tr Server.DefaultAction}" Style="{StaticResource Text.Label}" />
+                        <Border Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="1" HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Style="{StaticResource Radio.Segment}" GroupName="action"
+                                             IsChecked="{Binding DefaultAction, Converter={StaticResource Eq}, ConverterParameter=Files}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0" />
+                                        <TextBlock Text="{ui:Tr Cap.Files}" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource Radio.Segment}" GroupName="action"
+                                             IsChecked="{Binding DefaultAction, Converter={StaticResource Eq}, ConverterParameter=Desktop}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0" />
+                                        <TextBlock Text="{ui:Tr Cap.Desktop}" />
+                                    </StackPanel>
+                                </RadioButton>
                             </StackPanel>
-                        </RadioButton>
-                        <RadioButton Style="{StaticResource Radio.Option}" GroupName="cred" Content="{ui:Tr Cred.Mode.CurrentUser}"
-                                     IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=CurrentUser}" />
-                        <RadioButton Style="{StaticResource Radio.Option}" GroupName="cred" IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Custom}"
-                                     Content="{ui:Tr Cred.Mode.Custom}" />
-                        <StackPanel Margin="36,4,0,8" Visibility="{Binding IsCustom, Converter={StaticResource Vis}}">
-                            <Grid>
+                        </Border>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Files -->
+                <StackPanel Visibility="{Binding IsFilesSection, Converter={StaticResource Vis}}">
+                    <StackPanel DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Server.Files.Enable}" IsChecked="{Binding FilesEnabled}" Margin="0,4,0,18"
+                                  FontWeight="SemiBold" />
+                        <StackPanel IsEnabled="{Binding FilesEnabled}">
+                            <Grid Margin="0,0,0,16">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="14" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="{ui:Tr Cred.Username}" Style="{StaticResource Text.Label}" FontWeight="Normal" Foreground="{DynamicResource Fg.Secondary}" />
-                                    <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="{ui:Tr Cred.UsernameHint}" />
+                                    <TextBlock Text="{ui:Tr Server.Share}" Style="{StaticResource Text.Label}" />
+                                    <Grid>
+                                        <TextBox Text="{Binding Share, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}"
+                                                 ui:Ui.Hint="{ui:Tr Common.Optional}" Padding="10,0,34,0" />
+                                        <Button x:Name="ShareMenuButton" Style="{StaticResource Btn.IconSmall}" Content="&#xE70D;" HorizontalAlignment="Right" Margin="0,0,4,0"
+                                                ToolTip="{ui:Tr Server.PickShare}" Click="ShareMenuButton_Click"
+                                                Visibility="{Binding HasDiscoveredShares, Converter={StaticResource Vis}}" />
+                                    </Grid>
+                                    <TextBlock Text="{ui:Tr Server.ShareHint}" Style="{StaticResource Text.Caption}" Margin="0,6,0,0" TextWrapping="Wrap" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="2">
-                                    <TextBlock Text="{ui:Tr Cred.Password}" Style="{StaticResource Text.Label}" FontWeight="Normal" Foreground="{DynamicResource Fg.Secondary}" />
-                                    <Grid>
-                                        <PasswordBox x:Name="Password" PasswordChanged="Password_PasswordChanged" Tag="empty" Padding="10,0,34,0"
-                                                     ui:Ui.Hint="{Binding PasswordHint}" />
-                                        <TextBox x:Name="PasswordPlain" Visibility="Collapsed" Padding="10,0,34,0" TextChanged="PasswordPlain_TextChanged" />
-                                        <ToggleButton x:Name="ShowPassword" Style="{StaticResource Toggle.Icon}" Width="26" Height="26" FontSize="12" Content="&#xE7B3;"
-                                                      HorizontalAlignment="Right" Margin="0,0,4,0" ToolTip="{ui:Tr Cred.ShowPassword}"
-                                                      Checked="ShowPassword_Changed" Unchecked="ShowPassword_Changed" />
-                                    </Grid>
+                                    <TextBlock Text="{ui:Tr Server.StartFolder}" Style="{StaticResource Text.Label}" />
+                                    <TextBox Text="{Binding StartFolder, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="{ui:Tr Common.Optional}" />
                                 </StackPanel>
                             </Grid>
-                            <TextBlock Text="{ui:Tr Cred.PasswordUnreadable}" Foreground="{DynamicResource Status.Warn}" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0"
-                                       Visibility="{Binding PasswordUnreadable, Converter={StaticResource Vis}}" />
-                        </StackPanel>
-                        <RadioButton Style="{StaticResource Radio.Option}" GroupName="cred" IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Profile}"
-                                     Content="{ui:Tr Cred.Mode.Profile}" />
-                        <StackPanel Margin="36,4,0,8" Visibility="{Binding IsProfile, Converter={StaticResource Vis}}">
-                            <ComboBox ItemsSource="{Binding Profiles}" SelectedValuePath="Id" SelectedValue="{Binding ProfileId}" DisplayMemberPath="Display"
-                                      Visibility="{Binding HasProfiles, Converter={StaticResource Vis}}" />
-                            <StackPanel Orientation="Horizontal" Visibility="{Binding HasProfiles, Converter={StaticResource Vis}, ConverterParameter=invert}">
-                                <TextBlock Text="{ui:Tr Cred.NoProfiles}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
-                                <Button Style="{StaticResource Btn.Link}" Content="{ui:Tr Profiles.Add}" Margin="8,0,0,0" Command="{Binding ManageProfilesCommand}" />
-                            </StackPanel>
-                        </StackPanel>
-                        <RadioButton Style="{StaticResource Radio.Option}" GroupName="cred" IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Guest}"
-                                     Content="{ui:Tr Cred.Mode.Guest}" />
-                        <TextBlock Text="{ui:Tr Cred.GuestNote}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" Margin="36,0,0,6"
-                                   Visibility="{Binding IsGuest, Converter={StaticResource Vis}}" />
-
-                        <StackPanel Orientation="Horizontal" Margin="8,10,0,0">
-                            <TextBlock Text="&#xE72E;" Style="{StaticResource Icon}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}" Margin="0,0,8,0" />
-                            <TextBlock Text="{ui:Tr Cred.Stored}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" MaxWidth="480" />
+                            <Border Background="{DynamicResource Warn.Subtle}" CornerRadius="6" Padding="12,8" Margin="0,-4,0,16"
+                                    Visibility="{Binding DuplicateWarning, Converter={StaticResource VisIfAny}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE7BA;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Status.Warn}" Margin="0,0,10,0" />
+                                    <TextBlock Text="{Binding DuplicateWarning}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </StackPanel>
-                </Border>
+                    <TextBlock Text="{ui:Tr Group.CredentialsNote}" Style="{StaticResource Text.Secondary}" Margin="0,4,0,14"
+                               Visibility="{Binding IsGroup, Converter={StaticResource Vis}}" />
+                    <Border x:Name="FilesCredentials" Style="{StaticResource Panel}"
+                            IsEnabled="{Binding ServerFields.FilesEnabled, FallbackValue=True}">
+                        <StackPanel>
+                            <TextBlock Text="{ui:Tr Cred.Section}" Style="{StaticResource SectionTitle}" FontSize="14" />
+                            <ContentControl Content="{Binding Credentials}" ContentTemplate="{StaticResource CredentialBlock}" Focusable="False" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Remote desktop -->
+                <StackPanel Visibility="{Binding IsDesktopSection, Converter={StaticResource Vis}}">
+                    <StackPanel DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Server.Desktop.Enable}" IsChecked="{Binding DesktopEnabled}" Margin="0,4,0,18"
+                                  FontWeight="SemiBold" />
+                        <StackPanel Style="{StaticResource Field}" IsEnabled="{Binding DesktopEnabled}" HorizontalAlignment="Left">
+                            <TextBlock Text="{ui:Tr Server.Desktop.PortLabel}" Style="{StaticResource Text.Label}" />
+                            <TextBox Text="{Binding DesktopPort, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" Width="120" ui:Ui.Hint="3389" />
+                        </StackPanel>
+                    </StackPanel>
+                    <Border x:Name="DesktopCredentials" Style="{StaticResource Panel}" IsEnabled="{Binding ServerFields.DesktopEnabled, FallbackValue=True}">
+                        <StackPanel>
+                            <TextBlock Text="{ui:Tr Cred.Desktop.Section}" Style="{StaticResource SectionTitle}" FontSize="14" />
+                            <ContentControl Content="{Binding DesktopCredentials}" ContentTemplate="{StaticResource CredentialBlock}" Focusable="False" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource Panel}" IsEnabled="{Binding ServerFields.DesktopEnabled, FallbackValue=True}">
+                        <StackPanel>
+                            <TextBlock Text="{ui:Tr Rdp.Section}" Style="{StaticResource Text.Subtitle}" FontSize="14" />
+                            <TextBlock Text="{ui:Tr Rdp.SectionNote}" Style="{StaticResource Text.Caption}" Margin="0,4,0,12" />
+                            <ItemsControl ItemsSource="{Binding RdpOptions}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:RdpOptionRowViewModel}">
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="250" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- dot marks values changed here (not inherited) -->
+                                                <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" Margin="0,0,8,0"
+                                                         Visibility="{Binding IsOverridden, Converter={StaticResource Vis}}" />
+                                                <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" DisplayMemberPath="Label" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
 
                 <!-- Notes -->
-                <StackPanel Style="{StaticResource Field}" Margin="0">
+                <StackPanel Visibility="{Binding IsNotesSection, Converter={StaticResource Vis}}">
                     <TextBlock Text="{ui:Tr Server.Description}" Style="{StaticResource Text.Label}" />
-                    <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Multiline}" />
+                    <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Multiline}" MinHeight="220" MaxHeight="460" />
                 </StackPanel>
-            </StackPanel>
+            </Grid>
         </ScrollViewer>
 
-        <!-- Footer -->
-        <Border Grid.Row="1" Style="{StaticResource Dialog.Footer}">
+        <!-- ═══════════ Footer ═══════════ -->
+        <Border Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource Dialog.Footer}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <!-- Test connection (servers only) -->
-                    <StackPanel Orientation="Horizontal" DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
-                        <Button Command="{Binding TestCommand}" IsEnabled="{Binding IsTesting, Converter={StaticResource Not}}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE703;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
-                                <TextBlock x:Name="TestLabel" Text="{ui:Tr Server.Test}" />
-                            </StackPanel>
-                        </Button>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" MaxWidth="250"
-                                    Visibility="{Binding TestResult, Converter={StaticResource VisIfAny}}">
-                            <TextBlock x:Name="TestGlyph" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Top">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
-                                        <Setter Property="Text" Value="&#xE783;" />
-                                        <Setter Property="Foreground" Value="{DynamicResource Danger}" />
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding TestSucceeded}" Value="True">
-                                                <Setter Property="Text" Value="&#xE73E;" />
-                                                <Setter Property="Foreground" Value="{DynamicResource Status.Online}" />
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock Text="{Binding TestResult}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Fg.Secondary}" ToolTip="{Binding TestResult}"
-                                       MaxHeight="34" TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
+                    <Button Command="{Binding TestCommand}" IsEnabled="{Binding IsTesting, Converter={StaticResource Not}}" AutomationProperties.Name="{ui:Tr Server.Test}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE703;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
+                            <TextBlock Text="{ui:Tr Server.Test}" />
                         </StackPanel>
-                        <TextBlock Text="{ui:Tr Server.Testing}" Style="{StaticResource Text.Caption}" Margin="12,0,0,0" VerticalAlignment="Center"
-                                   Visibility="{Binding IsTesting, Converter={StaticResource Vis}}" />
+                    </Button>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" MaxWidth="300"
+                                Visibility="{Binding TestResult, Converter={StaticResource VisIfAny}}">
+                        <TextBlock FontSize="12" Margin="0,0,6,0" VerticalAlignment="Top">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                    <Setter Property="Text" Value="&#xE783;" />
+                                    <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TestSucceeded}" Value="True">
+                                            <Setter Property="Text" Value="&#xE73E;" />
+                                            <Setter Property="Foreground" Value="{DynamicResource Status.Online}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding TestResult}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Fg.Secondary}" ToolTip="{Binding TestResult}"
+                                   MaxHeight="34" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
+                    <TextBlock Text="{ui:Tr Server.Testing}" Style="{StaticResource Text.Caption}" Margin="12,0,0,0" VerticalAlignment="Center"
+                               Visibility="{Binding IsTesting, Converter={StaticResource Vis}}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <TextBlock Text="{Binding ValidationError}" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="220"
+                    <TextBlock Text="{Binding ValidationError}" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="240"
                                TextWrapping="Wrap" FontSize="12" Visibility="{Binding ValidationError, Converter={StaticResource VisIfAny}}" />
                     <Button Content="{ui:Tr Common.Cancel}" IsCancel="True" MinWidth="96" Margin="0,0,8,0" />
                     <Button Style="{StaticResource Btn.Primary}" Content="{ui:Tr Common.Save}" IsDefault="True" MinWidth="96" Click="Save_Click" />

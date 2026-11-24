@@ -13,7 +13,7 @@
         </Grid.RowDefinitions>
         <Grid Margin="24,0,24,12">
             <TextBlock Text="{ui:Tr Profiles.Subtitle}" Style="{StaticResource Text.Secondary}" Margin="0,0,180,0" VerticalAlignment="Center" />
-            <Button HorizontalAlignment="Right" Command="{Binding AddCommand}">
+            <Button HorizontalAlignment="Right" Command="{Binding AddCommand}" AutomationProperties.Name="{ui:Tr Profiles.Add}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
                     <TextBlock Text="{ui:Tr Profiles.Add}" />

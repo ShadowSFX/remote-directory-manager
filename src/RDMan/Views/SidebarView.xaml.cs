@@ -124,7 +124,27 @@ public partial class SidebarView : UserControl
             return;
         }
 
-        menu.Items.Add(Item("Tree.Ctx.Open", "\uE8A7", Vm.OpenNodeCommand, node, "Enter"));
+        if (node is ServerNodeViewModel sv)
+        {
+            // Both views when available; the one a click opens comes first and in bold.
+            var files = Item("Tree.Ctx.OpenFiles", "\uE8B7", Vm.OpenNodeFilesCommand, node);
+            var desktop = Item("Tree.Ctx.OpenDesktop", "\uE7F4", Vm.OpenNodeDesktopCommand, node, sv.HasFiles ? null : "Enter");
+            if (sv.DefaultAction == Core.Models.ServerAction.Desktop)
+            {
+                desktop.InputGestureText = "Enter";
+                desktop.FontWeight = FontWeights.SemiBold;
+                menu.Items.Add(desktop);
+                if (sv.HasFiles) menu.Items.Add(files);
+            }
+            else
+            {
+                files.InputGestureText = "Enter";
+                files.FontWeight = FontWeights.SemiBold;
+                menu.Items.Add(files);
+                if (sv.HasDesktop) menu.Items.Add(desktop);
+            }
+        }
+        else menu.Items.Add(Item("Tree.Ctx.Open", "\uE8A7", Vm.OpenNodeCommand, node, "Enter"));
         menu.Items.Add(Item("Tree.Ctx.OpenNewTab", "\uECCD", Vm.OpenNodeInNewTabCommand, node, "Ctrl+Clic"));
         menu.Items.Add(Item("Tree.Ctx.OpenOtherPane", "\uE89F", Vm.OpenNodeInOtherPaneCommand, node));
         if (node is ServerNodeViewModel)

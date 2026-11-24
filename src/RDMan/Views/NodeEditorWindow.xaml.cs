@@ -7,7 +7,6 @@ namespace RDMan.Views;
 public partial class NodeEditorWindow : DialogWindow
 {
     private readonly NodeEditorViewModel _vm;
-    private bool _syncingPassword;
 
     public NodeEditorWindow(NodeEditorViewModel vm)
     {
@@ -18,8 +17,9 @@ public partial class NodeEditorWindow : DialogWindow
         {
             if (vm.FocusCredentials)
             {
-                CredentialsSection.BringIntoView();
-                if (vm.Credentials.IsCustom) Password.Focus();
+                // Opened from an error panel ("Edit credentials"): land where the problem is.
+                vm.ShowSection(EditorSection.Files);
+                FilesCredentials.BringIntoView();
             }
             else if (vm is ServerEditorViewModel { IsNew: true }) AddressBox.Focus();
             else
@@ -28,7 +28,15 @@ public partial class NodeEditorWindow : DialogWindow
                 NameBox.SelectAll();
             }
         };
-        Closed += (_, _) => vm.Credentials.NewPassword = "";
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(NodeEditorViewModel.SelectedSection)) ContentScroll.ScrollToTop();
+        };
+        Closed += (_, _) =>
+        {
+            vm.Credentials.NewPassword = "";
+            vm.DesktopCredentials.NewPassword = "";
+        };
     }
 
     protected override void Accept()
@@ -38,46 +46,13 @@ public partial class NodeEditorWindow : DialogWindow
 
     private void Save_Click(object sender, RoutedEventArgs e) => Accept();
 
+    /// <summary>Both credential blocks share one template: the PasswordBox's DataContext says which one it feeds.</summary>
     private void Password_PasswordChanged(object sender, RoutedEventArgs e)
     {
-        Password.Tag = Password.SecurePassword.Length == 0 ? "empty" : null;
-        if (_syncingPassword) return;
-        _vm.Credentials.NewPassword = Password.Password;
+        if (sender is not PasswordBox { DataContext: CredentialEditorViewModel cred } box) return;
+        box.Tag = box.SecurePassword.Length == 0 ? "empty" : null;
+        cred.NewPassword = box.Password;
         if (_vm.ServerFields is { } s) s.TestResult = null;
-    }
-
-    private void PasswordPlain_TextChanged(object sender, TextChangedEventArgs e)
-    {
-        if (_syncingPassword) return;
-        _vm.Credentials.NewPassword = PasswordPlain.Text;
-    }
-
-    private void ShowPassword_Changed(object sender, RoutedEventArgs e)
-    {
-        _syncingPassword = true;
-        try
-        {
-            if (ShowPassword.IsChecked == true)
-            {
-                PasswordPlain.Text = _vm.Credentials.NewPassword;
-                PasswordPlain.Visibility = Visibility.Visible;
-                Password.Visibility = Visibility.Hidden;
-                PasswordPlain.Focus();
-                PasswordPlain.CaretIndex = PasswordPlain.Text.Length;
-            }
-            else
-            {
-                Password.Password = _vm.Credentials.NewPassword;
-                PasswordPlain.Text = "";
-                PasswordPlain.Visibility = Visibility.Collapsed;
-                Password.Visibility = Visibility.Visible;
-                Password.Focus();
-            }
-        }
-        finally
-        {
-            _syncingPassword = false;
-        }
     }
 
     private void Swatch_Loaded(object sender, RoutedEventArgs e)

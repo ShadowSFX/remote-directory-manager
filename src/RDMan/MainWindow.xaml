@@ -30,6 +30,7 @@
         <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewServerCommand}" />
         <KeyBinding Key="G" Modifiers="Control+Shift" Command="{Binding NewGroupCommand}" />
         <KeyBinding Key="OemComma" Modifiers="Control" Command="{Binding OpenSettingsCommand}" />
+        <KeyBinding Key="D" Modifiers="Control+Shift" Command="{Binding OpenActiveServerDesktopCommand}" />
     </Window.InputBindings>
 
     <Grid x:Name="Root">
@@ -149,9 +150,12 @@
             </StackPanel>
         </Grid>
 
-        <!-- ═══════════ Toasts ═══════════ -->
-        <ItemsControl Grid.Row="1" Grid.RowSpan="2" ItemsSource="{Binding Toasts.Items}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                      Margin="0,0,20,40" Width="380" Focusable="False">
+        <!-- ═══════════ Toasts ═══════════
+             In a Popup (its own window) so they show above a remote desktop session, which is a native child
+             window that would otherwise paint over any WPF content ("airspace"). Positioned in code-behind. -->
+        <Popup x:Name="ToastPopup" Placement="Relative" PlacementTarget="{Binding ElementName=Root}" AllowsTransparency="True"
+               StaysOpen="True" Focusable="False" PopupAnimation="None">
+        <ItemsControl x:Name="ToastList" ItemsSource="{Binding Toasts.Items}" Width="380" Margin="12,0,12,12" Focusable="False">
             <ItemsControl.ItemTemplate>
                 <DataTemplate DataType="{x:Type svc:ToastViewModel}">
                     <Border Background="{DynamicResource Bg.Toast}" CornerRadius="8" Padding="14,10,8,10" Margin="0,8,0,0" BorderThickness="1"
@@ -189,10 +193,13 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+        </Popup>
 
-        <!-- ═══════════ Command palette ═══════════ -->
-        <Grid x:Name="PaletteLayer" Grid.Row="0" Grid.RowSpan="3" Background="{DynamicResource Bg.Scrim}"
-              Visibility="{Binding Palette.IsOpen, Converter={StaticResource Vis}}" MouseDown="PaletteScrim_MouseDown">
+        <!-- ═══════════ Command palette ═══════════ (Popup for the same airspace reason as the toasts) -->
+        <Popup x:Name="PalettePopup" IsOpen="{Binding Palette.IsOpen, Mode=OneWay}" Placement="Relative" PlacementTarget="{Binding ElementName=Root}"
+               AllowsTransparency="True" StaysOpen="True" PopupAnimation="Fade">
+        <Grid x:Name="PaletteLayer" Background="{DynamicResource Bg.Scrim}" MouseDown="PaletteScrim_MouseDown"
+              Width="{Binding ActualWidth, ElementName=Root}" Height="{Binding ActualHeight, ElementName=Root}">
             <Border x:Name="PaletteCard" Width="640" VerticalAlignment="Top" Margin="0,84,0,0" Background="{DynamicResource Bg.Popup}"
                     BorderBrush="{DynamicResource Line.Popup}" BorderThickness="1" CornerRadius="10" DataContext="{Binding Palette}"
                     MouseDown="PaletteCard_MouseDown">
@@ -219,6 +226,7 @@
                                 <ListBox.ItemContainerStyle>
                                     <Style TargetType="ListBoxItem">
                                         <Setter Property="Focusable" Value="False" />
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Server.Name}" />
                                         <Setter Property="Template">
                                             <Setter.Value>
                                                 <ControlTemplate TargetType="ListBoxItem">
@@ -254,6 +262,8 @@
                                                            Visibility="{Binding HasGroup, Converter={StaticResource Vis}}" />
                                             </StackPanel>
                                             <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" DataContext="{Binding Server}">
+                                                <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource Font.Icons}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}"
+                                                           VerticalAlignment="Center" Margin="0,0,8,0" Visibility="{Binding HasDesktop, Converter={StaticResource Vis}}" />
                                                 <TextBlock Text="{Binding Address}" Style="{StaticResource Text.Mono}" Margin="0,0,10,0" />
                                                 <Ellipse Style="{StaticResource StatusDot}" />
                                             </StackPanel>
@@ -266,10 +276,11 @@
                         </Grid>
                     </Border>
                     <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="16,8">
-                        <TextBlock Text="{ui:Tr Palette.Hint}" Style="{StaticResource Text.Caption}" />
+                        <TextBlock Text="{ui:Tr Palette.Hint2}" Style="{StaticResource Text.Caption}" />
                     </Border>
                 </Grid>
             </Border>
         </Grid>
+        </Popup>
     </Grid>
 </Window>

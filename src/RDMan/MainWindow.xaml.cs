@@ -37,11 +37,33 @@ public partial class MainWindow : Window
         vm.Palette.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen) && vm.Palette.IsOpen)
+            {
+                // The palette is a topmost popup: never let it appear while another app is in front.
+                if (!IsActive) Activate();
+                if (!IsActive)
+                {
+                    vm.Palette.Close();
+                    return;
+                }
                 Dispatcher.BeginInvoke(() => { PaletteInput.Focus(); Keyboard.Focus(PaletteInput); }, System.Windows.Threading.DispatcherPriority.Input);
+            }
             if (e.PropertyName == nameof(CommandPaletteViewModel.Selected) && vm.Palette.Selected is { } sel)
                 PaletteList.ScrollIntoView(sel);
         };
         ThemeManager.Instance.ThemeChanged += (_, _) => ApplyBackdrop();
+        // Popups don't follow their owner by themselves: keep toasts/palette glued to the window.
+        LocationChanged += (_, _) => RepositionPopups();
+        SizeChanged += (_, _) => RepositionPopups();
+        StateChanged += (_, _) => RepositionPopups();
+        // Popups are topmost windows: hide them whenever RDMan isn't the active app, or they'd float over other programs.
+        Deactivated += (_, _) =>
+        {
+            ToastPopup.IsOpen = false;
+            if (!PalettePopup.IsKeyboardFocusWithin) _vm.Palette.Close();
+        };
+        Activated += (_, _) => UpdateToastPopup();
+        vm.Toasts.Items.CollectionChanged += (_, _) => UpdateToastPopup();
+        ToastList.SizeChanged += (_, _) => RepositionPopups();
         // Give the keyboard a home at startup so shortcuts (Ctrl+K, Ctrl+T…) work before the first click.
         ContentRendered += (_, _) => Dispatcher.BeginInvoke(FocusContent, System.Windows.Threading.DispatcherPriority.Input);
         SidebarColumn.Width = new GridLength(vm.State.Settings.SidebarWidth);
@@ -64,6 +86,28 @@ public partial class MainWindow : Window
     {
         WindowEffects.Apply(this, ThemeManager.Instance.IsDark);
         SetResourceReference(BackgroundProperty, "Bg.Base");
+    }
+
+    private void UpdateToastPopup()
+    {
+        // Popups are topmost windows: only show toasts while RDMan itself is the active app.
+        ToastPopup.IsOpen = _vm.Toasts.Items.Count > 0 && IsActive && WindowState != WindowState.Minimized;
+        RepositionPopups();
+    }
+
+    private void RepositionPopups()
+    {
+        if (!IsLoaded) return;
+        ToastPopup.HorizontalOffset = Math.Max(0, Root.ActualWidth - ToastList.ActualWidth - 32);
+        ToastPopup.VerticalOffset = Math.Max(0, Root.ActualHeight - ToastList.ActualHeight - 40);
+        // Nudge the offsets so WPF recomputes the screen position after the window moved.
+        foreach (var p in new[] { ToastPopup, PalettePopup })
+        {
+            if (!p.IsOpen) continue;
+            var h = p.HorizontalOffset;
+            p.HorizontalOffset = h + 0.01;
+            p.HorizontalOffset = h;
+        }
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -270,7 +314,8 @@ public partial class MainWindow : Window
             case Key.PageDown: _vm.Palette.Move(+8); e.Handled = true; break;
             case Key.PageUp: _vm.Palette.Move(-8); e.Handled = true; break;
             case Key.Enter:
-                _vm.Palette.Accept(newTab: (Keyboard.Modifiers & ModifierKeys.Control) != 0);
+                _vm.Palette.Accept(newTab: (Keyboard.Modifiers & ModifierKeys.Control) != 0,
+                                   alternate: (Keyboard.Modifiers & ModifierKeys.Shift) != 0);
                 e.Handled = true;
                 break;
             case Key.Escape:

@@ -488,6 +488,26 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private void OpenNodeDesktop(NodeViewModel? node)
+    {
+        if (node is ServerNodeViewModel s) OpenDesktop(s, OpenTarget.Current);
+    }
+
+    [RelayCommand]
+    private void OpenNodeFiles(NodeViewModel? node)
+    {
+        if (node is ServerNodeViewModel s) OpenFiles(s, OpenTarget.Current);
+    }
+
+    /// <summary>Ctrl+Shift+D: the desktop of the server the active tab is about.</summary>
+    [RelayCommand]
+    private void OpenActiveServerDesktop()
+    {
+        if (ActiveTab?.Server is { } s) OpenDesktop(s, OpenTarget.Current);
+        else if (TreeSelection is ServerNodeViewModel t) OpenDesktop(t, OpenTarget.Current);
+    }
+
+    [RelayCommand]
     private void OpenNodeInExplorer(NodeViewModel? node)
     {
         if (node is not ServerNodeViewModel s) return;

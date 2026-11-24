@@ -405,6 +405,11 @@ public static partial class Strings
         T("Cred.Desktop.WindowsNote", "Usa la credencial que Windows ya guardó para este equipo (la de Conexión a Escritorio remoto). Si no hay, se te pedirá al conectar.", "Uses the credential Windows already saved for this computer (from Remote Desktop Connection). If there isn't one, you'll be asked when connecting.");
         T("Cred.Desktop.Uses", "Usará: {0}", "Will use: {0}");
         T("Cred.Desktop.UsesFrom", "Usará: {0} (de «{1}»)", "Will use: {0} (from “{1}”)");
+        T("Cred.Desktop.SameAsFilesUses", "Igual que archivos: {0}", "Same as files: {0}");
+        T("Cred.Desktop.Mode.Inherit", "Heredar del grupo o usar la de archivos", "Inherit from the group, or use the files one");
+        T("Server.TestDesktopOk", "Escritorio remoto responde en el puerto {0} · {1} ms", "Remote desktop answers on port {0} · {1} ms");
+        T("Server.TestDesktopFail", "El puerto {0} de escritorio remoto no responde", "Remote desktop port {0} doesn't answer");
+        T("Rdp.InheritChoice", "Heredar: {0}", "Inherit: {0}");
 
         T("Rdp.Section", "Opciones del escritorio", "Desktop options");
         T("Rdp.SectionNote", "Cada opción hereda del grupo salvo que la cambies aquí.", "Each option is inherited from the group unless you change it here.");

@@ -62,10 +62,16 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         Selected = Results[i];
     }
 
-    public void Accept(bool newTab)
+    /// <summary>Enter = the server's default view; Shift+Enter = the other one (files ↔ desktop).</summary>
+    public void Accept(bool newTab, bool alternate = false)
     {
         var target = Selected;
         Close();
-        if (target is not null) _main.OpenServer(target.Server, newTab ? OpenTarget.NewTab : OpenTarget.Current);
+        if (target is null) return;
+        var where = newTab ? OpenTarget.NewTab : OpenTarget.Current;
+        var server = target.Server;
+        if (!alternate || !server.HasBoth) _main.OpenServer(server, where);
+        else if (server.DefaultAction == Core.Models.ServerAction.Desktop) _main.OpenFiles(server, where);
+        else _main.OpenDesktop(server, where);
     }
 }

@@ -200,14 +200,14 @@
                     <Border Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="2" Margin="0,0,10,0"
                             Visibility="{Binding ShowViewSwitch, Converter={StaticResource Vis}}">
                         <StackPanel Orientation="Horizontal">
-                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowFilesCommand}"
+                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowFilesCommand}" AutomationProperties.Name="{ui:Tr Cap.Files}"
                                     ui:Ui.IsOn="{Binding IsDesktop, Converter={StaticResource Not}}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
                                     <TextBlock Text="{ui:Tr Cap.Files}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
-                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowDesktopCommand}" ui:Ui.IsOn="{Binding IsDesktop}">
+                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowDesktopCommand}" ui:Ui.IsOn="{Binding IsDesktop}" AutomationProperties.Name="{ui:Tr Cap.Desktop}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
                                     <TextBlock Text="{ui:Tr Cap.Desktop}" VerticalAlignment="Center" />
@@ -333,7 +333,7 @@
                            Text="{Binding Session.Server.Name}" />
                 <TextBlock Text="{ui:Tr Desktop.Idle.Body}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" />
                 <Button Style="{StaticResource Btn.Primary}" HorizontalAlignment="Center" Margin="0,20,0,0" MinWidth="140" Height="36"
-                        Command="{Binding Session.ConnectCommand}">
+                        Command="{Binding Session.ConnectCommand}" AutomationProperties.Name="{ui:Tr Desktop.Connect}">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
                         <TextBlock Text="{ui:Tr Desktop.Connect}" />
@@ -342,7 +342,9 @@
             </StackPanel>
 
             <!-- Desktop: error -->
-            <ContentControl Content="{Binding Session.Error}" Visibility="{Binding Session.Error, Converter={StaticResource VisIfAny}}" Focusable="False">
+            <!-- FallbackValue: tabs without a session (files, dashboards) must never render this template -->
+            <ContentControl Content="{Binding Session.Error}" Focusable="False"
+                            Visibility="{Binding Session.Error, Converter={StaticResource VisIfAny}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
                 <ContentControl.ContentTemplate>
                     <DataTemplate DataType="{x:Type vm:ErrorInfo}">
                         <StackPanel MaxWidth="480" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32">
@@ -550,14 +552,15 @@
                                        Visibility="{Binding IsEmpty, Converter={StaticResource Vis}, ConverterParameter=invert}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                            <Button Margin="8,0,0,0" Click="DashboardEditGroup_Click" Visibility="{Binding IsHome, Converter={StaticResource Vis}, ConverterParameter=invert}">
+                            <Button Margin="8,0,0,0" Click="DashboardEditGroup_Click" Visibility="{Binding IsHome, Converter={StaticResource Vis}, ConverterParameter=invert}"
+                                    AutomationProperties.Name="{ui:Tr Common.Edit}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE70F;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
                                     <TextBlock Text="{ui:Tr Common.Edit}" />
                                 </StackPanel>
                             </Button>
                             <!-- When empty, the onboarding card below carries the primary action instead -->
-                            <Button Style="{StaticResource Btn.Primary}" Click="DashboardNewServer_Click" Margin="8,0,0,0"
+                            <Button Style="{StaticResource Btn.Primary}" Click="DashboardNewServer_Click" Margin="8,0,0,0" AutomationProperties.Name="{ui:Tr Server.TitleNew}"
                                     Visibility="{Binding IsEmpty, Converter={StaticResource Vis}, ConverterParameter=invert}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />

@@ -51,12 +51,18 @@ public sealed class ConnectionService
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
-        var sw = Stopwatch.StartNew();
         try
         {
-            // Dual-mode socket: handles IPv4, IPv6 and host names (all resolved addresses are tried).
+            // Resolve first and time only the TCP connect: name resolution (NetBIOS/LLMNR on a LAN can take
+            // hundreds of ms) isn't the server's latency.
+            var addresses = System.Net.IPAddress.TryParse(host, out var literal)
+                ? [literal]
+                : await System.Net.Dns.GetHostAddressesAsync(host, cts.Token).ConfigureAwait(false);
+            if (addresses.Length == 0) return null;
+            // Dual-mode socket: IPv4 and IPv6 addresses alike; every resolved address is tried in order.
             using var socket = new Socket(SocketType.Stream, ProtocolType.Tcp);
-            await socket.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            var sw = Stopwatch.StartNew();
+            await socket.ConnectAsync(addresses, port, cts.Token).ConfigureAwait(false);
             return (int)Math.Max(1, sw.ElapsedMilliseconds);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
