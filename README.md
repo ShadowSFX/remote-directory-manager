@@ -2,7 +2,7 @@
 
 <h1 align="center">Remote Directory Manager</h1>
 
-<p align="center">RDCMan, rebuilt: every server's <b>files</b> and <b>remote desktop</b> in one modern app. Name your servers, group them, keep their credentials, browse with real Windows copy &amp; paste and work on their desktops in tabs.</p>
+<p align="center">RDCMan, rebuilt: every server's <b>files</b>, <b>remote desktop</b> and <b>SSH terminal</b> in one modern app. Name your servers, group them, keep their credentials, browse with real Windows copy &amp; paste and work on their desktops in tabs.</p>
 
 <p align="center"><a href="../../releases/latest"><b>Descargar RDMan.exe</b></a> · Windows 10/11 x64 · portable, sin instalador</p>
 
@@ -10,7 +10,19 @@
 
 ## Español
 
-¿Entras a tus VPS con `\\ip` desde *Ejecutar* y por Escritorio remoto, y tienes que memorizar qué IP es cuál? RDMan los ordena en un árbol con nombres que reconoces y abre sus **archivos** o su **escritorio** en pestañas.
+¿Entras a tus VPS con `\\ip` desde *Ejecutar*, por Escritorio remoto o por `ssh`, y tienes que memorizar qué IP es cuál? RDMan los ordena en un árbol con nombres que reconoces y abre sus **archivos**, su **escritorio** o su **terminal** en pestañas.
+
+### Terminal SSH
+
+- **Terminal en pestañas y paneles**, junto a los archivos y el escritorio del mismo servidor (selector **Archivos | Escritorio | Terminal**). Texto dibujado por GPU con suavizado nítido (o ClearType), color real de 24 bits, imágenes (sixel), búsqueda (`Ctrl+Shift+F`), enlaces, zoom (`Ctrl+rueda`) y la fuente **Cascadia Code NF** incluida, con todos los símbolos powerline y Nerd Font.
+- **Como el comando `ssh`**: lee tu `~/.ssh/config` (Host, HostName, User, IdentityFile, Port, ProxyJump, Include…) y tu `known_hosts`. Un servidor llamado `mi-vps` conecta igual que `ssh mi-vps`, sin escribir usuario ni contraseña. **Importa de `~/.ssh/config`** todos tus hosts de una vez.
+- **Llaves `.pem` de AWS** (y OpenSSH, ed25519, ecdsa, PuTTY `.ppk`, certificados): se importan una vez, se guardan cifradas en RDMan y un grupo puede heredarlas a todos sus servidores. También agente SSH (OpenSSH de Windows o Pageant), contraseña y verificación en dos pasos.
+- **Prompt powerline sin tocar el servidor**: RDMan abre bash con un prompt de segmentos (usuario, servidor, carpeta, rama de git, código de error, duración) solo para esa sesión, más integración con el shell: saltar entre comandos (`Ctrl+Shift+↑/↓`), copiar la salida del último comando, carpeta actual.
+- **Se reconecta solo** si se cae la red, conservando el historial; **identidad del servidor verificada** (huella SHA256 y randomart, aviso claro si cambia).
+- **CPU, memoria, disco, carga y tiempo encendido** del servidor en vivo en la barra; **reenvío de puertos** (`-L`, `-R`, SOCKS) con su estado; **servidores intermedios** (ProxyJump).
+- **Panel de archivos SFTP** (`Ctrl+Shift+E`) que sigue la carpeta de la terminal: arrastra para subir, descarga, y **edita** un archivo con tu programa de Windows: cada vez que guardas se sube.
+- **Fragmentos** (comandos guardados con `{{variables}}`) desde `Ctrl+Shift+P` y `>`; **escribir en varias terminales a la vez** (`Ctrl+Shift+B`); **conexión rápida** escribiendo `usuario@servidor` en `Ctrl+K`; guardar la sesión en un archivo.
+- Las teclas son del shell (`Ctrl+W`, `Ctrl+K`, `F1`–`F12` para htop o mc); RDMan solo usa `Ctrl+Shift`, `Ctrl+Tab`, `F11` y `Ctrl+Alt+←` dentro de una terminal.
 
 ### Escritorio remoto (lo de RDCMan, sin sus fallas)
 
@@ -56,6 +68,10 @@
 | `Ctrl+Shift+D` | Abrir el escritorio del servidor actual |
 | `Shift+Enter` en `Ctrl+K` | Abrir la otra vista (archivos ↔ escritorio) |
 | `Ctrl+Alt+←` | Dentro de una sesión: devolver el teclado a RDMan |
+| `Ctrl+Shift+T` · `Ctrl+Shift+W` | En una terminal: otra terminal del mismo servidor · cerrarla |
+| `Ctrl+Shift+C` / `Ctrl+Shift+V` | En una terminal: copiar / pegar (`Ctrl+C` copia si hay selección) |
+| `Ctrl+Shift+F` · `Ctrl+Shift+E` · `Ctrl+Shift+B` | En una terminal: buscar · panel SFTP · escribir en varias |
+| `Ctrl+Shift+P` y `>` | Fragmentos para la terminal activa |
 
 `RDMan.exe \\servidor\recurso` abre esa ruta en una pestaña (en la ventana que ya esté abierta). `RDMan.exe /c Nombre` conecta al escritorio de ese servidor (por su nombre en RDMan o su dirección).
 
@@ -70,7 +86,7 @@
 
 ## English
 
-RDMan is RDCMan rebuilt for both sides of a server: a tree of named servers and groups with inherited credentials and live status, where each server opens its **remote desktop** (embedded RDP sessions in tabs and split panes, resized without reconnecting, Windows' saved credentials, per-option inheritance) and its **files** (a tabbed, split-pane browser on the Windows copy engine: same progress dialog, conflict handling, recycle bin and clipboard format as File Explorer).
+RDMan is RDCMan rebuilt for every side of a server: a tree of named servers and groups with inherited credentials and live status, where each server opens its **remote desktop** (embedded RDP sessions in tabs and split panes, resized without reconnecting, Windows' saved credentials, per-option inheritance), its **files** (a tabbed, split-pane browser on the Windows copy engine: same progress dialog, conflict handling, recycle bin and clipboard format as File Explorer) and its **SSH terminal** (GPU-rendered xterm with the bundled Cascadia Code NF font, your `~/.ssh/config` and `known_hosts`, AWS `.pem` keys stored encrypted, a session-only powerline prompt with shell integration, auto-reconnect, live server stats, port forwarding, jump hosts, an SFTP side panel with edit-and-upload, snippets and broadcast input).
 
 Download `RDMan.exe` from [Releases](../../releases/latest) and run it. No installer. It updates itself from GitHub Releases (SHA-256 verified, applied on restart).
 

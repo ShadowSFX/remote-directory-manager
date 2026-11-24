@@ -21,6 +21,14 @@ Portable WPF (.NET 9) app: RDCMan-style tree of SMB servers + tabbed/split file 
 - RoyalApps raises OnConnected/OnDisconnected with the inner client as sender: bind handlers per control (see RdpSessionViewModel.Connect).
 - Verify RDP changes against a real Windows server (unit tests can't cover the ActiveX).
 
+## SSH terminal
+- Core: `RDMan.Core/Ssh/` (OpenSSH config + known_hosts parsers, target/auth/option resolution, prompt script, stats, agent protocol — all tested). Models: `Models/SshModels.cs`; servers get a third capability `ServerNode.Terminal` (+ `ServerAction.Terminal`).
+- Sessions: `RemoteSessionViewModel` is the base of `RdpSessionViewModel` and `ViewModels/Terminal/SshSessionViewModel`; `BrowserTabViewModel.Session` is the base type. The terminal surface is a WebView2 (`Terminal/TerminalHost.cs`) living in the same `SessionOverlay` as RDP (same rules: never re-parent, airspace); it's created once per tab and kept across reconnects.
+- The page (`Terminal/web/`) is embedded and served from memory on `https://rdman.terminal/`; xterm.js 6 + addons are vendored as-is in `web/vendor` (upgrade by replacing the files from the npm tarballs; no npm build). Bridge: host→page strings starting with `o` are output, everything else JSON `{t:…}`; page→host JSON. Output is flow-controlled with acks (see `OnData`).
+- SSH.NET's public API only opens a login shell; `Services/Ssh/TerminalChannel.cs` drives its internal channel by reflection (pinned SSH.NET version) to exec RDMan's prompt with a PTY, and falls back to the plain shell. Re-check it when upgrading SSH.NET.
+- Keyboard: window shortcuts live in `MainWindow.Keys.cs` (no `Window.InputBindings`): inside a terminal only entries marked `InTerminal` fire, everything else reaches the shell.
+- Verify terminal changes against a real Linux server (the bash rc in `PromptScript` can be tested locally with Git Bash).
+
 ## Pane grid
 - `RDMan.Core/Layout/PaneLayout.cs` is the split tree (tested); `MainViewModel.Panes.cs` owns panes, MRU "other pane", split/close/move; `Views/PaneLayoutHost.cs` renders it and caches one `PaneView` per pane.
 - Drag & drop of tabs/tree nodes: `Views/PaneDragSession.cs` + `MainWindow.PaneDrag.cs`. The drop overlay Popup is the drop target (works over sessions); actions run after `DoDragDrop` returns.
