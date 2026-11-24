@@ -14,6 +14,9 @@ public static class ConnectionStore
 
     public static void Save(string path, ConnectionDocument doc) => JsonFileStore.Save(path, doc);
 
+    public const int MaxSnippets = 500;
+    public const int MaxForwardsPerServer = 32;
+
     /// <summary>Repairs nulls/duplicates from hand-edited or older files and upgrades the schema.</summary>
     public static void Normalize(ConnectionDocument doc)
     {
@@ -40,6 +43,28 @@ public static class ConnectionStore
             p.Username ??= "";
         }
 
+        doc.SshKeys ??= new List<SshKeyEntry>();
+        doc.SshKeys.RemoveAll(k => k is null);
+        var seenKeys = new HashSet<Guid>();
+        foreach (var k in doc.SshKeys)
+        {
+            if (k.Id == Guid.Empty || !seenKeys.Add(k.Id)) { k.Id = Guid.NewGuid(); seenKeys.Add(k.Id); }
+            k.Name ??= "";
+            k.Algorithm ??= "";
+            k.Fingerprint ??= "";
+        }
+
+        doc.Snippets ??= new List<Snippet>();
+        doc.Snippets.RemoveAll(sn => sn is null);
+        var seenSnippets = new HashSet<Guid>();
+        foreach (var sn in doc.Snippets)
+        {
+            if (sn.Id == Guid.Empty || !seenSnippets.Add(sn.Id)) { sn.Id = Guid.NewGuid(); seenSnippets.Add(sn.Id); }
+            sn.Name ??= "";
+            sn.Body ??= "";
+        }
+        if (doc.Snippets.Count > MaxSnippets) doc.Snippets = doc.Snippets.Take(MaxSnippets).ToList();
+
         // v1 → v2: servers gain Files/Desktop/DefaultAction/DesktopCredentials/Rdp. The defaults of those
         // properties (Files = true, no desktop, inherit everything) are exactly the v1 behavior, so the
         // migration is the normalization above; nothing else to rewrite.
@@ -57,6 +82,8 @@ public static class ConnectionStore
         node.Credentials ??= new CredentialSettings();
         node.DesktopCredentials ??= new CredentialSettings();
         node.Rdp ??= new RdpProfile();
+        node.SshAuth ??= new SshAuthSettings();
+        node.Ssh ??= new SshProfile();
         if (node.Rdp.ColorDepth is { } depth && depth is not (16 or 24 or 32)) node.Rdp.ColorDepth = null;
         if (node.Rdp.Gateway is { } gateway)
         {
@@ -80,8 +107,16 @@ public static class ConnectionStore
                 s.Tags ??= new List<string>();
                 s.Tags = s.Tags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                 if (s.Desktop is { } d && !Rdp.HostPort.IsValidPort(d.Port)) d.Port = DesktopEndpoint.DefaultPort;
-                // A server must offer at least one thing; an older or hand-edited file may disable both.
-                if (!s.Files && !s.HasDesktop) s.Files = true;
+                if (s.Terminal is { } t)
+                {
+                    if (t.Port is { } tp && !Rdp.HostPort.IsValidPort(tp)) t.Port = null;
+                    t.Forwards ??= new List<SshForward>();
+                    t.Forwards.RemoveAll(f => f is null || !Rdp.HostPort.IsValidPort(f.BindPort)
+                        || f.Kind != SshForwardKind.Dynamic && (string.IsNullOrWhiteSpace(f.TargetHost) || !Rdp.HostPort.IsValidPort(f.TargetPort)));
+                    if (t.Forwards.Count > MaxForwardsPerServer) t.Forwards = t.Forwards.Take(MaxForwardsPerServer).ToList();
+                }
+                // A server must offer at least one thing; an older or hand-edited file may disable all of them.
+                if (!s.Files && !s.HasDesktop && !s.HasTerminal) s.Files = true;
                 break;
         }
     }
@@ -97,6 +132,11 @@ public static class ConnectionStore
         if (!includeSecrets)
         {
             foreach (var p in copy.Profiles) p.ProtectedPassword = null;
+            foreach (var k in copy.SshKeys)
+            {
+                k.ProtectedKey = null;
+                k.ProtectedPassphrase = null;
+            }
             StripSecrets(copy.Root);
         }
         return copy;
@@ -107,6 +147,7 @@ public static class ConnectionStore
         node.Credentials.ProtectedPassword = null;
         node.DesktopCredentials.ProtectedPassword = null;
         if (node.Rdp?.Gateway is { } gw) gw.ProtectedPassword = null;
+        node.SshAuth.ProtectedPassword = null;
         if (node is GroupNode g) foreach (var c in g.Children) StripSecrets(c);
     }
 
@@ -123,17 +164,36 @@ public static class ConnectionStore
             profileMap[p.Id] = newId;
             p.Id = newId;
         }
-        Reassign(doc.Root, profileMap);
+        var keyMap = new Dictionary<Guid, Guid>();
+        foreach (var k in doc.SshKeys)
+        {
+            var newId = Guid.NewGuid();
+            keyMap[k.Id] = newId;
+            k.Id = newId;
+        }
+        var nodeMap = new Dictionary<Guid, Guid>();
+        Reassign(doc.Root, profileMap, keyMap, nodeMap);
         foreach (var g in doc.SmartGroups) g.Id = Guid.NewGuid();
+        foreach (var sn in doc.Snippets)
+        {
+            sn.Id = Guid.NewGuid();
+            if (sn.GroupId is { } gid) sn.GroupId = nodeMap.TryGetValue(gid, out var mg) ? mg : null;
+        }
     }
 
-    private static void Reassign(TreeNode node, Dictionary<Guid, Guid> profileMap)
+    private static void Reassign(TreeNode node, Dictionary<Guid, Guid> profileMap, Dictionary<Guid, Guid> keyMap, Dictionary<Guid, Guid> nodeMap)
     {
-        node.Id = Guid.NewGuid();
+        var id = Guid.NewGuid();
+        nodeMap[node.Id] = id;
+        node.Id = id;
+        if (node.SshAuth.ProfileId is { } spid)
+            node.SshAuth.ProfileId = profileMap.TryGetValue(spid, out var smapped) ? smapped : null;
+        if (node.SshAuth.KeyId is { } kid)
+            node.SshAuth.KeyId = keyMap.TryGetValue(kid, out var kmapped) ? kmapped : null;
         if (node.Credentials.ProfileId is { } pid)
             node.Credentials.ProfileId = profileMap.TryGetValue(pid, out var mapped) ? mapped : null;
         if (node.DesktopCredentials.ProfileId is { } dpid)
             node.DesktopCredentials.ProfileId = profileMap.TryGetValue(dpid, out var dmapped) ? dmapped : null;
-        if (node is GroupNode g) foreach (var c in g.Children) Reassign(c, profileMap);
+        if (node is GroupNode g) foreach (var c in g.Children) Reassign(c, profileMap, keyMap, nodeMap);
     }
 }

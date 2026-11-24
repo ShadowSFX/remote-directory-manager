@@ -63,6 +63,12 @@ public abstract class TreeNode
 
     /// <summary>Remote desktop options; every null field is inherited from the parent group.</summary>
     public RdpProfile Rdp { get; set; } = new();
+
+    /// <summary>How the SSH terminal authenticates (user, vault key, password, agent); inherited down the tree.</summary>
+    public SshAuthSettings SshAuth { get; set; } = new();
+
+    /// <summary>SSH terminal options; every null field is inherited from the parent group.</summary>
+    public SshProfile Ssh { get; set; } = new();
 }
 
 public sealed class GroupNode : TreeNode
@@ -91,23 +97,61 @@ public sealed class ServerNode : TreeNode
     /// <summary>Remote desktop (RDP) endpoint; null or disabled = no desktop for this server.</summary>
     public DesktopEndpoint? Desktop { get; set; }
 
-    /// <summary>What a plain click opens when the server offers both.</summary>
+    /// <summary>SSH terminal endpoint; null or disabled = no terminal for this server.</summary>
+    public SshEndpoint? Terminal { get; set; }
+
+    /// <summary>What a plain click opens when the server offers more than one thing.</summary>
     public ServerAction DefaultAction { get; set; } = ServerAction.Files;
 
     [JsonIgnore] public bool HasDesktop => Desktop is { Enabled: true };
     [JsonIgnore] public bool HasFiles => Files;
+    [JsonIgnore] public bool HasTerminal => Terminal is { Enabled: true };
+
+    /// <summary>How many of files / desktop / terminal the server offers.</summary>
+    [JsonIgnore] public int CapabilityCount => (HasFiles ? 1 : 0) + (HasDesktop ? 1 : 0) + (HasTerminal ? 1 : 0);
+
+    public bool Offers(ServerAction action) => action switch
+    {
+        ServerAction.Desktop => HasDesktop,
+        ServerAction.Terminal => HasTerminal,
+        _ => HasFiles,
+    };
 
     /// <summary>The action a plain click performs, respecting which capabilities exist.</summary>
     [JsonIgnore]
-    public ServerAction EffectiveDefaultAction => (DefaultAction, HasFiles, HasDesktop) switch
+    public ServerAction EffectiveDefaultAction =>
+        Offers(DefaultAction) ? DefaultAction
+        : HasFiles ? ServerAction.Files
+        : HasDesktop ? ServerAction.Desktop
+        : HasTerminal ? ServerAction.Terminal
+        : ServerAction.Files;
+
+    /// <summary>
+    /// Copy of everything that defines this server except identity and history (Id, favorite, last connected):
+    /// what "Duplicate" needs. Lives here so a new capability can't be forgotten by the copy.
+    /// </summary>
+    public ServerNode CloneSettings() => new()
     {
-        (_, true, false) => ServerAction.Files,
-        (_, false, true) => ServerAction.Desktop,
-        (var a, _, _) => a,
+        Name = Name,
+        Description = Description,
+        Color = Color,
+        Credentials = Credentials.Clone(),
+        DesktopCredentials = DesktopCredentials.Clone(),
+        Rdp = Rdp.Clone(),
+        SshAuth = SshAuth.Clone(),
+        Ssh = Ssh.Clone(),
+        Host = Host,
+        Share = Share,
+        StartFolder = StartFolder,
+        Tags = [.. Tags],
+        Files = Files,
+        Desktop = Desktop is null ? null : new DesktopEndpoint { Enabled = Desktop.Enabled, Port = Desktop.Port },
+        Terminal = Terminal?.Clone(),
+        DefaultAction = DefaultAction,
     };
 }
 
-public enum ServerAction { Files, Desktop }
+public enum ServerAction { Files, Desktop, Terminal }
 
 public sealed class DesktopEndpoint
 {
@@ -130,4 +174,10 @@ public sealed class ConnectionDocument
 
     /// <summary>Saved searches shown under Views (older builds ignore this property).</summary>
     public List<SmartGroup> SmartGroups { get; set; } = new();
+
+    /// <summary>Private keys imported for SSH terminals, DPAPI-encrypted (older builds keep them untouched).</summary>
+    public List<SshKeyEntry> SshKeys { get; set; } = new();
+
+    /// <summary>Saved terminal commands.</summary>
+    public List<Snippet> Snippets { get; set; } = new();
 }

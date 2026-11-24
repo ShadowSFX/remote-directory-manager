@@ -21,6 +21,7 @@ public static partial class Strings
         AddErrors();
         AddUpdates();
         AddDesktop();
+        AddTerminal();
     }
 
     private static void T(string key, string es, string en) => Table.Add(key, (es, en));

@@ -76,6 +76,9 @@ public sealed class AppSettings
     /// <summary>Version that last ran; used to show "What's new" once after an update.</summary>
     public string? LastRunVersion { get; set; }
 
+    /// <summary>SSH terminal defaults (servers and groups can override some of them).</summary>
+    public TerminalSettings Terminal { get; set; } = new();
+
     public void Normalize()
     {
         if (Language is not ("system" or "es" or "en")) Language = "system";
@@ -86,6 +89,8 @@ public sealed class AppSettings
         if (double.IsNaN(Window.Height) || Window.Height < 420) Window.Height = 820;
         if (Window.Left is { } l && (double.IsNaN(l) || double.IsInfinity(l))) Window.Left = null;
         if (Window.Top is { } t && (double.IsNaN(t) || double.IsInfinity(t))) Window.Top = null;
+        Terminal ??= new TerminalSettings();
+        Terminal.Normalize();
         Panes ??= new List<SavedPane>();
         if (Panes.Count > RDMan.Core.Layout.PaneLayout.MaxPanes) Panes = Panes.Take(RDMan.Core.Layout.PaneLayout.MaxPanes).ToList();
         ActivePane = Panes.Count == 0 ? 0 : Math.Clamp(ActivePane, 0, Panes.Count - 1);
