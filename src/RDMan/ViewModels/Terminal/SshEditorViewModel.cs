@@ -339,6 +339,10 @@ public sealed partial class SshEditorViewModel : ObservableObject
 
     public ObservableCollection<SshOptionRowViewModel> Options { get; } = new();
     [ObservableProperty] private string _proxyJump;
+
+    /// <summary>The ProxyJump typed here, or the one inherited from the groups (for the editor's test).</summary>
+    public string? EffectiveProxyJump => !string.IsNullOrWhiteSpace(ProxyJump) ? ProxyJump.Trim()
+        : SshSettingsResolver.ResolveUnder(_parent(), _main.State.Index).ProxyJump.Value;
     [ObservableProperty] private string _startupCommand;
     [ObservableProperty] private string? _proxyJumpHint;
     [ObservableProperty] private string? _startupCommandHint;
@@ -359,8 +363,8 @@ public sealed partial class SshEditorViewModel : ObservableObject
         Options.Add(new SshOptionRowViewModel("Term.Opt.Log", p.LogSession, Bools(),
             e => (YesNo(e.LogSession.Value), e.LogSession.Source), (r, v) => r.LogSession = (bool?)v));
         Options.Add(new SshOptionRowViewModel("Term.Opt.KeepAlive", p.KeepAliveSeconds,
-            [new SshChoice(15, "15 s"), new SshChoice(30, "30 s"), new SshChoice(60, "60 s"), new SshChoice(120, "120 s"), new SshChoice(0, Loc.T("Term.Opt.Off"))],
-            e => (e.KeepAliveSeconds.Value is { } k ? (k == 0 ? Loc.T("Term.Opt.Off") : $"{k} s") : Loc.T("Term.Opt.KeepAlive.Config"), e.KeepAliveSeconds.Source),
+            [.. new[] { 15, 30, 60, 120 }.Select(n => new SshChoice(n, Loc.F("Term.Opt.Seconds", n))), new SshChoice(0, Loc.T("Term.Opt.Off"))],
+            e => (e.KeepAliveSeconds.Value is { } k ? (k == 0 ? Loc.T("Term.Opt.Off") : Loc.F("Term.Opt.Seconds", k)) : Loc.T("Term.Opt.KeepAlive.Config"), e.KeepAliveSeconds.Source),
             (r, v) => r.KeepAliveSeconds = (int?)v));
         Options.Add(new SshOptionRowViewModel("Term.Opt.Clipboard", p.AllowClipboardWrite,
             [new SshChoice(true, Loc.T("Term.Opt.Clipboard.Allow")), new SshChoice(false, Loc.T("Term.Opt.Clipboard.Ask"))],

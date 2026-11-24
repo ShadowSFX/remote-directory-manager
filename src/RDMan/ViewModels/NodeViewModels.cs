@@ -235,7 +235,16 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
 
     /// <summary>Where the SSH port really is (an alias like "pangya-vps" resolves through ~/.ssh/config).</summary>
     private (string Host, int Port)? TerminalEndpoint()
-        => HasTerminal ? Services.Ssh.SshEnvironment.ProbeEndpoint(Server) : null;
+        => HasTerminal ? Services.Ssh.SshEnvironment.ProbeEndpoint(Server, InheritedProxyJump()) : null;
+
+    /// <summary>The server's ProxyJump, or the nearest group's (the option is inherited down the tree).</summary>
+    private string? InheritedProxyJump()
+    {
+        if (!string.IsNullOrWhiteSpace(Server.Ssh?.ProxyJump)) return Server.Ssh.ProxyJump;
+        for (var g = Parent; g is not null; g = g.Parent)
+            if (!string.IsNullOrWhiteSpace(g.Model.Ssh?.ProxyJump)) return g.Model.Ssh.ProxyJump;
+        return null;
+    }
 
     public override void Refresh()
     {

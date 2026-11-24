@@ -214,7 +214,7 @@ public static class SshConnector
             throw;
         }
 
-        request.AuthenticatedWith ??= auth.Describe();
+        if (!isHop) request.AuthenticatedWith = auth.Describe();
         request.Prompts.Progress(SshProgress.Authenticated, user);
         return client;
     }

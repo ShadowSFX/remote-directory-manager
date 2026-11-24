@@ -49,7 +49,8 @@ public sealed class SshEnvironment(AppState state)
     }
 
     /// <summary>Host and port the health monitor should probe for a server's terminal (aliases resolved).</summary>
-    public static (string Host, int Port)? ProbeEndpoint(ServerNode server)
+    /// <param name="proxyJump">The ProxyJump set in RDMan for this server or inherited from its groups (null = none set).</param>
+    public static (string Host, int Port)? ProbeEndpoint(ServerNode server, string? proxyJump = null)
     {
         if (server.Terminal is not { Enabled: true } endpoint || string.IsNullOrWhiteSpace(server.Host)) return null;
         var host = server.Host.Trim();
@@ -57,7 +58,9 @@ public sealed class SshEnvironment(AppState state)
         {
             var cfg = endpoint.UseSshConfig ? SharedConfig.Resolve(host) : null;
             // Behind a jump host the target usually isn't reachable directly: probing it would always say "offline".
-            if (IsJump(cfg?.ProxyJump) || IsJump(server.Ssh?.ProxyJump)) return null;
+            // RDMan's own setting (even "none") wins over the config, like it does when connecting.
+            var jump = string.IsNullOrWhiteSpace(proxyJump) ? cfg?.ProxyJump : proxyJump;
+            if (IsJump(jump)) return null;
             return (cfg?.EffectiveHost ?? host, endpoint.Port ?? cfg?.Port ?? SshEndpoint.DefaultPort);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

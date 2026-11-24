@@ -844,6 +844,7 @@ public sealed partial class MainViewModel : ObservableObject
         ConnectionStore.ReassignIds(doc);
         // Imported DPAPI blobs from another PC/user simply won't decrypt; the editor will ask to re-enter.
         State.Document.Profiles.AddRange(doc.Profiles);
+        ConnectionStore.MergeSsh(State.Document, doc);
         var name = Path.GetFileNameWithoutExtension(dlg.FileName);
         var count = TreeIndex.AllServers(doc.Root).Count();
         AddImported(name, doc.Root.Children);

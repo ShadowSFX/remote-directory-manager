@@ -152,6 +152,40 @@ public static class ConnectionStore
     }
 
     /// <summary>
+    /// Brings an imported document's SSH keys and snippets into <paramref name="into"/> (call after
+    /// <see cref="ReassignIds"/>). A key already present (same fingerprint) is reused and the imported nodes are pointed
+    /// at it; an existing entry that lost its key material (exported without secrets) gets it back.
+    /// </summary>
+    public static void MergeSsh(ConnectionDocument into, ConnectionDocument imported)
+    {
+        var map = new Dictionary<Guid, Guid>();
+        foreach (var k in imported.SshKeys)
+        {
+            var existing = string.IsNullOrEmpty(k.Fingerprint) ? null : into.SshKeys.FirstOrDefault(e => e.Fingerprint == k.Fingerprint);
+            if (existing is null)
+            {
+                into.SshKeys.Add(k);
+                continue;
+            }
+            map[k.Id] = existing.Id;
+            if (!existing.HasKeyMaterial && k.HasKeyMaterial)
+            {
+                existing.ProtectedKey = k.ProtectedKey;
+                existing.ProtectedPassphrase ??= k.ProtectedPassphrase;
+            }
+        }
+        if (map.Count > 0) RemapKeys(imported.Root, map);
+        foreach (var sn in imported.Snippets.Take(Math.Max(0, MaxSnippets - into.Snippets.Count)))
+            into.Snippets.Add(sn);
+    }
+
+    private static void RemapKeys(TreeNode node, Dictionary<Guid, Guid> map)
+    {
+        if (node.SshAuth?.KeyId is { } id && map.TryGetValue(id, out var to)) node.SshAuth.KeyId = to;
+        if (node is GroupNode g) foreach (var c in g.Children) RemapKeys(c, map);
+    }
+
+    /// <summary>
     /// Re-identifies every node/profile of an imported document so it can be merged without id collisions.
     /// Profile references are remapped accordingly.
     /// </summary>

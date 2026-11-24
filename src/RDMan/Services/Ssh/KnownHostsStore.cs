@@ -45,20 +45,42 @@ public static class KnownHostsStore
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) CreatePrivateDirectory(dir);
 
-            var kh = KnownHosts.Parse(ReadText(path));
+            var kh = KnownHosts.Parse(ReadForUpdate(path));
             kh.Add(host, port, keyType, blob, hash, replace);
             // Replacing also has to clear stale lines in the other files, or the next check still says "changed".
             if (replace)
             {
                 foreach (var other in files.Skip(1).Where(File.Exists))
                 {
-                    var o = KnownHosts.Parse(ReadText(other));
+                    var o = KnownHosts.Parse(ReadForUpdate(other));
                     if (o.Check(host, port, keyType, blob).Status != HostKeyStatus.Changed) continue;
                     o.Add(host, port, keyType, blob, hash, replace: true);
                     Write(other, o.ToString());
                 }
             }
             Write(path, kh.ToString());
+        }
+    }
+
+    /// <summary>
+    /// The current text before rewriting a file. Unlike <see cref="ReadText"/>, a file that exists but can't be read
+    /// (ssh appending, antivirus) is retried and then reported — never treated as empty, which would wipe it.
+    /// </summary>
+    private static string? ReadForUpdate(string path)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            if (!File.Exists(path)) return null;
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(stream);
+                return reader.ReadToEnd();
+            }
+            catch (IOException) when (attempt < 5)
+            {
+                Thread.Sleep(100);
+            }
         }
     }
 

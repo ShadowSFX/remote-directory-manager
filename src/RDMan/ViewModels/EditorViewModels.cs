@@ -600,8 +600,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
                 {
                     Host = t.Host,
                     Terminal = new SshEndpoint { Port = int.TryParse(Ssh.Port, out var sp) ? sp : null, UseSshConfig = Ssh.UseSshConfig },
-                    Ssh = new SshProfile { ProxyJump = string.IsNullOrWhiteSpace(Ssh.ProxyJump) ? null : Ssh.ProxyJump },
-                }) is { } ssh)
+                }, Ssh.EffectiveProxyJump) is { } ssh)
             {
                 var latency = await ConnectionService.ProbeAsync(ssh.Host, ssh.Port, ConnectionService.ProbeTimeout, CancellationToken.None);
                 ok &= latency is not null;

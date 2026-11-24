@@ -20,7 +20,7 @@ public abstract class TerminalChannel : IDisposable
     public event Action? Closed;
 
     /// <summary>True when the channel runs RDMan's command (prompt injection) instead of the plain login shell.</summary>
-    public bool RunsCommand { get; protected init; }
+    public bool RunsCommand { get; protected set; }
 
     public abstract void Write(byte[] data, int offset, int count);
 
@@ -51,7 +51,7 @@ public abstract class TerminalChannel : IDisposable
             {
                 return new ExecChannel(client, terminalType, size, command, environment);
             }
-            catch (Exception ex) when (ex is MissingMemberException or TargetInvocationException or InvalidCastException or NotSupportedException or ArgumentException)
+            catch (Exception ex) when (ex is MissingMemberException or TargetInvocationException or InvalidCastException or NotSupportedException or ArgumentException or SshException)
             {
                 // SSH.NET internals changed: degrade to the public shell API (no injected prompt).
                 App.Log(ex);
@@ -68,9 +68,8 @@ public abstract class TerminalChannel : IDisposable
     {
         private static readonly Assembly SshNet = typeof(SshClient).Assembly;
         private readonly object _channel;
-        private readonly MethodInfo _sendData;
-        private readonly MethodInfo _windowChange;
-        private readonly MethodInfo _dispose;
+        private MethodInfo? _sendData;
+        private MethodInfo? _windowChange;
         private readonly List<(EventInfo Event, Delegate Handler)> _handlers = new();
         private int _closed;
 
@@ -83,11 +82,22 @@ public abstract class TerminalChannel : IDisposable
             var channelType = createChannel.ReturnType; // IChannelSession
             var baseChannelType = SshNet.GetType("Renci.SshNet.Channels.IChannel") ?? throw new MissingMemberException("IChannel");
             _channel = createChannel.Invoke(session, null) ?? throw new NotSupportedException("no channel");
+            try
+            {
+                Start(channelType, baseChannelType, terminalType, size, command, environment);
+            }
+            catch
+            {
+                Dispose(); // a refused pty/exec must not leave the channel open on the session
+                throw;
+            }
+        }
 
+        private void Start(Type channelType, Type baseChannelType, string terminalType, PtySize size, string? command, IReadOnlyDictionary<string, string> environment)
+        {
             MethodInfo M(Type t, string name, params Type[] args) => t.GetMethod(name, args) ?? throw new MissingMemberException(t.Name + "." + name);
             _sendData = M(baseChannelType, "SendData", typeof(byte[]), typeof(int), typeof(int));
             _windowChange = M(channelType, "SendWindowChangeRequest", typeof(uint), typeof(uint), typeof(uint), typeof(uint));
-            _dispose = M(typeof(IDisposable), "Dispose");
 
             Subscribe(baseChannelType, "DataReceived", e => RaiseData(DataOf(e)));
             Subscribe(baseChannelType, "ExtendedDataReceived", e => RaiseData(DataOf(e)));
@@ -141,13 +151,13 @@ public abstract class TerminalChannel : IDisposable
 
         public override void Write(byte[] data, int offset, int count)
         {
-            try { _sendData.Invoke(_channel, [data, offset, count]); }
+            try { _sendData?.Invoke(_channel, [data, offset, count]); }
             catch (TargetInvocationException ex) when (ex.InnerException is SshException or ObjectDisposedException or InvalidOperationException) { OnClosed(); }
         }
 
         public override void Resize(PtySize size)
         {
-            try { _windowChange.Invoke(_channel, [size.Columns, size.Rows, size.PixelWidth, size.PixelHeight]); }
+            try { _windowChange?.Invoke(_channel, [size.Columns, size.Rows, size.PixelWidth, size.PixelHeight]); }
             catch (TargetInvocationException) { }
         }
 
@@ -158,8 +168,9 @@ public abstract class TerminalChannel : IDisposable
                 try { ev.RemoveEventHandler(_channel, del); } catch (TargetInvocationException) { }
             }
             _handlers.Clear();
-            try { _dispose.Invoke(_channel, null); }
-            catch (TargetInvocationException) { }
+            // The internal channel type implements IDisposable (IChannelSession : IChannel : IDisposable).
+            try { (_channel as IDisposable)?.Dispose(); }
+            catch (Exception ex) when (ex is SshException or ObjectDisposedException or InvalidOperationException) { }
         }
     }
 

@@ -197,8 +197,7 @@ public sealed partial class MainViewModel
             }
         }
         body = System.Text.RegularExpressions.Regex.Replace(body, @"\{\{\s*([\w.-]+)\s*\}\}", m => known[m.Groups[1].Value]);
-        terminal.PasteText(body, warn: false);
-        if (snippet.RunImmediately) terminal.SendInput("\r");
+        terminal.PasteText(body, warn: false, enter: snippet.RunImmediately);
         terminal.Focus();
     }
 

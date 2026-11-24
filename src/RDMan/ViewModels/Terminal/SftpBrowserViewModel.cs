@@ -139,6 +139,8 @@ public sealed partial class SftpBrowserViewModel : ObservableObject, IDisposable
     private Task EnsureConnectedAsync()
     {
         if (_link is { Client.IsConnected: true }) return Task.CompletedTask;
+        // A finished attempt (even one that failed synchronously) never blocks the next one.
+        if (_connecting is { IsCompleted: true }) _connecting = null;
         return _connecting ??= ConnectAsync();
     }
 
@@ -247,16 +249,20 @@ public sealed partial class SftpBrowserViewModel : ObservableObject, IDisposable
             if (!File.Exists(local)) continue;
             var name = System.IO.Path.GetFileName(local);
             var remote = Combine(Path, name);
-            if (Entries.Any(e => e.Name == name) &&
+            // Ask the server, not the listing: hidden files aren't listed when "show hidden" is off.
+            bool exists;
+            try { exists = await RunAsync(c => c.Exists(remote)); }
+            catch (Exception ex) when (ex is SshException or IOException or SshConnectException or InvalidOperationException) { exists = false; }
+            if (exists &&
                 !Views.Dialogs.Confirm(_main.Owner, Loc.T("Sftp.Upload"), Loc.F("Sftp.ConfirmOverwrite", name), Loc.T("Sftp.Overwrite"), danger: true))
                 continue;
             var transfer = new SftpTransfer(name, upload: true, new FileInfo(local).Length);
             Transfers.Add(transfer);
             OnPropertyChanged(nameof(HasTransfers));
-            await RunTransferAsync(transfer, client =>
+            await RunTransferAsync(transfer, async (client, ct) =>
             {
-                using var stream = File.OpenRead(local);
-                client.UploadFile(stream, remote, true, done => Progress(transfer, (long)done));
+                await using var stream = File.OpenRead(local);
+                await client.UploadFileAsync(stream, remote, true, Reporter<UploadFileProgressReport>(transfer, r => (long)r.TotalBytesUploaded), ct);
             });
         }
         await RefreshAsync();
@@ -279,11 +285,12 @@ public sealed partial class SftpBrowserViewModel : ObservableObject, IDisposable
         var transfer = new SftpTransfer(entry.Name, upload: false, entry.Length);
         Transfers.Add(transfer);
         OnPropertyChanged(nameof(HasTransfers));
-        var ok = await RunTransferAsync(transfer, client =>
+        var ok = await RunTransferAsync(transfer, async (client, ct) =>
         {
-            using var stream = File.Create(dlg.FileName);
-            client.DownloadFile(entry.FullName, stream, done => Progress(transfer, (long)done));
+            await using var stream = File.Create(dlg.FileName);
+            await client.DownloadFileAsync(entry.FullName, stream, Reporter<DownloadFileProgressReport>(transfer, r => (long)r.TotalBytesDownloaded), ct);
         });
+        if (!ok) TryDelete(dlg.FileName); // no half-written file left behind
         if (ok) _main.Toasts.Show(Loc.F("Sftp.Downloaded", entry.Name), ToastKind.Success, Loc.T("Sftp.ShowInFolder"),
             () => ShellLauncher.OpenFolder(System.IO.Path.GetDirectoryName(dlg.FileName)!));
     }
@@ -305,10 +312,10 @@ public sealed partial class SftpBrowserViewModel : ObservableObject, IDisposable
         var transfer = new SftpTransfer(entry.Name, upload: false, entry.Length);
         Transfers.Add(transfer);
         OnPropertyChanged(nameof(HasTransfers));
-        var ok = await RunTransferAsync(transfer, client =>
+        var ok = await RunTransferAsync(transfer, async (client, ct) =>
         {
-            using var stream = File.Create(local);
-            client.DownloadFile(entry.FullName, stream, done => Progress(transfer, (long)done));
+            await using var stream = File.Create(local);
+            await client.DownloadFileAsync(entry.FullName, stream, Reporter<DownloadFileProgressReport>(transfer, r => (long)r.TotalBytesDownloaded), ct);
         });
         if (!ok) return;
         Watch(local, entry.FullName);
@@ -336,19 +343,17 @@ public sealed partial class SftpBrowserViewModel : ObservableObject, IDisposable
             var transfer = new SftpTransfer(name, upload: true, new FileInfo(local).Length);
             Transfers.Add(transfer);
             OnPropertyChanged(nameof(HasTransfers));
-            var ok = await RunTransferAsync(transfer, client =>
+            var ok = await RunTransferAsync(transfer, async (client, ct) =>
             {
                 // Editors keep the file open while saving: retry briefly until it can be read.
-                for (var attempt = 0; ; attempt++)
+                FileStream? stream = null;
+                for (var attempt = 0; stream is null; attempt++)
                 {
-                    try
-                    {
-                        using var stream = new FileStream(local, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-                        client.UploadFile(stream, remote, true, done => Progress(transfer, (long)done));
-                        return;
-                    }
-                    catch (IOException) when (attempt < 10) { Thread.Sleep(200); }
+                    try { stream = new FileStream(local, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete); }
+                    catch (IOException) when (attempt < 10) { await Task.Delay(200, ct); }
                 }
+                await using (stream)
+                    await client.UploadFileAsync(stream, remote, true, Reporter<UploadFileProgressReport>(transfer, r => (long)r.TotalBytesUploaded), ct);
             });
             if (ok) _main.Toasts.Show(Loc.F("Sftp.Uploaded", name), ToastKind.Success);
         };
@@ -360,21 +365,21 @@ public sealed partial class SftpBrowserViewModel : ObservableObject, IDisposable
         _watchers.Add(watcher);
     }
 
-    private void Progress(SftpTransfer t, long done)
+    /// <summary>Progress from SSH.NET's worker thread to the transfer row (never throws: cancellation uses the token).</summary>
+    private IProgress<T> Reporter<T>(SftpTransfer t, Func<T, long> bytes)
+        => new Progress<T>(r => t.Done = bytes(r)); // Progress<T> posts to the UI thread it was created on
+
+    private static void TryDelete(string path)
     {
-        if (t.Cancel.IsCancellationRequested) throw new OperationCanceledException();
-        _ui.BeginInvoke(() => t.Done = done, DispatcherPriority.Background);
+        try { File.Delete(path); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
-    private async Task<bool> RunTransferAsync(SftpTransfer t, Action<SftpClient> work)
+    private async Task<bool> RunTransferAsync(SftpTransfer t, Func<SftpClient, CancellationToken, Task> work)
     {
         try
         {
-            await RunAsync<bool>(client =>
-            {
-                work(client);
-                return true;
-            });
+            await EnsureConnectedAsync();
+            await work(_link!.Client, t.Cancel.Token);
             t.Done = Math.Max(t.Done, t.Total);
             return true;
         }

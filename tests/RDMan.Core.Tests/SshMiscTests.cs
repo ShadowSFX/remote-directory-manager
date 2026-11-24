@@ -231,6 +231,29 @@ public class SshMiscTests
     }
 
     [Fact]
+    public void Merge_reuses_known_keys_restores_missing_material_and_adds_snippets()
+    {
+        var into = new ConnectionDocument();
+        var mine = new SshKeyEntry { Name = "mine", Fingerprint = "SHA256:same" }; // lost its key after an export
+        into.SshKeys.Add(mine);
+
+        var imported = new ConnectionDocument();
+        var same = new SshKeyEntry { Name = "copy", Fingerprint = "SHA256:same", ProtectedKey = "dpapi1:k" };
+        var other = new SshKeyEntry { Name = "other", Fingerprint = "SHA256:other", ProtectedKey = "dpapi1:o" };
+        imported.SshKeys.AddRange([same, other]);
+        var server = new ServerNode { Host = "h", SshAuth = new SshAuthSettings { Mode = SshAuthMode.Key, KeyId = same.Id } };
+        imported.Root.Children.Add(server);
+        imported.Snippets.Add(new Snippet { Name = "s", Body = "uptime" });
+
+        ConnectionStore.MergeSsh(into, imported);
+        Assert.Equal(2, into.SshKeys.Count);
+        Assert.Equal(mine.Id, server.SshAuth.KeyId);
+        Assert.Equal("dpapi1:k", mine.ProtectedKey);
+        Assert.Contains(other, into.SshKeys);
+        Assert.Single(into.Snippets);
+    }
+
+    [Fact]
     public void Ssh_fields_round_trip_through_json()
     {
         var doc = new ConnectionDocument();

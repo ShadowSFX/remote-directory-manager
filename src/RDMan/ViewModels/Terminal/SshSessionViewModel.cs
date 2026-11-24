@@ -362,7 +362,7 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         client.KeepAliveInterval = target.KeepAliveSeconds > 0 ? TimeSpan.FromSeconds(target.KeepAliveSeconds) : Timeout.InfiniteTimeSpan;
         client.ErrorOccurred += (_, e) => _ui.BeginInvoke(() => OnConnectionLost(gen, e.Exception));
 
-        var command = settings.InjectPrompt.Value ? PromptScript.RemoteCommand() : null;
+        var command = settings.InjectPrompt.Value && !_promptUnsupported ? PromptScript.RemoteCommand() : null;
         var environment = new Dictionary<string, string> { ["COLORTERM"] = "truecolor", ["TERM_PROGRAM"] = "RDMan", ["LC_TERMINAL"] = "RDMan" };
         TerminalChannel channel;
         try
@@ -385,6 +385,8 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
 
         _link = link;
         _channel = channel;
+        _sawPrompt = false;
+        _channelOpenedAt = DateTime.UtcNow;
         ResetPump();
         channel.Data += seg => OnData(gen, seg);
         channel.Closed += () => _ui.BeginInvoke(() => OnChannelClosed(gen));
@@ -427,6 +429,9 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
     }
 
     private string? _pendingStartup;
+    private bool _sawPrompt;
+    private bool _promptUnsupported;
+    private DateTime _channelOpenedAt;
 
     private void SendStartupCommand()
     {
@@ -694,7 +699,17 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
     {
         if (gen != _generation || _disposed) return;
         var stillConnected = _link?.Client.IsConnected == true;
+        var injected = _channel?.RunsCommand == true;
         TearDownConnection();
+        // RDMan's prompt runs through "sh"; a server whose login shell isn't POSIX (Windows OpenSSH with cmd or
+        // PowerShell, appliances) ends that command at once. Fall back to its normal shell for this session.
+        if (stillConnected && injected && !_sawPrompt && DateTime.UtcNow - _channelOpenedAt < TimeSpan.FromSeconds(6))
+        {
+            _promptUnsupported = true;
+            Line(Dim(Loc.T("Term.Line.PromptUnavailable")));
+            _ = ConnectAsync(isReconnect: false);
+            return;
+        }
         if (stillConnected)
         {
             // exit / logout: the server ended the session on purpose.
@@ -938,7 +953,7 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         PasteText(text);
     }
 
-    public void PasteText(string text, bool warn = true)
+    public void PasteText(string text, bool warn = true, bool enter = false)
     {
         if (_terminal is null || text.Length == 0) return;
         text = text.Replace("\r\n", "\n");
@@ -958,12 +973,12 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
                 actions = new object[]
                 {
                     CardAction(Loc.T("Common.Cancel"), "link", _ => Focus(), cancel: true, focus: true),
-                    CardAction(Loc.F("Term.Paste.Do", lines), "primary", _ => _terminal?.Send(new { t = "paste", text }), isDefault: true),
+                    CardAction(Loc.F("Term.Paste.Do", lines), "primary", _ => _terminal?.Send(new { t = "paste", text, enter }), isDefault: true),
                 },
             });
             return;
         }
-        _terminal.Send(new { t = "paste", text });
+        _terminal.Send(new { t = "paste", text, enter });
     }
 
     // ───────────── Page messages ─────────────
@@ -1034,6 +1049,7 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
                 RaiseActivated();
                 break;
             case "prompt":
+                _sawPrompt = true;
                 SendStartupCommand();
                 break;
             case "action":
@@ -1210,6 +1226,10 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
 
     private void Card(object? card)
     {
+        // Whatever question was showing is answered "cancel" when something else takes its place.
+        var pending = _cancelPendingCard;
+        _cancelPendingCard = null;
+        pending?.Invoke();
         _actionSeq++;
         foreach (var k in _actions.Keys.Where(k => k.StartsWith('c')).ToList()) _actions.Remove(k);
         _terminal?.Send(new { t = "card", card });
@@ -1319,22 +1339,42 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
     }
 
     /// <summary>Shows a card on the UI thread and completes when one of its actions runs (or on cancellation).</summary>
+    /// <summary>
+    /// Shows a question card and waits for its answer. Questions from the terminal and its SFTP panel take turns (one
+    /// card at a time); a card replaced by anything else (an error, a host key) counts as cancelled, so nobody waits
+    /// forever; cancellation only removes its own card.
+    /// </summary>
     private async Task<T?> AskAsync<T>(CancellationToken ct, Action<Action<T?>, CancellationToken> show, string attention) where T : class
     {
-        var tcs = new TaskCompletionSource<T?>(TaskCreationOptions.RunContinuationsAsynchronously);
-        await _ui.InvokeAsync(() =>
+        try { await _promptGate.WaitAsync(ct).ConfigureAwait(false); }
+        catch (OperationCanceledException) { return null; }
+        try
         {
-            if (_terminal is null || _disposed) { tcs.TrySetResult(null); return; }
-            show(r => tcs.TrySetResult(r), ct);
-            AttentionRequested?.Invoke(this, attention);
-        });
-        await using var reg = ct.Register(() =>
+            var tcs = new TaskCompletionSource<T?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var mySeq = -1;
+            await _ui.InvokeAsync(() =>
+            {
+                if (_terminal is null || _disposed) { tcs.TrySetResult(null); return; }
+                show(r => tcs.TrySetResult(r), ct);
+                mySeq = _actionSeq;
+                _cancelPendingCard = () => tcs.TrySetResult(null);
+                AttentionRequested?.Invoke(this, attention);
+            });
+            await using var reg = ct.Register(() =>
+            {
+                tcs.TrySetResult(null);
+                _ui.BeginInvoke(() => { if (_actionSeq == mySeq) Card(null); });
+            });
+            return await tcs.Task.ConfigureAwait(false);
+        }
+        finally
         {
-            tcs.TrySetResult(null);
-            _ui.BeginInvoke(() => Card(null));
-        });
-        return await tcs.Task.ConfigureAwait(false);
+            _promptGate.Release();
+        }
     }
+
+    private readonly SemaphoreSlim _promptGate = new(1, 1);
+    private Action? _cancelPendingCard;
 
     private static string Field(JsonElement m, string id)
         => m.TryGetProperty("values", out var values) && values.ValueKind == JsonValueKind.Object && values.TryGetProperty(id, out var v)

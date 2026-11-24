@@ -593,7 +593,12 @@
       case 'focus': if (term && $('scrim').hidden) term.focus(); break;
       case 'banner': showBanner(m.banner); break;
       case 'card': showCard(m.card); break;
-      case 'paste': if (term) term.paste(m.text || ''); break;
+      case 'paste':
+        if (!term) break;
+        term.paste(m.text || '');
+        // A snippet that runs: Enter goes after the text, through the same input path (keeps the order).
+        if (m.enter) post({ t: 'input', d: '\r' });
+        break;
       case 'search': if (term) openSearch(); break;
       case 'clear': if (term) { term.clear(); prompts.length = 0; } break;
       case 'reset': if (term) { term.reset(); prompts.length = 0; } break;

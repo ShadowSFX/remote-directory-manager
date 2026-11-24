@@ -367,6 +367,9 @@ public static partial class Strings
         T("Term.Stats.Cpu", "Uso de CPU (último minuto)", "CPU usage (last minute)");
         T("Term.Stats.Load", "Carga media (1 minuto)", "Load average (1 minute)");
         T("Term.Stats.LoadShort", "carga", "load");
+        T("Term.Stats.CpuShort", "CPU", "CPU");
+        T("Term.Stats.RamShort", "RAM", "RAM");
+        T("Term.Opt.Seconds", "{0} s", "{0} s");
         T("Term.Stats.Uptime", "Tiempo encendido", "Uptime");
     }
 }

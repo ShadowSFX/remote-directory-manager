@@ -426,7 +426,7 @@
                                MaxWidth="180" TextTrimming="CharacterEllipsis" ToolTip="{Binding OsName}" />
                     <Border Style="{StaticResource StatChip}" ToolTip="{ui:Tr Term.Stats.Cpu}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="CPU" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{ui:Tr Term.Stats.CpuShort}" Style="{StaticResource StatLabel}" />
                             <Polyline Points="{Binding CpuSparkline}" Stroke="{DynamicResource Accent}" StrokeThickness="1.25" Width="40" Height="14"
                                       Margin="6,0" VerticalAlignment="Center" StrokeLineJoin="Round" />
                             <TextBlock Text="{Binding CpuPercent, StringFormat={}{0:0}%}" Style="{StaticResource StatValue}" Tag="{Binding CpuLevel}" />
@@ -434,7 +434,7 @@
                     </Border>
                     <Border Style="{StaticResource StatChip}" ToolTip="{Binding MemText}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="RAM" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{ui:Tr Term.Stats.RamShort}" Style="{StaticResource StatLabel}" />
                             <TextBlock Text="{Binding MemPercent, StringFormat={}{0:0}%}" Style="{StaticResource StatValue}" Margin="6,0,0,0" Tag="{Binding MemLevel}" />
                         </StackPanel>
                     </Border>

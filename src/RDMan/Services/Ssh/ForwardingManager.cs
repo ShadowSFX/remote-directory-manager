@@ -120,9 +120,10 @@ public sealed class ForwardingManager : IDisposable
         if (_client is not { IsConnected: true } client || item.IsListening) return;
         var f = item.Forward;
         var bind = string.IsNullOrWhiteSpace(f.BindAddress) ? "127.0.0.1" : f.BindAddress == "*" ? "0.0.0.0" : f.BindAddress!;
+        ForwardedPort? port = null;
         try
         {
-            ForwardedPort port = f.Kind switch
+            port = f.Kind switch
             {
                 SshForwardKind.Dynamic => new ForwardedPortDynamic(bind, (uint)f.BindPort),
                 SshForwardKind.Remote => new ForwardedPortRemote(string.IsNullOrWhiteSpace(f.BindAddress) ? "localhost" : bind, (uint)f.BindPort, f.TargetHost!, (uint)f.TargetPort),
@@ -143,7 +144,8 @@ public sealed class ForwardingManager : IDisposable
         {
             item.Problem = ex is SocketException { SocketErrorCode: SocketError.AddressAlreadyInUse } ? Loc.T("Term.Forward.InUse") : ex.Message;
             item.State = ForwardState.Failed;
-            if (item.Port is null) TryRemove(client, null);
+            TryRemove(client, port); // never leave a dead forward registered on the client
+            item.Port = null;
         }
     }
 
