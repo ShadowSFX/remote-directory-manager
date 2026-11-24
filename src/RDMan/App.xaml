@@ -1,0 +1,29 @@
+﻿<Application x:Class="RDMan.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
+             xmlns:ui="clr-namespace:RDMan.Infrastructure"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Controls.xaml" />
+                <ResourceDictionary Source="Themes/Windows.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <ui:BoolToVisibility x:Key="Vis" />
+            <ui:NotEmptyToVisibility x:Key="VisIfAny" />
+            <ui:EqualsToBool x:Key="Eq" />
+            <ui:EqualsToVisibility x:Key="EqVis" />
+            <ui:NullToBool x:Key="NotNull" />
+            <ui:NotConverter x:Key="Not" />
+            <ui:ItemOpacity x:Key="ItemOpacity" />
+            <ui:BrushOrFallback x:Key="BrushOr" />
+            <ui:SortGlyph x:Key="SortGlyph" />
+            <ui:Multiply x:Key="Mul" />
+            <ui:TreeDepth x:Key="TreeDepth" />
+            <!-- Row height follows the density setting (App.ApplyDensity). -->
+            <sys:Double x:Key="Row.Height">32</sys:Double>
+            <sys:Double x:Key="Tree.RowHeight">32</sys:Double>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

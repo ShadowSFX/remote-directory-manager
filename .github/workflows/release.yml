@@ -1,0 +1,51 @@
+name: Release
+
+# Push a tag like v1.2.3 to publish RDMan.exe + RDMan.exe.sha256 as a GitHub Release.
+# Running copies of RDMan pick it up automatically (they poll /releases/latest).
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Version from tag
+        id: ver
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "Tag must be vMAJOR.MINOR.PATCH (got ${{ github.ref_name }})" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test tests/RDMan.Core.Tests -c Release
+
+      - name: Publish single-file exe
+        run: >
+          dotnet publish src/RDMan/RDMan.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true
+          -p:Version=${{ steps.ver.outputs.version }} -o publish
+
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash publish/RDMan.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  RDMan.exe" | Out-File -FilePath publish/RDMan.exe.sha256 -Encoding ascii -NoNewline
+          Write-Host "SHA-256: $hash"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create "${{ github.ref_name }}" publish/RDMan.exe publish/RDMan.exe.sha256 `
+            --title "RDMan ${{ steps.ver.outputs.version }}" --generate-notes --verify-tag

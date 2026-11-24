@@ -1,0 +1,53 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Graphite surfaces, periwinkle accent. Color only ever means identity (server tags) or status. -->
+    <Color x:Key="C.Base">#FF15181D</Color>
+    <Color x:Key="C.Accent">#FF7480FF</Color>
+
+    <SolidColorBrush x:Key="Bg.Base" Color="#FF15181D" />
+    <SolidColorBrush x:Key="Bg.Chrome" Color="#E615181D" />
+    <SolidColorBrush x:Key="Bg.Sidebar" Color="#99181B21" />
+    <SolidColorBrush x:Key="Bg.Content" Color="#FF1B1F26" />
+    <SolidColorBrush x:Key="Bg.Raised" Color="#FF232833" />
+    <SolidColorBrush x:Key="Bg.Input" Color="#FF20242C" />
+    <SolidColorBrush x:Key="Bg.Hover" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="Bg.Pressed" Color="#0CFFFFFF" />
+    <SolidColorBrush x:Key="Bg.Selected" Color="#2E7480FF" />
+    <SolidColorBrush x:Key="Bg.SelectedHover" Color="#3D7480FF" />
+    <SolidColorBrush x:Key="Bg.SelectedInactive" Color="#1FFFFFFF" />
+    <SolidColorBrush x:Key="Bg.Popup" Color="#FF252A35" />
+    <SolidColorBrush x:Key="Bg.Scrim" Color="#8C08090C" />
+    <SolidColorBrush x:Key="Bg.Tab" Color="#FF1B1F26" />
+    <SolidColorBrush x:Key="Bg.Toast" Color="#FF2B3140" />
+
+    <SolidColorBrush x:Key="Line" Color="#FF2A303A" />
+    <SolidColorBrush x:Key="Line.Subtle" Color="#FF22272F" />
+    <SolidColorBrush x:Key="Line.Strong" Color="#FF3B4250" />
+    <SolidColorBrush x:Key="Line.Popup" Color="#FF363D4B" />
+
+    <SolidColorBrush x:Key="Fg.Primary" Color="#FFE8EBF1" />
+    <SolidColorBrush x:Key="Fg.Secondary" Color="#FFA6AEBB" />
+    <SolidColorBrush x:Key="Fg.Tertiary" Color="#FF737C8C" />
+    <SolidColorBrush x:Key="Fg.Disabled" Color="#FF525A67" />
+    <SolidColorBrush x:Key="Fg.OnAccent" Color="#FFFFFFFF" />
+
+    <SolidColorBrush x:Key="Accent" Color="#FF7480FF" />
+    <SolidColorBrush x:Key="Accent.Hover" Color="#FF8791FF" />
+    <SolidColorBrush x:Key="Accent.Pressed" Color="#FF6570EC" />
+    <SolidColorBrush x:Key="Accent.Text" Color="#FFA3ABFF" />
+    <SolidColorBrush x:Key="Accent.Subtle" Color="#267480FF" />
+
+    <SolidColorBrush x:Key="Status.Online" Color="#FF3FBF62" />
+    <SolidColorBrush x:Key="Status.Offline" Color="#FFF0605D" />
+    <SolidColorBrush x:Key="Status.Unknown" Color="#FF5D6574" />
+    <SolidColorBrush x:Key="Status.Warn" Color="#FFE0AE45" />
+
+    <SolidColorBrush x:Key="Danger" Color="#FFF0605D" />
+    <SolidColorBrush x:Key="Danger.Hover" Color="#FFF37572" />
+    <SolidColorBrush x:Key="Danger.Subtle" Color="#26F0605D" />
+    <SolidColorBrush x:Key="Warn.Subtle" Color="#24E0AE45" />
+
+    <SolidColorBrush x:Key="Caption.CloseHover" Color="#FFC42B1C" />
+    <Color x:Key="Shadow.Color">#FF000000</Color>
+    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="Shadow.Opacity">0.45</sys:Double>
+</ResourceDictionary>

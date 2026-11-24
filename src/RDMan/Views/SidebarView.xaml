@@ -1,0 +1,261 @@
+<UserControl x:Class="RDMan.Views.SidebarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:RDMan.Infrastructure"
+             xmlns:vm="clr-namespace:RDMan.ViewModels">
+    <UserControl.Resources>
+        <!-- Full-row tree item with indentation computed from depth -->
+        <Style x:Key="TreeItem" TargetType="TreeViewItem">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <Setter Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TreeViewItem">
+                        <StackPanel>
+                            <Border x:Name="Row" Background="Transparent" CornerRadius="6" Height="{DynamicResource Tree.RowHeight}" Margin="6,1">
+                                <Grid>
+                                    <Border x:Name="Pill" Width="3" Height="16" CornerRadius="1.5" HorizontalAlignment="Left" Margin="0,0,0,0"
+                                            Background="{DynamicResource Accent}" Visibility="Collapsed" />
+                                    <Border x:Name="DropLine" Height="2" VerticalAlignment="Bottom" Background="{DynamicResource Accent}" Visibility="Collapsed" />
+                                    <Grid Margin="{Binding RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource TreeDepth}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="18" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ToggleButton x:Name="Expander" IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
+                                                      ClickMode="Press" Focusable="False" Width="18" Height="18">
+                                            <ToggleButton.Template>
+                                                <ControlTemplate TargetType="ToggleButton">
+                                                    <Border Background="Transparent">
+                                                        <TextBlock x:Name="Chev" Text="&#xE76C;" FontFamily="{StaticResource Font.Icons}" FontSize="9"
+                                                                   Foreground="{DynamicResource Fg.Tertiary}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                   RenderTransformOrigin="0.5,0.5">
+                                                            <TextBlock.RenderTransform>
+                                                                <RotateTransform x:Name="Rot" Angle="0" />
+                                                            </TextBlock.RenderTransform>
+                                                        </TextBlock>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsChecked" Value="True">
+                                                            <Setter TargetName="Chev" Property="RenderTransform">
+                                                                <Setter.Value>
+                                                                    <RotateTransform Angle="90" />
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Chev" Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </ToggleButton.Template>
+                                        </ToggleButton>
+                                        <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                            <ItemsPresenter x:Name="ItemsHost" />
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="False">
+                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Collapsed" />
+                            </Trigger>
+                            <Trigger Property="HasItems" Value="False">
+                                <Setter TargetName="Expander" Property="Visibility" Value="Hidden" />
+                            </Trigger>
+                            <Trigger SourceName="Row" Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Bg.Hover}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Bg.SelectedInactive}" />
+                                <Setter TargetName="Pill" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="True" />
+                                    <Condition Property="IsSelectionActive" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Bg.Selected}" />
+                            </MultiTrigger>
+                            <DataTrigger Binding="{Binding IsDropTarget}" Value="True">
+                                <Setter TargetName="Row" Property="Background" Value="{DynamicResource Accent.Subtle}" />
+                                <Setter TargetName="Row" Property="BorderBrush" Value="{DynamicResource Accent}" />
+                                <Setter TargetName="Row" Property="BorderThickness" Value="1" />
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <HierarchicalDataTemplate DataType="{x:Type vm:GroupNodeViewModel}" ItemsSource="{Binding Children}">
+            <Grid Background="Transparent" ToolTip="{Binding Description}" ToolTipService.IsEnabled="{Binding Description, Converter={StaticResource NotNull}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid Width="18" Margin="2,0,8,0">
+                    <TextBlock Text="&#xE8F1;" Style="{StaticResource Icon}" FontSize="14" Foreground="{DynamicResource Fg.Secondary}" />
+                    <Ellipse Width="6" Height="6" Fill="{Binding ColorBrush}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-1,3"
+                             Visibility="{Binding HasColor, Converter={StaticResource Vis}}" />
+                </Grid>
+                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Style="{StaticResource Text.Caption}" Margin="8,0,10,0" VerticalAlignment="Center">
+                    <Run Text="{Binding OnlineCount, Mode=OneWay}" /><Run Text="/" /><Run Text="{Binding ServerCount, Mode=OneWay}" />
+                </TextBlock>
+            </Grid>
+        </HierarchicalDataTemplate>
+
+        <DataTemplate DataType="{x:Type vm:ServerNodeViewModel}">
+            <Grid Background="Transparent">
+                <Grid.ToolTip>
+                    <ToolTip>
+                        <StackPanel MaxWidth="320">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding RootPath}" FontFamily="{StaticResource Font.Mono}" FontSize="12" Margin="0,2,0,0" Foreground="{DynamicResource Fg.Secondary}" />
+                            <TextBlock Text="{Binding StatusText}" Margin="0,6,0,0" Foreground="{DynamicResource Fg.Secondary}" />
+                            <TextBlock Text="{Binding Description}" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="{DynamicResource Fg.Secondary}"
+                                       Visibility="{Binding Description, Converter={StaticResource VisIfAny}}" />
+                        </StackPanel>
+                    </ToolTip>
+                </Grid.ToolTip>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <!-- identity tag + live status -->
+                <Grid Width="18" Margin="2,0,8,0">
+                    <Border Width="4" Height="16" CornerRadius="2" HorizontalAlignment="Left"
+                            Background="{Binding ColorBrush, Converter={StaticResource BrushOr}, ConverterParameter=Line.Strong}" />
+                    <Ellipse Style="{StaticResource StatusDot}" HorizontalAlignment="Right" />
+                </Grid>
+                <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding Host}" Style="{StaticResource Text.Mono}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}"
+                           Margin="8,0,10,0" VerticalAlignment="Center" MaxWidth="120" />
+            </Grid>
+        </DataTemplate>
+
+        <Style x:Key="SidebarHeader" TargetType="TextBlock" BasedOn="{StaticResource Text.Section}">
+            <Setter Property="Margin" Value="18,0,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="PlaceButton" TargetType="Button" BasedOn="{StaticResource Btn.Base}">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Height" Value="{DynamicResource Tree.RowHeight}" />
+            <Setter Property="Margin" Value="6,1" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Home -->
+        <Button Grid.Row="0" Style="{StaticResource PlaceButton}" Command="{Binding OpenHomeCommand}" Margin="6,4,6,2">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE80F;" Style="{StaticResource Icon}" FontSize="14" Foreground="{DynamicResource Fg.Secondary}" Width="18" Margin="20,0,8,0" />
+                <TextBlock Text="{ui:Tr Home.Title}" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+
+        <!-- Connections header -->
+        <Grid Grid.Row="1" Height="36" Margin="0,8,0,0">
+            <TextBlock Text="{ui:Tr Tree.Connections}" Style="{StaticResource SidebarHeader}" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0">
+                <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE8F4;" FontSize="12" ToolTip="{ui:Tr Menu.NewGroup}" Command="{Binding NewGroupCommand}" />
+                <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE710;" FontSize="12" ToolTip="{ui:Tr Menu.NewServer}" Command="{Binding NewServerCommand}" Margin="2,0,0,0" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Connection tree -->
+        <TreeView x:Name="Tree" Grid.Row="2" ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0" Padding="0,0,0,8"
+                  ItemContainerStyle="{StaticResource TreeItem}" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" AllowDrop="True"
+                  SelectedItemChanged="Tree_SelectedItemChanged" PreviewMouseLeftButtonDown="Tree_PreviewMouseLeftButtonDown"
+                  PreviewMouseMove="Tree_PreviewMouseMove" MouseLeftButtonUp="Tree_MouseLeftButtonUp" PreviewMouseDown="Tree_PreviewMouseDown"
+                  MouseDoubleClick="Tree_MouseDoubleClick" PreviewMouseRightButtonDown="Tree_PreviewMouseRightButtonDown"
+                  ContextMenuOpening="Tree_ContextMenuOpening" KeyDown="Tree_KeyDown"
+                  DragOver="Tree_DragOver" Drop="Tree_Drop" DragLeave="Tree_DragLeave">
+            <TreeView.Resources>
+                <Style TargetType="TreeViewItem" BasedOn="{StaticResource TreeItem}" />
+            </TreeView.Resources>
+            <TreeView.ContextMenu>
+                <ContextMenu />
+            </TreeView.ContextMenu>
+        </TreeView>
+
+        <!-- Empty state -->
+        <StackPanel Grid.Row="2" Margin="18,8,18,0" Visibility="{Binding IsTreeEmpty, Converter={StaticResource Vis}}">
+            <TextBlock Text="{ui:Tr Tree.Empty.Title}" FontWeight="SemiBold" FontSize="14" />
+            <TextBlock Text="{ui:Tr Tree.Empty.Body}" Style="{StaticResource Text.Secondary}" Margin="0,6,0,10" />
+            <Button Style="{StaticResource Btn.Link}" HorizontalAlignment="Left" Content="{ui:Tr Tree.Empty.Import}"
+                    Command="{Binding ImportFromWindowsCommand}" />
+        </StackPanel>
+
+        <!-- This PC -->
+        <Border Grid.Row="3" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,6,0,8">
+            <StackPanel>
+                <Grid Height="30">
+                    <Button Style="{StaticResource Btn.Base}" Padding="0" Height="28" HorizontalAlignment="Left" Margin="6,0,0,0"
+                            Command="{Binding OpenThisPcCommand}" Background="Transparent">
+                        <TextBlock Text="{ui:Tr Tree.ThisPc}" Style="{StaticResource Text.Section}" Margin="12,0" />
+                    </Button>
+                    <ToggleButton HorizontalAlignment="Right" Margin="0,0,10,0" Width="24" Height="24" Focusable="False"
+                                  IsChecked="{Binding IsThisPcExpanded}" Style="{StaticResource Btn.IconSmall}">
+                        <TextBlock Text="&#xE70E;" FontFamily="{StaticResource Font.Icons}" FontSize="9" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="RenderTransform">
+                                        <Setter.Value>
+                                            <RotateTransform Angle="180" />
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsThisPcExpanded}" Value="True">
+                                            <Setter Property="RenderTransform">
+                                                <Setter.Value>
+                                                    <RotateTransform Angle="0" />
+                                                </Setter.Value>
+                                            </Setter>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </ToggleButton>
+                </Grid>
+                <ItemsControl ItemsSource="{Binding LocalPlaces}" MaxHeight="230" Visibility="{Binding IsThisPcExpanded, Converter={StaticResource Vis}}">
+                    <ItemsControl.Template>
+                        <ControlTemplate TargetType="ItemsControl">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsPresenter />
+                            </ScrollViewer>
+                        </ControlTemplate>
+                    </ItemsControl.Template>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:LocalPlace}">
+                            <Button Style="{StaticResource PlaceButton}" Command="{Binding DataContext.OpenLocalPlaceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}" ToolTip="{Binding Path}" AllowDrop="True" Tag="{Binding Path}"
+                                    DragOver="Place_DragOver" Drop="Place_Drop">
+                                <StackPanel Orientation="Horizontal">
+                                    <Image Source="{Binding Icon}" Width="16" Height="16" Margin="20,0,10,0" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

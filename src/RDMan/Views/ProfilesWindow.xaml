@@ -1,0 +1,93 @@
+<v:DialogWindow x:Class="RDMan.Views.ProfilesWindow"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:ui="clr-namespace:RDMan.Infrastructure"
+                xmlns:v="clr-namespace:RDMan.Views"
+                xmlns:vm="clr-namespace:RDMan.ViewModels"
+                Title="{ui:Tr Profiles.Title}" Width="600">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid Margin="24,0,24,12">
+            <TextBlock Text="{ui:Tr Profiles.Subtitle}" Style="{StaticResource Text.Secondary}" Margin="0,0,180,0" VerticalAlignment="Center" />
+            <Button HorizontalAlignment="Right" Command="{Binding AddCommand}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
+                    <TextBlock Text="{ui:Tr Profiles.Add}" />
+                </StackPanel>
+            </Button>
+        </Grid>
+        <ScrollViewer Grid.Row="1" MaxHeight="480" MinHeight="120" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="24,0,24,20">
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ProfileItemViewModel}">
+                            <Border Style="{StaticResource Surface.Card}" Padding="14,12" Margin="0,0,0,10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Border Width="30" Height="30" CornerRadius="15" Background="{DynamicResource Accent.Subtle}" Margin="0,0,12,0">
+                                                <TextBlock Text="&#xE8D7;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Accent.Text}" />
+                                            </Border>
+                                            <StackPanel VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                <TextBlock Style="{StaticResource Text.Caption}">
+                                                    <Run Text="{Binding Username, Mode=OneWay}" /><Run Text="  ·  " /><Run Text="{Binding UsageText, Mode=OneWay}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <ToggleButton Style="{StaticResource Toggle.Icon}" Content="&#xE70F;" IsChecked="{Binding IsExpanded}" ToolTip="{ui:Tr Common.Edit}" />
+                                            <Button Style="{StaticResource Btn.Icon}" Content="&#xE74D;" Foreground="{DynamicResource Danger}" ToolTip="{ui:Tr Common.Delete}"
+                                                    Command="{Binding DataContext.RemoveCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <Grid Grid.Row="1" Margin="0,14,0,2" Visibility="{Binding IsExpanded, Converter={StaticResource Vis}}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{ui:Tr Profiles.Name}" Style="{StaticResource Text.Caption}" Margin="0,0,0,4" />
+                                            <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="{ui:Tr Profiles.NameHint}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="{ui:Tr Cred.Username}" Style="{StaticResource Text.Caption}" Margin="0,0,0,4" />
+                                            <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="{ui:Tr Cred.Password}" Style="{StaticResource Text.Caption}" Margin="0,0,0,4" />
+                                            <PasswordBox PasswordChanged="Password_PasswordChanged" Tag="empty" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Row="1" Grid.ColumnSpan="5" Text="{ui:Tr Cred.PasswordUnreadable}" Foreground="{DynamicResource Status.Warn}"
+                                                   FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap" Visibility="{Binding PasswordUnreadable, Converter={StaticResource Vis}}" />
+                                    </Grid>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{ui:Tr Profiles.Empty}" Style="{StaticResource Text.Secondary}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,30"
+                           Visibility="{Binding IsEmpty, Converter={StaticResource Vis}}" />
+            </Grid>
+        </ScrollViewer>
+        <Border Grid.Row="2" Style="{StaticResource Dialog.Footer}">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <TextBlock Text="{Binding ValidationError}" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="12"
+                           Visibility="{Binding ValidationError, Converter={StaticResource VisIfAny}}" />
+                <Button Content="{ui:Tr Common.Cancel}" IsCancel="True" MinWidth="96" Margin="0,0,8,0" />
+                <Button Style="{StaticResource Btn.Primary}" Content="{ui:Tr Common.Save}" IsDefault="True" MinWidth="96" Click="Save_Click" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</v:DialogWindow>

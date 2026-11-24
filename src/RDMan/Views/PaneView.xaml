@@ -1,0 +1,100 @@
+<UserControl x:Class="RDMan.Views.PaneView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:RDMan.Infrastructure"
+             xmlns:v="clr-namespace:RDMan.Views"
+             xmlns:vm="clr-namespace:RDMan.ViewModels"
+             PreviewMouseDown="Pane_PreviewMouseDown" GotKeyboardFocus="Pane_GotKeyboardFocus">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="40" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Tab strip -->
+        <Border Grid.Row="0" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Background="{DynamicResource Bg.Base}">
+            <Grid>
+                <Border x:Name="ActiveMarker" Height="2" VerticalAlignment="Top" Background="{DynamicResource Accent}" Opacity="0" />
+                <DockPanel LastChildFill="True" Margin="6,6,6,0">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource Btn.Icon}" Width="30" Height="28" FontSize="12" Content="&#xE710;"
+                            VerticalAlignment="Top" Command="{Binding NewTabCommand}" ToolTip="{ui:Tr Nav.NewTab}" Margin="2,0,0,0" />
+                    <ListBox x:Name="TabStrip" ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" Background="Transparent" BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                             ScrollViewer.CanContentScroll="False" PreviewMouseWheel="TabStrip_PreviewMouseWheel"
+                             PreviewMouseDown="TabStrip_PreviewMouseDown" AllowDrop="True" DragOver="Tab_DragOver" Drop="Tab_Drop">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Bd" Background="Transparent" CornerRadius="6,6,0,0" Height="34" MinWidth="120" MaxWidth="240"
+                                                    Margin="0,0,2,0" BorderThickness="1,1,1,0" BorderBrush="Transparent">
+                                                <ContentPresenter />
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Bg.Hover}" />
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Bg.Content}" />
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource Line}" />
+                                                    <Setter TargetName="Bd" Property="Margin" Value="0,0,2,-1" />
+                                                    <Setter TargetName="Bd" Property="Height" Value="35" />
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:BrowserTabViewModel}">
+                                <Grid x:Name="TabRoot" Background="Transparent" ToolTip="{Binding Title}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <!-- identity strip on top of the tab -->
+                                    <Border Grid.ColumnSpan="3" Height="2" VerticalAlignment="Top" Margin="8,0" CornerRadius="0,0,2,2"
+                                            Background="{Binding IdentityBrush}" />
+                                    <Grid Width="16" Margin="12,0,8,0">
+                                        <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Secondary}" />
+                                        <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                 Margin="0,0,-3,4" Visibility="{Binding IsLoading, Converter={StaticResource Vis}}" />
+                                    </Grid>
+                                    <TextBlock x:Name="TabTitle" Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Fg.Secondary}" />
+                                    <Button x:Name="CloseBtn" Grid.Column="2" Style="{StaticResource Btn.IconSmall}" Width="22" Height="22" Content="&#xE711;" FontSize="9"
+                                            Margin="6,0,6,0" Opacity="0" ToolTip="{ui:Tr Nav.CloseTab}"
+                                            Command="{Binding DataContext.CloseTabCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                                </Grid>
+                                <DataTemplate.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                        <Setter TargetName="CloseBtn" Property="Opacity" Value="1" />
+                                        <Setter TargetName="TabTitle" Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+                                    </DataTrigger>
+                                    <Trigger SourceName="TabRoot" Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="CloseBtn" Property="Opacity" Value="1" />
+                                    </Trigger>
+                                </DataTemplate.Triggers>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ContextMenu>
+                            <ContextMenu Opened="TabMenu_Opened" />
+                        </ListBox.ContextMenu>
+                    </ListBox>
+                </DockPanel>
+            </Grid>
+        </Border>
+
+        <!-- Active tab -->
+        <v:BrowserTabView Grid.Row="1" DataContext="{Binding SelectedTab}" />
+    </Grid>
+</UserControl>

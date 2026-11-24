@@ -1,0 +1,21 @@
+# Build output
+bin/
+obj/
+publish/
+artifacts/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+TestResults/
+
+# Runtime data created next to the exe (portable mode) — never commit credentials
+RDMan.data/
+*.rdm.bak
+*.corrupt-*
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store

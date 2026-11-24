@@ -1,0 +1,15 @@
+<Project>
+  <PropertyGroup>
+    <!-- CI overrides this from the git tag (v1.2.3 -> 1.2.3). Local builds stay "-dev" so the updater never replaces a dev build. -->
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
+    <Product>Remote Directory Manager</Product>
+    <Company>ShadowSFX</Company>
+    <Copyright>Copyright © 2026 ShadowSFX</Copyright>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Symbols inside the binaries so the published folder is exactly one RDMan.exe -->
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+</Project>
