@@ -89,6 +89,7 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
     private readonly Dictionary<string, TaskCompletionSource<string>> _serialized = new();
 
     private readonly DispatcherTimer _thumbTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private bool _ownsThumbnail;
 
     public SshSessionViewModel(MainViewModel main, ServerNodeViewModel server) : base(main, server)
     {
@@ -677,6 +678,7 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         if (_disposed) return;
         App.Log(ex);
         var hadSession = IsConnected;
+        _generation++; // late events from the old connection must not touch the new state
         DisposeHost();
         TearDownConnection();
         State = TerminalState.Idle;
@@ -814,6 +816,11 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
     private void TearDownConnection()
     {
         _thumbTimer.Stop();
+        if (_ownsThumbnail)
+        {
+            Server.Thumbnail = null; // the Connected view shows live sessions only
+            _ownsThumbnail = false;
+        }
         _stats?.Dispose();
         _stats = null;
         HasStats = false;
@@ -1490,7 +1497,9 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
             image.StreamSource = new MemoryStream(png);
             image.EndInit();
             image.Freeze();
+            if (!IsConnected) return; // disconnected while capturing
             Server.Thumbnail = image;
+            _ownsThumbnail = true;
         }
         catch (Exception ex) when (ex is NotSupportedException or IOException or FileFormatException) { }
     }
