@@ -23,6 +23,8 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>embedded</DebugType>
+    <!-- Package XML docs (WebView2) are for the IDE, not for the portable folder -->
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
     <!-- WFO0003 asks WinForms apps to drop DPI settings from the manifest; this is a WPF app, where the
          manifest (PerMonitorV2) is the correct mechanism and also applies to the hosted RDP control. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
