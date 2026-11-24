@@ -14,6 +14,14 @@ public partial class PaneView : UserControl
         InitializeComponent();
         // Keep the session layer exactly over the active tab's content area.
         LayoutUpdated += (_, _) => PositionSessionLayer();
+        Loaded += (_, _) =>
+        {
+            if (Main is { } main)
+            {
+                main.PropertyChanged -= OnMainPropertyChanged;
+                main.PropertyChanged += OnMainPropertyChanged;
+            }
+        };
         DataContextChanged += (_, e) =>
         {
             if (e.OldValue is PaneViewModel old) old.PropertyChanged -= OnPanePropertyChanged;
@@ -43,6 +51,20 @@ public partial class PaneView : UserControl
         SessionLayer.Margin = margin;
     }
     private static MainViewModel? Main => Application.Current.MainWindow?.DataContext as MainViewModel;
+
+    /// <summary>Full screen: the tab area (session layer included) covers the tab strip.</summary>
+    private void ApplyFullScreen()
+    {
+        var full = Main?.FullScreenTab is { } t && ReferenceEquals(t.Pane, Pane);
+        Grid.SetRow(TabArea, full ? 0 : 1);
+        Grid.SetRowSpan(TabArea, full ? 2 : 1);
+        Panel.SetZIndex(TabArea, full ? 10 : 0);
+    }
+
+    private void OnMainPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainViewModel.FullScreenTab)) ApplyFullScreen();
+    }
 
     private void OnPanePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {

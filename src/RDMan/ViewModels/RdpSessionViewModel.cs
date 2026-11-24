@@ -68,6 +68,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     /// <summary>Raised when the session takes the keyboard (a click inside the remote desktop), so its pane becomes active.</summary>
     public event EventHandler? Activated;
 
+    /// <summary>Full screen requested (true) or left (false): toolbar button, or Ctrl+Alt+Pause inside the session.</summary>
+    public event EventHandler<bool>? FullScreenRequested;
+
     // ───────────── Connect ─────────────
     [RelayCommand]
     public void Connect()
@@ -215,6 +218,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         cfg.Display.ResizeBehavior = ResizeBehavior.UpdateDesktopSize;
         cfg.Display.ColorDepth = s.ColorDepth.Value switch { 16 => ColorDepth.ColorDepth16Bpp, 24 => ColorDepth.ColorDepth24Bpp, _ => ColorDepth.ColorDepth32Bpp };
         cfg.Display.AutoScaling = true;
+        // RDMan does full screen itself (the window covers the monitor and shows only the session), so the remote
+        // resolution follows the monitor through the same resize path. The control only reports Ctrl+Alt+Pause.
+        cfg.Display.ContainerHandledFullScreen = true;
 
         cfg.Input.KeyboardHookMode = s.WindowsKeysToServer.Value;
         cfg.Input.EnableWindowsKey = s.WindowsKeysToServer.Value;
@@ -253,8 +259,38 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
 
     private void OnClientConfigured(object? sender, EventArgs e)
     {
-        if (_control?.RdpClient is AxMSTSCLib.AxMsRdpClient11NotSafeForScripting ax)
-            ax.OnFocusReleased += (_, _) => FocusReleased?.Invoke(this, EventArgs.Empty);
+        // RoyalApps picks the newest ActiveX the OS has (RdpClient12 wraps AxMsRdpClient11, older ones wrap older Ax
+        // classes) and those don't share a base type: bind the event by name so focus release works on every version.
+        if (_control?.RdpClient is not { } client) return;
+        var type = client.GetType();
+        type.GetEvent("OnFocusReleased")?.AddEventHandler(client,
+            new AxMSTSCLib.IMsTscAxEvents_OnFocusReleasedEventHandler((_, _) => FocusReleased?.Invoke(this, EventArgs.Empty)));
+        // RDMan's top bar replaces mstsc's connection bar (the ActiveX shows its own once FullScreen is set).
+        try
+        {
+            if (client.GetOcx() is MSTSCLib.IMsRdpClientNonScriptable5 ns) ns.DisableConnectionBar = true;
+        }
+        catch (Exception ex) when (ex is COMException or InvalidCastException) { App.Log(ex); }
+        // Ctrl+Alt+Pause inside the session (container-handled full screen).
+        BindPlain(client, type, "OnRequestGoFullScreen", () => FullScreenRequested?.Invoke(this, true));
+        BindPlain(client, type, "OnRequestLeaveFullScreen", () => FullScreenRequested?.Invoke(this, false));
+    }
+
+    private static void BindPlain(object target, Type type, string name, Action action)
+    {
+        if (type.GetEvent(name) is { EventHandlerType: { } t } ev && t == typeof(EventHandler))
+            ev.AddEventHandler(target, new EventHandler((_, _) => action()));
+    }
+
+    /// <summary>Keeps the control's own full-screen flag in step with RDMan's, so Ctrl+Alt+Pause toggles correctly.</summary>
+    public void SyncFullScreen(bool on)
+    {
+        if (_control?.RdpClient is not { } client) return;
+        try
+        {
+            if (client.FullScreen != on) client.FullScreen = on;
+        }
+        catch (COMException ex) { App.Log(ex); }
     }
 
     private void OnControlEnter(object? sender, EventArgs e) => Activated?.Invoke(this, EventArgs.Empty);
@@ -386,9 +422,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void FullScreen()
     {
-        if (!IsConnected || _control?.RdpClient is not { } client) return;
-        try { client.FullScreen = true; }
-        catch (COMException ex) { App.Log(ex); }
+        if (IsConnected) FullScreenRequested?.Invoke(this, true);
     }
 
     public void Focus()

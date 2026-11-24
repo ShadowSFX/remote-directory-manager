@@ -371,6 +371,8 @@ public static partial class Strings
         T("Desktop.Disconnect", "Desconectar", "Disconnect");
         T("Desktop.CtrlAltDel", "Enviar Ctrl+Alt+Supr", "Send Ctrl+Alt+Del");
         T("Desktop.FullScreen", "Pantalla completa (F11)", "Full screen (F11)");
+        T("Desktop.ExitFullScreen", "Salir de pantalla completa (Ctrl+Alt+Pausa)", "Exit full screen (Ctrl+Alt+Pause)");
+        T("Desktop.FullScreenHint", "Lleva el mouse al borde superior para ver esta barra", "Move the mouse to the top edge to show this bar");
         T("Desktop.FocusHint", "Ctrl+Alt+← devuelve el teclado a RDMan", "Ctrl+Alt+← gives the keyboard back to RDMan");
         T("Desktop.Idle.Title", "Escritorio de {0}", "{0} desktop");
         T("Desktop.Idle.Body", "La sesión no está conectada. Al conectar, el escritorio se ajusta solo al tamaño de esta pestaña.", "The session isn't connected. Once connected, the desktop resizes itself to this tab.");

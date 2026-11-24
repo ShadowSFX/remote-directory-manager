@@ -252,4 +252,15 @@ public sealed class DesktopTests : IDisposable
         ConnectionStore.ReassignIds(doc);
         Assert.Equal(doc.Profiles[0].Id, group.DesktopCredentials.ProfileId);
     }
+
+    [Fact]
+    public void Saved_document_contains_only_settings_not_computed_flags()
+    {
+        var (doc, _, server) = Tree();
+        server.Rdp = new RdpProfile { RedirectDrives = true };
+        var json = System.Text.Json.JsonSerializer.Serialize(doc, JsonFileStore.Options);
+        Assert.DoesNotContain("isEmpty", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("hasDesktop", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("redirectDrives", json, StringComparison.OrdinalIgnoreCase);
+    }
 }

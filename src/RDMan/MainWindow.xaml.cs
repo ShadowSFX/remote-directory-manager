@@ -56,9 +56,11 @@ public partial class MainWindow : Window
         SizeChanged += (_, _) => RepositionPopups();
         StateChanged += (_, _) => RepositionPopups();
         // Popups are topmost windows: hide them whenever RDMan isn't the active app, or they'd float over other programs.
+        _edgeTimer.Tick += EdgeTimer_Tick;
         Deactivated += (_, _) =>
         {
             ToastPopup.IsOpen = false;
+            FullScreenBar.IsOpen = false;
             if (!PalettePopup.IsKeyboardFocusWithin) _vm.Palette.Close();
         };
         Activated += (_, _) => UpdateToastPopup();
@@ -113,10 +115,139 @@ public partial class MainWindow : Window
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(MainViewModel.IsSplit)) UpdateSplitColumns();
+        if (e.PropertyName == nameof(MainViewModel.FullScreenTab)) ApplyFullScreen();
+    }
+
+    // ───────────── Full screen (desktop sessions) ─────────────
+    // RDMan itself covers the monitor and hides every piece of chrome around the session, so the remote resolution
+    // follows the monitor through the normal resize path (the ActiveX's own full screen keeps the old resolution).
+    private sealed record FullScreenRestore(WindowState State, Rect Bounds, GridLength Sidebar, GridLength LeftPane, GridLength RightPane,
+        double LeftMin, double RightMin, GridLength PaneSplitter);
+
+    private FullScreenRestore? _restore;
+    private NativeMethods.RECT _monitorPx;
+    private readonly System.Windows.Threading.DispatcherTimer _edgeTimer = new() { Interval = TimeSpan.FromMilliseconds(120) };
+    private DateTime _barShownAt;
+    private bool _barHint;
+
+    private void ApplyFullScreen()
+    {
+        var tab = _vm.FullScreenTab;
+        var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
+        if (tab is not null && _restore is null)
+        {
+            _restore = new FullScreenRestore(WindowState, WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds,
+                SidebarColumn.Width, LeftPaneColumn.Width, RightPaneColumn.Width, LeftPaneColumn.MinWidth, RightPaneColumn.MinWidth, PaneSplitterColumn.Width);
+            TitleBar.Visibility = Visibility.Collapsed;
+            StatusBar.Visibility = Visibility.Collapsed;
+            Sidebar.Visibility = Visibility.Collapsed;
+            SidebarSplitter.Visibility = Visibility.Collapsed;
+            Root.RowDefinitions[0].Height = new GridLength(0);
+            Root.RowDefinitions[2].Height = new GridLength(0);
+            SidebarColumn.MinWidth = 0;
+            SidebarColumn.Width = new GridLength(0);
+            SidebarSplitterColumn.Width = new GridLength(0);
+            ContentSheet.BorderThickness = new Thickness(0);
+            ContentSheet.CornerRadius = new CornerRadius(0);
+            chrome.ResizeBorderThickness = new Thickness(0);
+            chrome.CaptionHeight = 0;
+            if (WindowState != WindowState.Normal) WindowState = WindowState.Normal;
+            Root.Margin = new Thickness(0);
+            CoverMonitor();
+            _edgeTimer.Start();
+            // After the window took the monitor (and is active again), introduce the bar once.
+            Dispatcher.BeginInvoke(() => ShowFullScreenBar(hint: true), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+        else if (tab is null && _restore is { } r)
+        {
+            _restore = null;
+            _edgeTimer.Stop();
+            FullScreenBar.IsOpen = false;
+            TitleBar.Visibility = Visibility.Visible;
+            StatusBar.Visibility = Visibility.Visible;
+            Sidebar.Visibility = Visibility.Visible;
+            SidebarSplitter.Visibility = Visibility.Visible;
+            Root.RowDefinitions[0].Height = new GridLength(40);
+            Root.RowDefinitions[2].Height = new GridLength(28);
+            SidebarColumn.MinWidth = 200;
+            SidebarColumn.Width = r.Sidebar;
+            SidebarSplitterColumn.Width = new GridLength(6);
+            ContentSheet.BorderThickness = new Thickness(1, 1, 0, 0);
+            ContentSheet.CornerRadius = new CornerRadius(8, 0, 0, 0);
+            chrome.ResizeBorderThickness = new Thickness(6);
+            chrome.CaptionHeight = 40;
+            Left = r.Bounds.Left;
+            Top = r.Bounds.Top;
+            Width = r.Bounds.Width;
+            Height = r.Bounds.Height;
+            if (r.State == WindowState.Maximized) WindowState = WindowState.Maximized;
+            UpdateMaximizeState();
+            LeftPaneColumn.MinWidth = r.LeftMin;
+            LeftPaneColumn.Width = r.LeftPane;
+            RightPaneColumn.MinWidth = r.RightMin;
+            RightPaneColumn.Width = r.RightPane;
+            PaneSplitterColumn.Width = r.PaneSplitter;
+            return;
+        }
+        if (tab is null) return;
+        // Only the full-screen tab's pane is shown.
+        var left = ReferenceEquals(tab.Pane, _vm.Left);
+        LeftPaneColumn.MinWidth = 0;
+        RightPaneColumn.MinWidth = 0;
+        LeftPaneColumn.Width = left ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        RightPaneColumn.Width = left ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        PaneSplitterColumn.Width = new GridLength(0);
+    }
+
+    /// <summary>Places the window exactly over its monitor (Windows then keeps the taskbar behind it).</summary>
+    private void CoverMonitor()
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        var info = new NativeMethods.MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MONITORINFO>() };
+        if (!NativeMethods.GetMonitorInfo(NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MONITOR_DEFAULTTONEAREST), ref info)) return;
+        _monitorPx = info.rcMonitor;
+        var toDip = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        var tl = toDip.Transform(new Point(info.rcMonitor.Left, info.rcMonitor.Top));
+        var br = toDip.Transform(new Point(info.rcMonitor.Right, info.rcMonitor.Bottom));
+        Left = tl.X;
+        Top = tl.Y;
+        Width = br.X - tl.X;
+        Height = br.Y - tl.Y;
+    }
+
+    private void ShowFullScreenBar(bool hint)
+    {
+        if (_restore is null || !IsActive) return;
+        _barHint = hint;
+        FullScreenBarHint.Visibility = hint ? Visibility.Visible : Visibility.Collapsed;
+        _barShownAt = DateTime.UtcNow;
+        if (!FullScreenBar.IsOpen) FullScreenBar.IsOpen = true;
+        FullScreenBarCard.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var toDip = PresentationSource.FromVisual(this)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+        var tl = toDip.Transform(new Point(_monitorPx.Left, _monitorPx.Top));
+        var br = toDip.Transform(new Point(_monitorPx.Right, _monitorPx.Bottom));
+        FullScreenBar.HorizontalOffset = tl.X + (br.X - tl.X - FullScreenBarCard.DesiredSize.Width) / 2;
+        FullScreenBar.VerticalOffset = tl.Y;
+    }
+
+    private void EdgeTimer_Tick(object? sender, EventArgs e)
+    {
+        if (_restore is null) return;
+        NativeMethods.GetCursorPos(out var pt);
+        var onMonitor = pt.X >= _monitorPx.Left && pt.X < _monitorPx.Right && pt.Y >= _monitorPx.Top && pt.Y < _monitorPx.Bottom;
+        if (onMonitor && pt.Y <= _monitorPx.Top + 1)
+        {
+            ShowFullScreenBar(hint: false);
+            return;
+        }
+        if (!FullScreenBar.IsOpen || FullScreenBarCard.IsMouseOver) return;
+        var linger = _barHint ? 2500 : 600;
+        if ((DateTime.UtcNow - _barShownAt).TotalMilliseconds > linger) FullScreenBar.IsOpen = false;
     }
 
     private void UpdateSplitColumns()
     {
+        if (_restore is not null) return; // full screen manages the columns until it ends
         if (_vm.IsSplit)
         {
             PaneSplitterColumn.Width = new GridLength(5);
@@ -275,6 +406,7 @@ public partial class MainWindow : Window
             }
             _vm.SessionsEndConfirmed = true;
         }
+        _vm.ExitFullScreenCommand.Execute(null); // save the normal placement, not the monitor rectangle
         var p = _vm.State.Settings.Window;
         var bounds = WindowState == WindowState.Normal ? new Rect(Left, Top, Width, Height) : RestoreBounds;
         if (!bounds.IsEmpty)

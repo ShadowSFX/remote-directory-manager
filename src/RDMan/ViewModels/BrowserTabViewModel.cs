@@ -69,6 +69,9 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     [ObservableProperty] private Location _current;
     [ObservableProperty] private TabMode _mode = TabMode.Dashboard;
     [ObservableProperty] private bool _isLoading;
+
+    /// <summary>This tab's session fills the monitor (RDMan hides every other piece of chrome).</summary>
+    [ObservableProperty] private bool _isFullScreen;
     [ObservableProperty] private bool _showSpinner;
     [ObservableProperty] private string _loadingText = "";
     [ObservableProperty] private ErrorInfo? _error;
@@ -358,6 +361,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
                     Session.PropertyChanged += OnSessionChanged;
                     Session.FocusReleased += OnSessionFocusReleased;
                     Session.Activated += OnSessionActivated;
+                    Session.FullScreenRequested += OnSessionFullScreenRequested;
                 }
                 Mode = TabMode.Desktop;
                 EndLoading();
@@ -633,12 +637,16 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         Session.PropertyChanged -= OnSessionChanged;
         Session.FocusReleased -= OnSessionFocusReleased;
         Session.Activated -= OnSessionActivated;
+        Session.FullScreenRequested -= OnSessionFullScreenRequested;
+        if (IsFullScreen) _main.SetFullScreen(this, false);
         Session.Dispose();
         Session = null;
     }
 
     private void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(RdpSessionViewModel.State) && IsFullScreen && Session is not { IsConnected: true })
+            _main.SetFullScreen(this, false); // disconnected/failed: bring the window back to show what happened
         if (e.PropertyName is nameof(RdpSessionViewModel.State) or nameof(RdpSessionViewModel.ConnectedAs))
         {
             NotifySessionVisibility();
@@ -648,6 +656,8 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     }
 
     private void OnSessionFocusReleased(object? sender, EventArgs e) => SessionFocusReleased?.Invoke(this, EventArgs.Empty);
+
+    private void OnSessionFullScreenRequested(object? sender, bool on) => _main.SetFullScreen(this, on);
 
     // Clicks inside the remote desktop never reach WPF's mouse events: activate the pane from the session's focus.
     private void OnSessionActivated(object? sender, EventArgs e)

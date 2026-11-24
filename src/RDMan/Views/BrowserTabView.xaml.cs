@@ -29,6 +29,7 @@ public partial class BrowserTabView : UserControl
                 old.RequestSelect -= OnRequestSelect;
                 old.RequestFocusList -= OnRequestFocusList;
                 old.SessionFocusReleased -= OnSessionFocusReleased;
+                old.PropertyChanged -= OnTabPropertyChanged;
             }
             if (e.NewValue is BrowserTabViewModel tab)
             {
@@ -36,8 +37,24 @@ public partial class BrowserTabView : UserControl
                 tab.RequestSelect += OnRequestSelect;
                 tab.RequestFocusList += OnRequestFocusList;
                 tab.SessionFocusReleased += OnSessionFocusReleased;
+                tab.PropertyChanged += OnTabPropertyChanged;
             }
+            ApplyFullScreen();
         };
+    }
+
+    private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(BrowserTabViewModel.IsFullScreen)) ApplyFullScreen();
+    }
+
+    /// <summary>Full screen: the content area (where the session sits) spans the identity band and toolbar too.</summary>
+    private void ApplyFullScreen()
+    {
+        var full = Tab?.IsFullScreen == true;
+        Grid.SetRow(ContentArea, full ? 0 : 3);
+        Grid.SetRowSpan(ContentArea, full ? 4 : 1);
+        Panel.SetZIndex(ContentArea, full ? 10 : 0);
     }
 
     private BrowserTabViewModel? Tab => DataContext as BrowserTabViewModel;

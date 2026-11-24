@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 namespace RDMan.Core.Models;
 
 public enum RdpAudio { Local, Remote, Off }
@@ -52,6 +53,7 @@ public sealed class RdpProfile
 
     public RdpProfile Clone() => (RdpProfile)MemberwiseClone();
 
+    [JsonIgnore]
     public bool IsEmpty =>
         RedirectClipboard is null && RedirectDrives is null && RedirectPrinters is null && RedirectSmartCards is null &&
         Audio is null && WindowsKeysToServer is null && NetworkLevelAuthentication is null && ServerCheck is null &&

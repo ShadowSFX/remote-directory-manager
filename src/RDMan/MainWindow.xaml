@@ -31,6 +31,7 @@
         <KeyBinding Key="G" Modifiers="Control+Shift" Command="{Binding NewGroupCommand}" />
         <KeyBinding Key="OemComma" Modifiers="Control" Command="{Binding OpenSettingsCommand}" />
         <KeyBinding Key="D" Modifiers="Control+Shift" Command="{Binding OpenActiveServerDesktopCommand}" />
+        <KeyBinding Key="F11" Command="{Binding ToggleFullScreenCommand}" />
     </Window.InputBindings>
 
     <Grid x:Name="Root">
@@ -92,21 +93,21 @@
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="SidebarColumn" Width="272" MinWidth="200" MaxWidth="560" />
-                <ColumnDefinition Width="6" />
+                <ColumnDefinition x:Name="SidebarSplitterColumn" Width="6" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <v:SidebarView Grid.Column="0" />
+            <v:SidebarView x:Name="Sidebar" Grid.Column="0" />
 
-            <GridSplitter Grid.Column="1" Style="{StaticResource Splitter}" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
+            <GridSplitter x:Name="SidebarSplitter" Grid.Column="1" Style="{StaticResource Splitter}" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
                           DragCompleted="SidebarSplitter_DragCompleted" />
 
             <!-- Content surface: a single rounded sheet over the window backdrop -->
-            <Border Grid.Column="2" Background="{DynamicResource Bg.Content}" BorderBrush="{DynamicResource Line}" BorderThickness="1,1,0,0"
+            <Border x:Name="ContentSheet" Grid.Column="2" Background="{DynamicResource Bg.Content}" BorderBrush="{DynamicResource Line}" BorderThickness="1,1,0,0"
                     CornerRadius="8,0,0,0" ClipToBounds="True">
                 <Grid x:Name="PanesGrid">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" MinWidth="320" />
+                        <ColumnDefinition x:Name="LeftPaneColumn" Width="*" MinWidth="320" />
                         <ColumnDefinition x:Name="PaneSplitterColumn" Width="0" />
                         <ColumnDefinition x:Name="RightPaneColumn" Width="0" />
                     </Grid.ColumnDefinitions>
@@ -119,7 +120,7 @@
         </Grid>
 
         <!-- ═══════════ Status bar ═══════════ -->
-        <Grid Grid.Row="2" Margin="14,0,8,0">
+        <Grid x:Name="StatusBar" Grid.Row="2" Margin="14,0,8,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
@@ -153,6 +154,33 @@
         <!-- ═══════════ Toasts ═══════════
              In a Popup (its own window) so they show above a remote desktop session, which is a native child
              window that would otherwise paint over any WPF content ("airspace"). Positioned in code-behind. -->
+        <!-- ═══════════ Full-screen bar ═══════════
+             Desktop sessions in full screen: shown briefly on entry and whenever the mouse touches the top edge
+             (a Popup, so it sits above the session's native window). -->
+        <Popup x:Name="FullScreenBar" Placement="Absolute" AllowsTransparency="True" StaysOpen="True" Focusable="False" PopupAnimation="Fade">
+            <Border x:Name="FullScreenBarCard" Background="{DynamicResource Bg.Popup}" BorderBrush="{DynamicResource Line.Popup}" BorderThickness="1,0,1,1"
+                    CornerRadius="0,0,10,10" Padding="8,6" Margin="24,0,24,24" DataContext="{Binding FullScreenTab}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" ShadowDepth="6" Direction="270" Opacity="0.35" />
+                </Border.Effect>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="3" Height="20" CornerRadius="1.5" Background="{Binding IdentityBrush}" Margin="8,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding IdentityAddress}" Style="{StaticResource Text.Mono}" Foreground="{DynamicResource Fg.Secondary}"
+                                   VerticalAlignment="Center" Margin="10,0,16,0" />
+                        <Border Width="1" Height="18" Background="{DynamicResource Line}" Margin="0,0,6,0" />
+                        <Button Style="{StaticResource Btn.Icon}" Content="&#xE765;" Command="{Binding Session.SendCtrlAltDelCommand}" ToolTip="{ui:Tr Desktop.CtrlAltDel}" />
+                        <Button Style="{StaticResource Btn.Icon}" Content="&#xE73F;" Command="{Binding DataContext.ExitFullScreenCommand, RelativeSource={RelativeSource AncestorType=Popup}}"
+                                ToolTip="{ui:Tr Desktop.ExitFullScreen}" />
+                        <Button Style="{StaticResource Btn.Icon}" Content="&#xE7E8;" Command="{Binding Session.DisconnectCommand}" ToolTip="{ui:Tr Desktop.Disconnect}" />
+                    </StackPanel>
+                    <TextBlock x:Name="FullScreenBarHint" Text="{ui:Tr Desktop.FullScreenHint}" Style="{StaticResource Text.Caption}" HorizontalAlignment="Center"
+                               Margin="0,4,0,2" />
+                </StackPanel>
+            </Border>
+        </Popup>
+
         <Popup x:Name="ToastPopup" Placement="Relative" PlacementTarget="{Binding ElementName=Root}" AllowsTransparency="True"
                StaysOpen="True" Focusable="False" PopupAnimation="None">
         <ItemsControl x:Name="ToastList" ItemsSource="{Binding Toasts.Items}" Width="380" Margin="12,0,12,12" Focusable="False">

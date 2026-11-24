@@ -59,6 +59,43 @@ public sealed partial class MainViewModel : ObservableObject
     public ObservableCollection<LocalPlace> LocalPlaces { get; } = new();
 
     [ObservableProperty] private bool _isSplit;
+
+    /// <summary>The desktop tab shown full screen, or null. MainWindow hides all chrome while this is set.</summary>
+    [ObservableProperty] private BrowserTabViewModel? _fullScreenTab;
+
+    partial void OnFullScreenTabChanged(BrowserTabViewModel? oldValue, BrowserTabViewModel? newValue)
+    {
+        if (oldValue is not null) oldValue.IsFullScreen = false;
+        if (newValue is not null) newValue.IsFullScreen = true;
+    }
+
+    /// <summary>Enters/leaves full screen for a connected desktop tab (toolbar, F11, Ctrl+Alt+Pause, the top bar).</summary>
+    public void SetFullScreen(BrowserTabViewModel tab, bool on)
+    {
+        if (on)
+        {
+            if (tab.Session is not { IsConnected: true } || ReferenceEquals(FullScreenTab, tab)) return;
+            Reveal(tab.Pane, tab);
+            FullScreenTab = tab;
+        }
+        else if (ReferenceEquals(FullScreenTab, tab)) FullScreenTab = null;
+        else return;
+        tab.Session?.SyncFullScreen(on);
+        if (on) tab.Session?.Focus();
+    }
+
+    [RelayCommand]
+    private void ToggleFullScreen()
+    {
+        if (FullScreenTab is { } current) SetFullScreen(current, false);
+        else if (ActiveTab is { IsDesktop: true } tab) SetFullScreen(tab, true);
+    }
+
+    [RelayCommand]
+    private void ExitFullScreen()
+    {
+        if (FullScreenTab is { } current) SetFullScreen(current, false);
+    }
     [ObservableProperty] private PaneViewModel _activePane;
     [ObservableProperty] private bool _isUpdateBannerVisible;
 
@@ -607,6 +644,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     public void OnPaneTabChanged(PaneViewModel pane)
     {
+        // Switching away from the full-screen tab (Ctrl+Tab after releasing the keyboard) leaves full screen.
+        if (FullScreenTab is { } fs && ReferenceEquals(fs.Pane, pane) && !ReferenceEquals(pane.SelectedTab, fs)) SetFullScreen(fs, false);
         if (!ReferenceEquals(pane, ActivePane)) return;
         OnPropertyChanged(nameof(ActiveTab));
         OnPropertyChanged(nameof(WindowTitle));
@@ -634,6 +673,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand]
     public void ToggleSplit()
     {
+        ExitFullScreen();
         IsSplit = !IsSplit;
         if (IsSplit)
         {
