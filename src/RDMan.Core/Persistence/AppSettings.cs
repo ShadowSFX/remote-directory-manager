@@ -28,6 +28,19 @@ public sealed class SavedPane
     public int ActiveIndex { get; set; }
 }
 
+/// <summary>
+/// One node of the saved pane grid: a leaf (<see cref="Pane"/> = index into <see cref="AppSettings.Panes"/>) or a split
+/// (<see cref="Dir"/> "h" = columns, "v" = rows, with <see cref="Children"/>). Plain strings/ints on purpose: an
+/// unknown value must degrade to a default instead of failing the whole settings file.
+/// </summary>
+public sealed class SavedLayoutNode
+{
+    public int? Pane { get; set; }
+    public string? Dir { get; set; }
+    public double Weight { get; set; } = 1;
+    public List<SavedLayoutNode>? Children { get; set; }
+}
+
 public sealed class AppSettings
 {
     public const int CurrentSchemaVersion = 1;
@@ -47,9 +60,14 @@ public sealed class AppSettings
     public bool ThisPcExpanded { get; set; } = true;
 
     public double SidebarWidth { get; set; } = 272;
+    /// <summary>1.x flag (two panes, right one shown). Still written so an older build degrades sensibly.</summary>
     public bool SplitView { get; set; }
     public WindowPlacement Window { get; set; } = new();
+    /// <summary>Panes in reading order; <see cref="Layout"/> places them.</summary>
     public List<SavedPane> Panes { get; set; } = new();
+    public SavedLayoutNode? Layout { get; set; }
+    /// <summary>Index into <see cref="Panes"/> of the pane that had the keyboard.</summary>
+    public int ActivePane { get; set; }
 
     /// <summary>Version that last ran; used to show "What's new" once after an update.</summary>
     public string? LastRunVersion { get; set; }
@@ -65,7 +83,8 @@ public sealed class AppSettings
         if (Window.Left is { } l && (double.IsNaN(l) || double.IsInfinity(l))) Window.Left = null;
         if (Window.Top is { } t && (double.IsNaN(t) || double.IsInfinity(t))) Window.Top = null;
         Panes ??= new List<SavedPane>();
-        if (Panes.Count > 2) Panes = Panes.Take(2).ToList();
+        if (Panes.Count > RDMan.Core.Layout.PaneLayout.MaxPanes) Panes = Panes.Take(RDMan.Core.Layout.PaneLayout.MaxPanes).ToList();
+        ActivePane = Panes.Count == 0 ? 0 : Math.Clamp(ActivePane, 0, Panes.Count - 1);
         foreach (var p in Panes)
         {
             p.Tabs ??= new List<SavedTab>();
