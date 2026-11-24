@@ -586,40 +586,118 @@
         <!-- ═══════════ Footer ═══════════ -->
         <Border Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource Dialog.Footer}">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" DataContext="{Binding ServerFields}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
-                    <Button Command="{Binding TestCommand}" IsEnabled="{Binding IsTesting, Converter={StaticResource Not}}" AutomationProperties.Name="{ui:Tr Server.Test}">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE703;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
-                            <TextBlock Text="{ui:Tr Server.Test}" />
-                        </StackPanel>
-                    </Button>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0" MaxWidth="300"
-                                Visibility="{Binding TestResult, Converter={StaticResource VisIfAny}}">
-                        <TextBlock FontSize="12" Margin="0,0,6,0" VerticalAlignment="Top">
+                <!-- "Test connection" results: one row per enabled protocol, badge first, so it's clear what was tested and what failed -->
+                <ItemsControl Grid.ColumnSpan="2" DataContext="{Binding ServerFields}" ItemsSource="{Binding TestResults}" Focusable="False"
+                              AutomationProperties.LiveSetting="Polite">
+                    <ItemsControl.Style>
+                        <Style TargetType="ItemsControl">
+                            <!-- rows carry 3px above/below: -3 keeps the footer's 14px top inset, 9 leaves 12px above the buttons -->
+                            <Setter Property="Margin" Value="0,-3,0,9" />
+                            <Style.Triggers>
+                                <Trigger Property="HasItems" Value="False">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.Style>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ConnectionCheck}">
+                            <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="Badge" Style="{StaticResource CapBadge.Smb}" Width="34" Margin="0,0,10,0" VerticalAlignment="Top">
+                                    <TextBlock Text="{Binding Protocol}" />
+                                </Border>
+                                <Grid Grid.Column="1" Width="14" Height="16" Margin="0,0,8,0" VerticalAlignment="Top">
+                                    <!-- Running: a turning arc (a circle doesn't wobble when rotated, an icon glyph does) -->
+                                    <Ellipse x:Name="Spinner" Width="11" Height="11" Stroke="{DynamicResource Fg.Tertiary}" StrokeThickness="1.5"
+                                             StrokeDashArray="4 2.4" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+                                        <Ellipse.RenderTransform>
+                                            <RotateTransform />
+                                        </Ellipse.RenderTransform>
+                                    </Ellipse>
+                                    <TextBlock x:Name="Glyph" Style="{StaticResource Icon}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Visibility="Collapsed" />
+                                </Grid>
+                                <TextBlock x:Name="Text" Grid.Column="2" Text="{Binding Message}" FontSize="12" TextWrapping="Wrap" LineHeight="16"
+                                           Foreground="{DynamicResource Fg.Tertiary}" VerticalAlignment="Top" />
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding Protocol}" Value="RDP">
+                                    <Setter TargetName="Badge" Property="Style" Value="{StaticResource CapBadge.Rdp}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Protocol}" Value="SSH">
+                                    <Setter TargetName="Badge" Property="Style" Value="{StaticResource CapBadge.Ssh}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Running">
+                                    <DataTrigger.EnterActions>
+                                        <BeginStoryboard x:Name="Spin">
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetName="Spinner" Storyboard.TargetProperty="RenderTransform.Angle"
+                                                                 From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </DataTrigger.EnterActions>
+                                    <DataTrigger.ExitActions>
+                                        <StopStoryboard BeginStoryboardName="Spin" />
+                                    </DataTrigger.ExitActions>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Ok">
+                                    <Setter TargetName="Spinner" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Glyph" Property="Text" Value="&#xE73E;" />
+                                    <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Status.Online}" />
+                                    <Setter TargetName="Text" Property="Foreground" Value="{DynamicResource Fg.Secondary}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Failed">
+                                    <Setter TargetName="Spinner" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Glyph" Property="Text" Value="&#xE711;" />
+                                    <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Danger}" />
+                                    <Setter TargetName="Text" Property="Foreground" Value="{DynamicResource Fg.Primary}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="Skipped">
+                                    <Setter TargetName="Spinner" Property="Visibility" Value="Collapsed" />
+                                    <Setter TargetName="Glyph" Property="Visibility" Value="Visible" />
+                                    <Setter TargetName="Glyph" Property="Text" Value="&#xE946;" />
+                                    <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Fg.Tertiary}" />
+                                    <Setter TargetName="Text" Property="Foreground" Value="{DynamicResource Fg.Secondary}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Center" DataContext="{Binding ServerFields}"
+                        Visibility="{Binding Converter={StaticResource VisIfAny}}" Command="{Binding TestCommand}"
+                        IsEnabled="{Binding IsTesting, Converter={StaticResource Not}}" ToolTip="{ui:Tr Server.TestTip}" AutomationProperties.Name="{ui:Tr Server.Test}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE703;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
+                        <TextBlock>
                             <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
-                                    <Setter Property="Text" Value="&#xE783;" />
-                                    <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="{ui:Tr Server.Test}" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding TestSucceeded}" Value="True">
-                                            <Setter Property="Text" Value="&#xE73E;" />
-                                            <Setter Property="Foreground" Value="{DynamicResource Status.Online}" />
+                                        <DataTrigger Binding="{Binding IsTesting}" Value="True">
+                                            <Setter Property="Text" Value="{ui:Tr Server.Testing}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
                             </TextBlock.Style>
                         </TextBlock>
-                        <TextBlock Text="{Binding TestResult}" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource Fg.Secondary}" ToolTip="{Binding TestResult}"
-                                   MaxHeight="34" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
-                    <TextBlock Text="{ui:Tr Server.Testing}" Style="{StaticResource Text.Caption}" Margin="12,0,0,0" VerticalAlignment="Center"
-                               Visibility="{Binding IsTesting, Converter={StaticResource Vis}}" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                </Button>
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
                     <TextBlock Text="{Binding ValidationError}" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" Margin="0,0,12,0" MaxWidth="240"
                                TextWrapping="Wrap" FontSize="12" Visibility="{Binding ValidationError, Converter={StaticResource VisIfAny}}" />
                     <Button Content="{ui:Tr Common.Cancel}" IsCancel="True" MinWidth="96" Margin="0,0,8,0" />

@@ -54,8 +54,12 @@ public static partial class Strings
     private static void AddTerminalEditor()
     {
         T("Server.Section.Terminal", "Terminal SSH", "SSH terminal");
-        T("Server.TestSshOk", "SSH (puerto {0}) responde en {1} ms", "SSH (port {0}) answers in {1} ms");
-        T("Server.TestSshFail", "SSH (puerto {0}) no responde", "SSH (port {0}) doesn't answer");
+        T("Server.TestSshOk", "El puerto {0} responde · {1} ms. La autenticación se comprueba al conectar",
+            "Port {0} answers · {1} ms. Authentication is checked when connecting");
+        T("Server.TestSshFail", "El puerto {0} no responde: equipo apagado, firewall o servidor SSH detenido",
+            "Port {0} doesn't answer: machine off, firewall, or SSH server stopped");
+        T("Server.TestSshJump", "Se llega a través de un salto (ProxyJump): no se puede probar directamente",
+            "Reached through a jump host (ProxyJump): it can't be tested directly");
         T("Term.Editor.Enable", "Abrir una terminal SSH en este servidor", "Open an SSH terminal on this server");
         T("Term.Editor.Port", "Puerto", "Port");
         T("Term.Editor.UseConfig", "Usar ~/.ssh/config, como el comando ssh", "Use ~/.ssh/config, like the ssh command");

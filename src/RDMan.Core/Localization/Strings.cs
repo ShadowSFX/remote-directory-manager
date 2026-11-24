@@ -370,8 +370,12 @@ public static partial class Strings
         T("Server.Description", "Notas", "Notes");
         T("Server.Test", "Probar conexión", "Test connection");
         T("Server.Testing", "Probando…", "Testing…");
-        T("Server.TestOk", "Conexión correcta · {0} recursos", "Connected · {0} shares");
-        T("Server.TestOkShare", "Conexión correcta", "Connected");
+        T("Server.TestTip", "Prueba cada conexión activada: SMB inicia sesión de verdad; RDP y SSH comprueban que su puerto responda",
+            "Tests every enabled connection: SMB actually signs in; RDP and SSH check that their port answers");
+        T("Server.TestSmbRunning", "Iniciando sesión y leyendo los recursos compartidos…", "Signing in and reading the shares…");
+        T("Server.TestOk", "Sesión iniciada · {0} recursos compartidos", "Signed in · {0} shares");
+        T("Server.TestOkShare", "Sesión iniciada · «{0}» accesible", "Signed in · “{0}” is reachable");
+        T("Server.TestPortRunning", "Comprobando que el puerto {0} responda…", "Checking that port {0} answers…");
         T("Server.PickShare", "Elegir recurso…", "Pick share…");
         T("Server.Validation.Name", "Escribe un nombre.", "Enter a name.");
         T("Server.Validation.Address", "La dirección no es válida. Usa una IP, un nombre de host o \\\\host\\recurso.", "The address isn't valid. Use an IP, a host name or \\\\host\\share.");
@@ -553,8 +557,10 @@ public static partial class Strings
         T("Cred.Desktop.UsesFrom", "Usará: {0} (de «{1}»)", "Will use: {0} (from “{1}”)");
         T("Cred.Desktop.SameAsFilesUses", "Igual que archivos: {0}", "Same as files: {0}");
         T("Cred.Desktop.Mode.Inherit", "Heredar del grupo o usar la de archivos", "Inherit from the group, or use the files one");
-        T("Server.TestDesktopOk", "Escritorio remoto responde en el puerto {0} · {1} ms", "Remote desktop answers on port {0} · {1} ms");
-        T("Server.TestDesktopFail", "El puerto {0} de escritorio remoto no responde", "Remote desktop port {0} doesn't answer");
+        T("Server.TestDesktopOk", "El puerto {0} responde · {1} ms. Usuario y contraseña se comprueban al conectar",
+            "Port {0} answers · {1} ms. Username and password are checked when connecting");
+        T("Server.TestDesktopFail", "El puerto {0} no responde: equipo apagado, firewall o escritorio remoto desactivado",
+            "Port {0} doesn't answer: machine off, firewall, or remote desktop turned off");
         T("Rdp.InheritChoice", "Heredar: {0}", "Inherit: {0}");
 
         T("Rdp.Section", "Opciones del escritorio", "Desktop options");

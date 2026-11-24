@@ -23,6 +23,23 @@ public enum EditorSection { General, Files, Desktop, Terminal, Notes }
 
 public sealed record SectionChoice(EditorSection Section, string Glyph, string Label);
 
+public enum CheckState { Running, Ok, Failed, Skipped }
+
+/// <summary>One protocol's line in the editor's "Test connection" results: which protocol, what was checked, how it went.</summary>
+public sealed partial class ConnectionCheck(string protocol, string message) : ObservableObject
+{
+    /// <summary>"SMB", "RDP" or "SSH" (picks the badge).</summary>
+    public string Protocol { get; } = protocol;
+    [ObservableProperty] private CheckState _state = CheckState.Running;
+    [ObservableProperty] private string _message = message;
+
+    public void Finish(bool ok, string message)
+    {
+        State = ok ? CheckState.Ok : CheckState.Failed;
+        Message = message;
+    }
+}
+
 /// <summary>The credentials block shared by the server and group editors (files or remote desktop).</summary>
 public sealed partial class CredentialEditorViewModel : ObservableObject
 {
@@ -426,7 +443,10 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
         Ssh.UpdatePreview();
         Ssh.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName is nameof(Terminal.SshEditorViewModel.Port) or nameof(Terminal.SshEditorViewModel.ProxyJump)
+                or nameof(Terminal.SshEditorViewModel.UseSshConfig)) ClearTestResults();
             if (e.PropertyName != nameof(Terminal.SshEditorViewModel.Enabled)) return;
+            ClearTestResults();
             OnPropertyChanged(nameof(HasBoth));
             if (Ssh.Enabled && !FilesEnabled && !DesktopEnabled) DefaultAction = ServerAction.Terminal;
             if (!Ssh.Enabled && DefaultAction == ServerAction.Terminal) DefaultAction = FilesEnabled ? ServerAction.Files : ServerAction.Desktop;
@@ -441,8 +461,6 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
     [ObservableProperty] private string _startFolder;
     [ObservableProperty] private string _tags;
     [ObservableProperty] private bool _isTesting;
-    [ObservableProperty] private string? _testResult;
-    [ObservableProperty] private bool _testSucceeded;
     [ObservableProperty] private string? _duplicateWarning;
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasBoth))] private bool _filesEnabled;
@@ -453,6 +471,12 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
     /// <summary>The "on click, open" choice only matters when the server offers more than one thing.</summary>
     public bool HasBoth => (FilesEnabled ? 1 : 0) + (DesktopEnabled ? 1 : 0) + (Ssh.Enabled ? 1 : 0) > 1;
 
+    /// <summary>"Test connection" results, one per enabled protocol (SMB, RDP, SSH, in the sidebar's order).</summary>
+    public ObservableCollection<ConnectionCheck> TestResults { get; } = new();
+
+    /// <summary>Results describe the form as it was tested: any change that affects them clears them.</summary>
+    public void ClearTestResults() => TestResults.Clear();
+
     public ObservableCollection<string> DiscoveredShares { get; } = new();
     public bool HasDiscoveredShares => DiscoveredShares.Count > 0;
 
@@ -460,7 +484,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
 
     partial void OnAddressChanged(string value)
     {
-        TestResult = null;
+        ClearTestResults();
         CheckDuplicate();
         Ssh.Address = value;
         Ssh.UpdatePreview();
@@ -508,12 +532,15 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
 
     partial void OnShareChanged(string value)
     {
-        TestResult = null;
+        ClearTestResults();
         CheckDuplicate();
     }
 
+    partial void OnDesktopPortChanged(string value) => ClearTestResults();
+
     partial void OnDesktopEnabledChanged(bool value)
     {
+        ClearTestResults();
         if (!value && DefaultAction == ServerAction.Desktop) DefaultAction = FilesEnabled ? ServerAction.Files : ServerAction.Terminal;
         if (value && !FilesEnabled && !Ssh.Enabled) DefaultAction = ServerAction.Desktop;
         if (!value && !FilesEnabled && !Ssh.Enabled) FilesEnabled = true; // a server must offer something
@@ -521,6 +548,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
 
     partial void OnFilesEnabledChanged(bool value)
     {
+        ClearTestResults();
         if (!value && DefaultAction == ServerAction.Files) DefaultAction = DesktopEnabled ? ServerAction.Desktop : ServerAction.Terminal;
         if (!value && !DesktopEnabled && !Ssh.Enabled) DesktopEnabled = true; // a server must offer something
     }
@@ -591,66 +619,80 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
             return;
         }
         IsTesting = true;
-        TestResult = null;
-        var results = new List<string>();
-        var ok = true;
+        TestResults.Clear();
+        // Every enabled protocol gets its row right away (so it's clear what is being tested), then they run together.
+        var checks = new List<Task>();
+        if (FilesEnabled) checks.Add(TestFiles(t.Host, Add("SMB", Loc.T("Server.TestSmbRunning"))));
+        if (DesktopEnabled)
+        {
+            if (TryPort(out var port))
+                checks.Add(TestPort(t.Host, port, Add("RDP", Loc.F("Server.TestPortRunning", port)), "Server.TestDesktopOk", "Server.TestDesktopFail"));
+            else Add("RDP", "").Finish(false, Loc.T("Server.Validation.RdpPort"));
+        }
+        if (Ssh.Enabled)
+        {
+            var endpoint = Services.Ssh.SshEnvironment.ProbeEndpoint(new ServerNode
+            {
+                Host = t.Host,
+                Terminal = new SshEndpoint { Port = int.TryParse(Ssh.Port, out var sp) ? sp : null, UseSshConfig = Ssh.UseSshConfig },
+            }, Ssh.EffectiveProxyJump);
+            if (endpoint is { } ssh)
+                checks.Add(TestPort(ssh.Host, ssh.Port, Add("SSH", Loc.F("Server.TestPortRunning", ssh.Port)), "Server.TestSshOk", "Server.TestSshFail"));
+            else Add("SSH", Loc.T("Server.TestSshJump")).State = CheckState.Skipped;
+        }
         try
         {
-            if (Ssh.Enabled && Services.Ssh.SshEnvironment.ProbeEndpoint(new ServerNode
-                {
-                    Host = t.Host,
-                    Terminal = new SshEndpoint { Port = int.TryParse(Ssh.Port, out var sp) ? sp : null, UseSshConfig = Ssh.UseSshConfig },
-                }, Ssh.EffectiveProxyJump) is { } ssh)
-            {
-                var latency = await ConnectionService.ProbeAsync(ssh.Host, ssh.Port, ConnectionService.ProbeTimeout, CancellationToken.None);
-                ok &= latency is not null;
-                results.Add(latency is null ? Loc.F("Server.TestSshFail", ssh.Port) : Loc.F("Server.TestSshOk", ssh.Port, latency));
-            }
-            if (DesktopEnabled && TryPort(out var port))
-            {
-                var latency = await ConnectionService.ProbeAsync(t.Host, port, ConnectionService.ProbeTimeout, CancellationToken.None);
-                ok &= latency is not null;
-                results.Add(latency is null ? Loc.F("Server.TestDesktopFail", port) : Loc.F("Server.TestDesktopOk", port, latency));
-            }
-            if (FilesEnabled)
-            {
-                try
-                {
-                    var cred = Credentials.Preview();
-                    Main.Services.Connections.Invalidate(t.Host);
-                    await Main.Services.Connections.EnsureSessionAsync(t.Host, null, cred, CancellationToken.None);
-                    var shares = await Main.Services.Connections.ListSharesAsync(t.Host, Main.State.Settings.ShowHiddenShares, CancellationToken.None);
-                    DiscoveredShares.Clear();
-                    foreach (var s in shares) DiscoveredShares.Add(s.Name);
-                    OnPropertyChanged(nameof(HasDiscoveredShares));
-                    var share = Share.Trim();
-                    if (share.Length > 0 && !shares.Any(s => string.Equals(s.Name, share, StringComparison.OrdinalIgnoreCase)))
-                    {
-                        // Hidden shares aren't listed; verify by touching the share directly.
-                        await Task.Run(() => System.IO.Directory.Exists($@"\\{UncPath.ToUncHost(t.Host)}\{share}") ? 0 : throw new SmbException(SmbErrorTranslator.ErrorBadNetName));
-                    }
-                    results.Insert(0, share.Length > 0 ? Loc.T("Server.TestOkShare") : Loc.F("Server.TestOk", shares.Count));
-                }
-                catch (SmbException ex)
-                {
-                    ok = false;
-                    var tr = SmbErrorTranslator.Translate(ex.Code);
-                    results.Insert(0, $"{Loc.T(tr.TitleKey)}. {Loc.T(tr.DetailKey)}");
-                }
-                catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
-                {
-                    ok = false;
-                    results.Insert(0, ex.Message);
-                }
-            }
-            TestSucceeded = ok;
-            TestResult = string.Join("  ·  ", results);
+            await Task.WhenAll(checks);
             foreach (var p in new[] { ConnectionService.SmbPort }.Concat(DesktopEnabled && TryPort(out var dp) ? [dp] : Array.Empty<int>()))
                 _ = Main.Services.Health.CheckAsync(t.Host, p);
         }
         finally
         {
             IsTesting = false;
+        }
+
+        ConnectionCheck Add(string protocol, string message)
+        {
+            var check = new ConnectionCheck(protocol, message);
+            TestResults.Add(check);
+            return check;
+        }
+    }
+
+    private static async Task TestPort(string host, int port, ConnectionCheck check, string okKey, string failKey)
+    {
+        var latency = await ConnectionService.ProbeAsync(host, port, ConnectionService.ProbeTimeout, CancellationToken.None);
+        check.Finish(latency is not null, latency is null ? Loc.F(failKey, port) : Loc.F(okKey, port, latency));
+    }
+
+    /// <summary>SMB is the one real login: open a session with the form's credentials and list (or touch) the shares.</summary>
+    private async Task TestFiles(string host, ConnectionCheck check)
+    {
+        try
+        {
+            var cred = Credentials.Preview();
+            Main.Services.Connections.Invalidate(host);
+            await Main.Services.Connections.EnsureSessionAsync(host, null, cred, CancellationToken.None);
+            var shares = await Main.Services.Connections.ListSharesAsync(host, Main.State.Settings.ShowHiddenShares, CancellationToken.None);
+            DiscoveredShares.Clear();
+            foreach (var s in shares) DiscoveredShares.Add(s.Name);
+            OnPropertyChanged(nameof(HasDiscoveredShares));
+            var share = Share.Trim().Trim('\\', '/');
+            if (share.Length > 0 && !shares.Any(s => string.Equals(s.Name, share, StringComparison.OrdinalIgnoreCase)))
+            {
+                // Hidden shares aren't listed; verify by touching the share directly.
+                await Task.Run(() => System.IO.Directory.Exists($@"\\{UncPath.ToUncHost(host)}\{share}") ? 0 : throw new SmbException(SmbErrorTranslator.ErrorBadNetName));
+            }
+            check.Finish(true, share.Length > 0 ? Loc.F("Server.TestOkShare", share) : Loc.F("Server.TestOk", shares.Count));
+        }
+        catch (SmbException ex)
+        {
+            var tr = SmbErrorTranslator.Translate(ex.Code);
+            check.Finish(false, $"{Loc.T(tr.TitleKey)}. {Loc.T(tr.DetailKey)}");
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            check.Finish(false, ex.Message);
         }
     }
 

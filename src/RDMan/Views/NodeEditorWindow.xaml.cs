@@ -53,7 +53,7 @@ public partial class NodeEditorWindow : DialogWindow
         if (sender is not PasswordBox { DataContext: CredentialEditorViewModel cred } box) return;
         box.Tag = box.SecurePassword.Length == 0 ? "empty" : null;
         cred.NewPassword = box.Password;
-        if (_vm.ServerFields is { } s) s.TestResult = null;
+        if (_vm.ServerFields is { } s) s.ClearTestResults();
     }
 
     private void Swatch_Loaded(object sender, RoutedEventArgs e)
