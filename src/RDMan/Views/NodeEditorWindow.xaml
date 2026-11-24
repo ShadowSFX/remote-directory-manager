@@ -24,11 +24,11 @@
                 </RadioButton>
                 <RadioButton Style="{StaticResource Radio.Option}" Content="{ui:Tr Cred.Mode.Custom}"
                              IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Custom}" />
-                <StackPanel Margin="36,4,0,8" Visibility="{Binding IsCustom, Converter={StaticResource Vis}}">
+                <StackPanel Margin="36,4,8,8" Visibility="{Binding IsCustom, Converter={StaticResource Vis}}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="12" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
@@ -45,7 +45,7 @@
                 </StackPanel>
                 <RadioButton Style="{StaticResource Radio.Option}" Content="{ui:Tr Cred.Mode.Profile}"
                              IsChecked="{Binding Mode, Converter={StaticResource Eq}, ConverterParameter=Profile}" />
-                <StackPanel Margin="36,4,0,8" Visibility="{Binding IsProfile, Converter={StaticResource Vis}}">
+                <StackPanel Margin="36,4,8,8" Visibility="{Binding IsProfile, Converter={StaticResource Vis}}">
                     <ComboBox ItemsSource="{Binding Profiles}" SelectedValuePath="Id" SelectedValue="{Binding ProfileId}" DisplayMemberPath="Display"
                               Visibility="{Binding HasProfiles, Converter={StaticResource Vis}}" />
                     <StackPanel Orientation="Horizontal" Visibility="{Binding HasProfiles, Converter={StaticResource Vis}, ConverterParameter=invert}">
@@ -58,7 +58,7 @@
                              Visibility="{Binding IsFiles, Converter={StaticResource Vis}}" />
                 <TextBlock Text="{ui:Tr Cred.GuestNote}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" Margin="36,0,0,6"
                            Visibility="{Binding IsGuest, Converter={StaticResource Vis}}" />
-                <Grid Margin="8,10,0,0">
+                <Grid Margin="8,10,8,0">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE72E;" Style="{StaticResource Icon}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}" Margin="0,0,8,0" />
                         <TextBlock Text="{ui:Tr Cred.Stored}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" MaxWidth="420" />
@@ -107,7 +107,7 @@
                                     <Grid>
                                         <Border x:Name="Pill" Width="3" Height="16" CornerRadius="1.5" HorizontalAlignment="Left" Background="{DynamicResource Accent}"
                                                 Visibility="Collapsed" />
-                                        <ContentPresenter Margin="14,0,8,0" VerticalAlignment="Center" />
+                                        <ContentPresenter Margin="12,0,8,0" VerticalAlignment="Center" />
                                     </Grid>
                                 </Border>
                                 <ControlTemplate.Triggers>
@@ -135,13 +135,13 @@
         </ListBox>
 
         <!-- ═══════════ Section content ═══════════ -->
-        <ScrollViewer x:Name="ContentScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="20,0,24,12">
+        <ScrollViewer x:Name="ContentScroll" Grid.Column="1" VerticalScrollBarVisibility="Auto" Padding="24,0,24,12">
             <Grid>
                 <!-- General -->
                 <StackPanel Visibility="{Binding IsGeneralSection, Converter={StaticResource Vis}}">
                     <StackPanel Style="{StaticResource Field}">
                         <TextBlock Text="{ui:Tr Server.Name}" Style="{StaticResource Text.Label}" />
-                        <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontSize="14" MinHeight="36"
+                        <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                  ui:Ui.Hint="{ui:Tr Server.NameHint}" />
                     </StackPanel>
 
@@ -155,7 +155,7 @@
                     <Grid Margin="0,0,0,16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="12" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <StackPanel>
@@ -229,7 +229,7 @@
                             <Grid Margin="0,0,0,16">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="12" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
@@ -263,7 +263,8 @@
                             IsEnabled="{Binding ServerFields.FilesEnabled, FallbackValue=True}">
                         <StackPanel>
                             <TextBlock Text="{ui:Tr Cred.Section}" Style="{StaticResource SectionTitle}" FontSize="14" />
-                            <ContentControl Content="{Binding Credentials}" ContentTemplate="{StaticResource CredentialBlock}" Focusable="False" />
+                            <!-- -8: the option rows keep their hover padding while their rings line up with the panel title -->
+                            <ContentControl Content="{Binding Credentials}" ContentTemplate="{StaticResource CredentialBlock}" Focusable="False" Margin="-8,0,-8,0" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -281,7 +282,7 @@
                     <Border x:Name="DesktopCredentials" Style="{StaticResource Panel}" IsEnabled="{Binding ServerFields.DesktopEnabled, FallbackValue=True}">
                         <StackPanel>
                             <TextBlock Text="{ui:Tr Cred.Desktop.Section}" Style="{StaticResource SectionTitle}" FontSize="14" />
-                            <ContentControl Content="{Binding DesktopCredentials}" ContentTemplate="{StaticResource CredentialBlock}" Focusable="False" />
+                            <ContentControl Content="{Binding DesktopCredentials}" ContentTemplate="{StaticResource CredentialBlock}" Focusable="False" Margin="-8,0,-8,0" />
                         </StackPanel>
                     </Border>
                     <Border Style="{StaticResource Panel}" IsEnabled="{Binding ServerFields.DesktopEnabled, FallbackValue=True}">

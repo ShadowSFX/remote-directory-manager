@@ -337,7 +337,9 @@
                             <TextBlock x:Name="Hint" Text="{TemplateBinding ui:Ui.Hint}" Foreground="{DynamicResource Fg.Tertiary}"
                                        Margin="{TemplateBinding Padding}" Padding="2,0,0,0" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                        IsHitTestVisible="False" Visibility="Collapsed" TextTrimming="CharacterEllipsis" />
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                            <!-- No Margin here: TextBox already applies its Padding to the content host. Adding it again pushed typed
+                                 text ~10px right of the placeholder and of ComboBox text (asymmetric inputs). -->
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                           Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
                         </Grid>
                     </Border>
@@ -405,7 +407,7 @@
                             <TextBlock x:Name="Hint" Text="{TemplateBinding ui:Ui.Hint}" Foreground="{DynamicResource Fg.Tertiary}"
                                        Margin="{TemplateBinding Padding}" Padding="2,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"
                                        Visibility="Collapsed" TextTrimming="CharacterEllipsis" />
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" Focusable="False" />
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" Focusable="False" />
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>

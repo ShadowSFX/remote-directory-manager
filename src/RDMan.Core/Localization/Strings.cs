@@ -257,7 +257,7 @@ public static partial class Strings
         T("Cred.InheritsFrom", "Usará: {0} (de «{1}»)", "Will use: {0} (from “{1}”)");
         T("Cred.InheritsDefault", "Usará: tu usuario de Windows", "Will use: your Windows user");
         T("Cred.Username", "Usuario", "Username");
-        T("Cred.UsernameHint", "usuario, DOMINIO\\usuario o usuario@dominio", "user, DOMAIN\\user or user@domain");
+        T("Cred.UsernameHint", "usuario o DOMINIO\\usuario", "user or DOMAIN\\user");
         T("Cred.Password", "Contraseña", "Password");
         T("Cred.PasswordKeep", "Deja vacío para conservar la contraseña guardada", "Leave empty to keep the saved password");
         T("Cred.PasswordUnreadable", "La contraseña guardada se cifró en otro equipo o usuario. Vuelve a escribirla.", "The saved password was encrypted on another PC or user. Type it again.");
