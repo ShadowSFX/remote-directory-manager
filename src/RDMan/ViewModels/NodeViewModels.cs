@@ -96,6 +96,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
 {
     private HostHealth _filesHealth;
     private HostHealth? _desktopHealth;
+    private HostHealth? _terminalHealth;
 
     public ServerNodeViewModel(ServerNode model, GroupNodeViewModel? parent, HealthMonitor monitor) : base(model, parent)
     {
@@ -103,6 +104,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
         _filesHealth = monitor.Get(model.Host);
         _filesHealth.PropertyChanged += OnHealthChanged;
         AttachDesktopHealth();
+        AttachTerminalHealth();
         Loc.Instance.LanguageChanged += OnLanguageChanged;
     }
 
@@ -115,6 +117,9 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     public bool HasFiles => Server.HasFiles;
     public bool HasDesktop => Server.HasDesktop;
     public bool HasBoth => HasFiles && HasDesktop;
+    public bool HasTerminal => Server.HasTerminal;
+    /// <summary>How many of files / desktop / terminal this server offers (the view switch needs two or more).</summary>
+    public int CapabilityCount => Server.CapabilityCount;
     public int DesktopPort => Server.Desktop?.Port ?? DesktopEndpoint.DefaultPort;
     public ServerAction DefaultAction => Server.EffectiveDefaultAction;
     public bool IsFavorite => Server.IsFavorite;
@@ -141,8 +146,18 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     /// <summary>Reachability of the RDP port, or null when the server has no desktop.</summary>
     public HostHealth? DesktopHealth => _desktopHealth;
 
+    /// <summary>Reachability of the SSH port (through ~/.ssh/config aliases), or null when the server has no terminal.</summary>
+    public HostHealth? TerminalHealth => _terminalHealth;
+
     /// <summary>The status shown on the dot: the service a plain click opens.</summary>
-    public HostHealth Health => DefaultAction == ServerAction.Desktop && _desktopHealth is not null ? _desktopHealth : _filesHealth;
+    public HostHealth Health => DefaultAction switch
+    {
+        ServerAction.Desktop when _desktopHealth is not null => _desktopHealth,
+        ServerAction.Terminal when _terminalHealth is not null => _terminalHealth,
+        _ when !HasFiles && _desktopHealth is not null => _desktopHealth,
+        _ when !HasFiles && _terminalHealth is not null => _terminalHealth,
+        _ => _filesHealth,
+    };
 
     /// <summary>"10.0.0.5\www" — what the user would have typed before.</summary>
     public string Address => Server.Share is null || !HasFiles ? Server.Host : $@"{Server.Host}\{Server.Share}";
@@ -165,12 +180,20 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
             var parts = new List<string>();
             if (HasFiles) parts.Add(Describe(_filesHealth, desktop: false));
             if (_desktopHealth is not null) parts.Add(Describe(_desktopHealth, desktop: true));
+            if (_terminalHealth is not null) parts.Add(DescribeTerminal(_terminalHealth));
             return string.Join("  ·  ", parts);
         }
     }
 
     /// <summary>Short status of the primary service, for cards.</summary>
-    public string PrimaryStatusText => Describe(Health, desktop: ReferenceEquals(Health, _desktopHealth), compact: true);
+    public string PrimaryStatusText => Describe(Health, desktop: ReferenceEquals(Health, _desktopHealth) || ReferenceEquals(Health, _terminalHealth), compact: true);
+
+    private static string DescribeTerminal(HostHealth h) => h.State switch
+    {
+        HealthState.Online => Loc.F("Health.Terminal.Online", h.LatencyMs ?? 0),
+        HealthState.Offline => Loc.F("Health.Terminal.Offline", h.Port),
+        _ => Loc.T("Health.Unknown"),
+    };
 
     private static string Describe(HostHealth h, bool desktop, bool compact = false) => h.State switch
     {
@@ -203,6 +226,17 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
         if (_desktopHealth is not null) _desktopHealth.PropertyChanged += OnHealthChanged;
     }
 
+    private void AttachTerminalHealth()
+    {
+        if (_terminalHealth is not null) _terminalHealth.PropertyChanged -= OnHealthChanged;
+        _terminalHealth = TerminalEndpoint() is { } ep ? Monitor.Get(ep.Host, ep.Port) : null;
+        if (_terminalHealth is not null) _terminalHealth.PropertyChanged += OnHealthChanged;
+    }
+
+    /// <summary>Where the SSH port really is (an alias like "pangya-vps" resolves through ~/.ssh/config).</summary>
+    private (string Host, int Port)? TerminalEndpoint()
+        => HasTerminal ? Services.Ssh.SshEnvironment.ProbeEndpoint(Server) : null;
+
     public override void Refresh()
     {
         // Host, port or capabilities may have changed → re-attach to the right health records.
@@ -214,6 +248,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
             _filesHealth.PropertyChanged += OnHealthChanged;
         }
         AttachDesktopHealth();
+        AttachTerminalHealth();
         base.Refresh();
     }
 
@@ -228,6 +263,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     {
         _filesHealth.PropertyChanged -= OnHealthChanged;
         if (_desktopHealth is not null) _desktopHealth.PropertyChanged -= OnHealthChanged;
+        if (_terminalHealth is not null) _terminalHealth.PropertyChanged -= OnHealthChanged;
         Loc.Instance.LanguageChanged -= OnLanguageChanged;
     }
 
@@ -236,6 +272,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     {
         if (HasFiles) yield return (Server.Host, ConnectionService.SmbPort);
         if (HasDesktop) yield return (Server.Host, DesktopPort);
+        if (TerminalEndpoint() is { } ssh) yield return ssh;
     }
 }
 

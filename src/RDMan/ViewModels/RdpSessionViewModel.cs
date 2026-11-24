@@ -24,7 +24,7 @@ public enum DesktopState { Idle, Connecting, Connected, Error }
 /// One embedded Remote Desktop session (RoyalApps RdpControl → Microsoft's RDP ActiveX, hosted in a
 /// WindowsFormsHost). Lives as long as its tab: switching tabs only hides it, so the session stays connected.
 /// </summary>
-public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
+public sealed partial class RdpSessionViewModel : RemoteSessionViewModel
 {
     private readonly MainViewModel _main;
     private readonly AppServices _svc;
@@ -42,45 +42,35 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private bool _resizeConfirmed; // the server applied a live resolution change at least once this session
     private (int W, int H)? _connectSize;
 
-    public RdpSessionViewModel(MainViewModel main, ServerNodeViewModel server)
+    public RdpSessionViewModel(MainViewModel main, ServerNodeViewModel server) : base(main, server)
     {
         _main = main;
         _svc = main.Services;
-        Server = server;
         Loc.Instance.LanguageChanged += OnLanguageChanged;
         _sizeWatch.Tick += SizeWatch_Tick;
         _thumbTimer.Tick += (_, _) => CaptureThumbnail();
     }
 
-    public ServerNodeViewModel Server { get; }
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSurfaceVisible), nameof(IsConnected), nameof(IsBusy), nameof(ShowIdle))]
     private DesktopState _state = DesktopState.Idle;
 
-    [ObservableProperty] private WindowsFormsHost? _host;
-    [ObservableProperty] private ErrorInfo? _error;
-    [ObservableProperty] private string _connectedAs = "";
 
     /// <summary>The ActiveX surface is shown while connecting (it paints its own progress) and when connected.</summary>
-    public bool IsSurfaceVisible => State is DesktopState.Connecting or DesktopState.Connected;
-    public bool IsConnected => State == DesktopState.Connected;
-    public bool IsBusy => State == DesktopState.Connecting;
-    public bool ShowIdle => State == DesktopState.Idle;
+    public override bool IsSurfaceVisible => State is DesktopState.Connecting or DesktopState.Connected;
+    public override bool IsConnected => State == DesktopState.Connected;
+    public override bool IsBusy => State == DesktopState.Connecting;
+    public override bool ShowIdle => State == DesktopState.Idle;
+    public override bool IsTerminal => false;
+    public override string IdleGlyph => "";
+    public override string IdleText => Loc.T("Desktop.Idle.Body");
+    public override string ConfirmLeaveText => Loc.F("Desktop.ConfirmLeave", Server.Name);
     public string ConnectingText => Loc.F("Desktop.Connecting", Server.Name);
 
-    /// <summary>Raised when the user presses the release-focus hotkey inside the session (Ctrl+Alt+←/→).</summary>
-    public event EventHandler? FocusReleased;
-
-    /// <summary>Raised when the session takes the keyboard (a click inside the remote desktop), so its pane becomes active.</summary>
-    public event EventHandler? Activated;
-
-    /// <summary>Full screen requested (true) or left (false): toolbar button, or Ctrl+Alt+Pause inside the session.</summary>
-    public event EventHandler<bool>? FullScreenRequested;
 
     // ───────────── Connect ─────────────
     [RelayCommand]
-    public void Connect()
+    public override void Connect()
     {
         if (_disposed) return;
         if (!Server.HasDesktop)
@@ -331,7 +321,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         if (_control?.RdpClient is not { } client) return;
         var type = client.GetType();
         type.GetEvent("OnFocusReleased")?.AddEventHandler(client,
-            new AxMSTSCLib.IMsTscAxEvents_OnFocusReleasedEventHandler((_, _) => FocusReleased?.Invoke(this, EventArgs.Empty)));
+            new AxMSTSCLib.IMsTscAxEvents_OnFocusReleasedEventHandler((_, _) => RaiseFocusReleased()));
         // RDMan's top bar replaces mstsc's connection bar (the ActiveX shows its own once FullScreen is set).
         try
         {
@@ -339,8 +329,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is COMException or InvalidCastException) { App.Log(ex); }
         // Ctrl+Alt+Pause inside the session (container-handled full screen).
-        BindPlain(client, type, "OnRequestGoFullScreen", () => FullScreenRequested?.Invoke(this, true));
-        BindPlain(client, type, "OnRequestLeaveFullScreen", () => FullScreenRequested?.Invoke(this, false));
+        BindPlain(client, type, "OnRequestGoFullScreen", () => RaiseFullScreenRequested(true));
+        BindPlain(client, type, "OnRequestLeaveFullScreen", () => RaiseFullScreenRequested(false));
     }
 
     private static void BindPlain(object target, Type type, string name, Action action)
@@ -350,11 +340,9 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>The window showing this session (RDMan's, or its own when undocked): prompts open there.</summary>
-    private System.Windows.Window? DialogOwner
-        => (Host is not null ? System.Windows.Window.GetWindow(Host) : null) ?? _main.Owner;
 
     /// <summary>Keeps the control's own full-screen flag in step with RDMan's, so Ctrl+Alt+Pause toggles correctly.</summary>
-    public void SyncFullScreen(bool on)
+    public override void SyncFullScreen(bool on)
     {
         if (_control?.RdpClient is not { } client) return;
         try
@@ -364,11 +352,11 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         catch (COMException ex) { App.Log(ex); }
     }
 
-    private void OnControlEnter(object? sender, EventArgs e) => Activated?.Invoke(this, EventArgs.Empty);
+    private void OnControlEnter(object? sender, EventArgs e) => RaiseActivated();
 
     private void OnHostFocusWithinChanged(object? sender, System.Windows.DependencyPropertyChangedEventArgs e)
     {
-        if (e.NewValue is true) Activated?.Invoke(this, EventArgs.Empty);
+        if (e.NewValue is true) RaiseActivated();
     }
 
     // ───────────── Events ─────────────
@@ -456,7 +444,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
 
     // ───────────── Actions ─────────────
     [RelayCommand]
-    public void Disconnect()
+    public override void Disconnect()
     {
         if (_control is null) return;
         State = DesktopState.Idle;
@@ -509,10 +497,10 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void FullScreen()
     {
-        if (IsConnected) FullScreenRequested?.Invoke(this, true);
+        if (IsConnected) RaiseFullScreenRequested(true);
     }
 
-    public void Focus()
+    public override void Focus()
     {
         if (IsConnected) _control?.FocusRdpClient();
     }
@@ -595,7 +583,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         _thumbTimer.Stop();
         Server.Thumbnail = null;
         var control = _control;
-        var host = Host;
+        var host = Host as WindowsFormsHost;
         _control = null;
         if (control is not null)
         {
@@ -626,7 +614,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         }, System.Windows.Threading.DispatcherPriority.Background);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         _disposed = true;

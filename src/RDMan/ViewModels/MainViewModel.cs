@@ -373,15 +373,20 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Plain click: the server's default view (files or desktop).</summary>
     public void OpenServer(ServerNodeViewModel server, OpenTarget target)
     {
-        if (server.DefaultAction == ServerAction.Desktop) OpenDesktop(server, target);
-        else OpenFiles(server, target);
+        switch (server.DefaultAction)
+        {
+            case ServerAction.Desktop: OpenDesktop(server, target); break;
+            case ServerAction.Terminal: OpenTerminal(server, target); break;
+            default: OpenFiles(server, target); break;
+        }
     }
 
     public void OpenFiles(ServerNodeViewModel server, OpenTarget target)
     {
         if (!server.HasFiles)
         {
-            OpenDesktop(server, target);
+            if (server.HasDesktop) OpenDesktop(server, target);
+            else OpenTerminal(server, target);
             return;
         }
         Open(new FolderLocation(server.RootPath), target);
@@ -448,11 +453,15 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
         if (view == ServerAction.Desktop) OpenDesktop(server, OpenTarget.NewTab);
+        else if (view == ServerAction.Terminal) OpenTerminal(server, OpenTarget.NewTab);
         else OpenInNewTab(new FolderLocation(server.RootPath), pane);
 
-        bool IsCompanion(BrowserTabViewModel t) => view == ServerAction.Desktop
-            ? t.Current is DesktopLocation d && d.ServerId == server.Model.Id
-            : !ReferenceEquals(t, from) && t.Current is FolderLocation { IsUnc: true } && ReferenceEquals(t.Server, server);
+        bool IsCompanion(BrowserTabViewModel t) => view switch
+        {
+            ServerAction.Desktop => t.Current is DesktopLocation d && d.ServerId == server.Model.Id,
+            ServerAction.Terminal => !ReferenceEquals(t, from) && t.Current is TerminalLocation tl && tl.ServerId == server.Model.Id,
+            _ => !ReferenceEquals(t, from) && t.Current is FolderLocation { IsUnc: true } && ReferenceEquals(t.Server, server),
+        };
     }
 
     /// <summary>Shows a tab wherever it lives (leaving another tab's full screen first).</summary>
@@ -470,7 +479,8 @@ public sealed partial class MainViewModel : ObservableObject
     public bool RevealOtherSession(RdpSessionViewModel session)
     {
         if (RevealDetached(session.Server, session)) return true;
-        var hit = FindTab(t => t.Session is { State: DesktopState.Connecting or DesktopState.Connected } s
+        // Only desktops count: a terminal to the same server never blocks (nor is blocked by) a desktop.
+        var hit = FindTab(t => t.Session is RdpSessionViewModel { IsLive: true } s
                                && !ReferenceEquals(s, session) && ReferenceEquals(s.Server, session.Server));
         if (hit is not { } h) return false;
         Reveal(h.Pane, h.Tab);
@@ -478,17 +488,17 @@ public sealed partial class MainViewModel : ObservableObject
         return true;
     }
 
-    /// <summary>Asks once before ending the connected desktop sessions among <paramref name="tabs"/>.</summary>
+    /// <summary>Asks once before ending the connected sessions (desktops and terminals) among <paramref name="tabs"/>.</summary>
     public bool ConfirmEndSessions(IEnumerable<BrowserTabViewModel> tabs)
-        => ConfirmEndSessions(tabs.Select(t => t.Session).OfType<RdpSessionViewModel>());
+        => ConfirmEndSessions(tabs.Select(t => t.Session).OfType<RemoteSessionViewModel>());
 
     /// <summary>Asks once before ending the connected sessions among <paramref name="sessions"/>.</summary>
-    public bool ConfirmEndSessions(IEnumerable<RdpSessionViewModel> sessions)
+    public bool ConfirmEndSessions(IEnumerable<RemoteSessionViewModel> sessions)
     {
         var live = sessions.Where(s => s.IsConnected).ToList();
         if (live.Count == 0) return true;
         var message = live.Count == 1
-            ? Loc.F("Desktop.ConfirmLeave", live[0].Server.Name)
+            ? live[0].ConfirmLeaveText
             : Loc.F("Desktop.ConfirmLeaveMany", live.Count);
         return Dialogs.Confirm(Owner, Loc.T("Desktop.Disconnect"), message, Loc.T("Desktop.Disconnect"), danger: false);
     }
@@ -767,7 +777,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (group is null) return;
         var servers = group.AllServers().ToHashSet();
-        var live = AllSessions.Where(s => s.IsConnected && servers.Contains(s.Server)).ToList();
+        var live = AllSessions.OfType<RdpSessionViewModel>().Where(s => s.IsConnected && servers.Contains(s.Server)).ToList();
         if (live.Count == 0 || !ConfirmEndSessions(live)) return;
         foreach (var s in live) s.Disconnect();
     }
@@ -776,7 +786,7 @@ public sealed partial class MainViewModel : ObservableObject
     public int ConnectedDesktops(GroupNodeViewModel group)
     {
         var servers = group.AllServers().ToHashSet();
-        return AllSessions.Count(s => s.IsConnected && servers.Contains(s.Server));
+        return AllSessions.OfType<RdpSessionViewModel>().Count(s => s.IsConnected && servers.Contains(s.Server));
     }
 
     [RelayCommand]

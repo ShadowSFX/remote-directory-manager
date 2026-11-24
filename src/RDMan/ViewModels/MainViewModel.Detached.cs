@@ -17,9 +17,9 @@ public partial class MainViewModel
     /// <summary>Desktop sessions living in their own window.</summary>
     public IEnumerable<RdpSessionViewModel> DetachedSessions => _detached.Select(w => w.Session);
 
-    /// <summary>Every desktop session, in tabs and in windows.</summary>
-    public IEnumerable<RdpSessionViewModel> AllSessions
-        => AllTabs.Select(t => t.Session).OfType<RdpSessionViewModel>().Concat(DetachedSessions);
+    /// <summary>Every remote session (desktops and terminals), in tabs and in windows.</summary>
+    public IEnumerable<RemoteSessionViewModel> AllSessions
+        => AllTabs.Select(t => t.Session).OfType<RemoteSessionViewModel>().Concat(DetachedSessions);
 
     /// <summary>Moves a tab's remote desktop to its own window (the tab closes, the session reconnects there).</summary>
     [RelayCommand]
@@ -28,7 +28,7 @@ public partial class MainViewModel
         if (tab is not { IsDesktop: true, Server: { } server }) return;
         if (FullScreenTab is { } fs && ReferenceEquals(fs, tab)) ExitFullScreen();
         var size = tab.Session?.Host is { ActualWidth: > 200, ActualHeight: > 150 } host ? new Size(host.ActualWidth, host.ActualHeight) : (Size?)null;
-        var wasLive = tab.Session is { State: DesktopState.Connecting or DesktopState.Connected };
+        var wasLive = tab.Session is { IsLive: true };
         tab.Session?.Disconnect(); // ends the embedded session first: a second one would sign it out
         tab.Pane.CloseTab(tab);
         OpenDesktopWindow(server, size);

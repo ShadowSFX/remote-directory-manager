@@ -10,20 +10,25 @@ namespace RDMan.Services.Ssh;
 /// </summary>
 public sealed class SshEnvironment(AppState state)
 {
-    private SshConfig? _config;
-    private DateTime _configStamp;
-    private readonly object _gate = new();
+    private static SshConfig? _config;
+    private static DateTime _configStamp;
+    private static DateTime _checkedAt;
+    private static readonly object Gate = new();
 
-    public string Home { get; } = SshConfig.DefaultHome;
+    public static string Home { get; } = SshConfig.DefaultHome;
 
-    public string ConfigPath => SshConfig.DefaultPath(Home);
+    public static string ConfigPath => SshConfig.DefaultPath(Home);
 
-    public SshConfig Config
+    /// <summary>The parsed config (shared by every session and the health monitor; re-read when the file changes).</summary>
+    public static SshConfig SharedConfig
     {
         get
         {
-            lock (_gate)
+            lock (Gate)
             {
+                // Checking the timestamp is cheap, but the health monitor asks often: once a second is enough.
+                if (_config is not null && DateTime.UtcNow - _checkedAt < TimeSpan.FromSeconds(1)) return _config;
+                _checkedAt = DateTime.UtcNow;
                 var stamp = Stamp(ConfigPath);
                 if (_config is null || stamp != _configStamp)
                 {
@@ -35,15 +40,33 @@ public sealed class SshEnvironment(AppState state)
         }
     }
 
+    public SshConfig Config => SharedConfig;
+
     private static DateTime Stamp(string path)
     {
-        try
-        {
-            // Includes can change too; the main file's time is a good enough signal plus a short cache.
-            return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
-        }
+        try { return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue; }
         catch (IOException) { return DateTime.MinValue; }
     }
+
+    /// <summary>Host and port the health monitor should probe for a server's terminal (aliases resolved).</summary>
+    public static (string Host, int Port)? ProbeEndpoint(ServerNode server)
+    {
+        if (server.Terminal is not { Enabled: true } endpoint || string.IsNullOrWhiteSpace(server.Host)) return null;
+        var host = server.Host.Trim();
+        try
+        {
+            var cfg = endpoint.UseSshConfig ? SharedConfig.Resolve(host) : null;
+            // Behind a jump host the target usually isn't reachable directly: probing it would always say "offline".
+            if (IsJump(cfg?.ProxyJump) || IsJump(server.Ssh?.ProxyJump)) return null;
+            return (cfg?.EffectiveHost ?? host, endpoint.Port ?? cfg?.Port ?? SshEndpoint.DefaultPort);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return (host, endpoint.Port ?? SshEndpoint.DefaultPort);
+        }
+    }
+
+    private static bool IsJump(string? spec) => !string.IsNullOrWhiteSpace(spec) && !spec.Trim().Equals("none", StringComparison.OrdinalIgnoreCase);
 
     public EffectiveSshAuth ResolveAuth(TreeNode node)
         => SshAuthResolver.Resolve(node, state.Index, state.Document.Profiles, state.Document.SshKeys);

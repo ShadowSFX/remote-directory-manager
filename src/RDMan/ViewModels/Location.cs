@@ -14,6 +14,7 @@ public abstract record Location
         "view" when t.Path is MainViewModel.ViewFavorites or MainViewModel.ViewRecent or MainViewModel.ViewConnected => new ViewLocation(t.Path),
         "thispc" => new ThisPcLocation(),
         "desktop" when t.NodeId is { } sid => new DesktopLocation(sid),
+        "terminal" when t.NodeId is { } tid => new TerminalLocation(tid),
         "folder" when !string.IsNullOrWhiteSpace(t.Path) => new FolderLocation(t.Path!),
         _ => new HomeLocation(),
     };
@@ -47,6 +48,12 @@ public sealed record SmartGroupLocation(Guid SmartGroupId) : Location
 public sealed record DesktopLocation(Guid ServerId) : Location
 {
     public override SavedTab ToSaved() => new() { Kind = "desktop", NodeId = ServerId };
+}
+
+/// <summary>An SSH terminal on a server in the tree (several tabs may point at the same server).</summary>
+public sealed record TerminalLocation(Guid ServerId) : Location
+{
+    public override SavedTab ToSaved() => new() { Kind = "terminal", NodeId = ServerId };
 }
 
 public sealed record ThisPcLocation : Location

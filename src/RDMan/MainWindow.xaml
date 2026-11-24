@@ -17,22 +17,7 @@
         <WindowChrome CaptionHeight="40" ResizeBorderThickness="6" GlassFrameThickness="0,0,0,1" CornerRadius="0" UseAeroCaptionButtons="False" />
     </WindowChrome.WindowChrome>
 
-    <Window.InputBindings>
-        <KeyBinding Key="K" Modifiers="Control" Command="{Binding OpenPaletteCommand}" />
-        <KeyBinding Key="P" Modifiers="Control+Shift" Command="{Binding OpenPaletteCommand}" />
-        <KeyBinding Key="T" Modifiers="Control" Command="{Binding NewTabCommand}" />
-        <KeyBinding Key="W" Modifiers="Control" Command="{Binding CloseTabCommand}" />
-        <KeyBinding Key="F4" Modifiers="Control" Command="{Binding CloseTabCommand}" />
-        <KeyBinding Key="Tab" Modifiers="Control" Command="{Binding NextTabCommand}" />
-        <KeyBinding Key="Tab" Modifiers="Control+Shift" Command="{Binding PreviousTabCommand}" />
-        <KeyBinding Key="F3" Command="{Binding SplitRightCommand}" />
-        <KeyBinding Key="F6" Command="{Binding FocusOtherPaneCommand}" />
-        <KeyBinding Key="N" Modifiers="Control" Command="{Binding NewServerCommand}" />
-        <KeyBinding Key="G" Modifiers="Control+Shift" Command="{Binding NewGroupCommand}" />
-        <KeyBinding Key="OemComma" Modifiers="Control" Command="{Binding OpenSettingsCommand}" />
-        <KeyBinding Key="D" Modifiers="Control+Shift" Command="{Binding OpenActiveServerDesktopCommand}" />
-        <KeyBinding Key="F11" Command="{Binding ToggleFullScreenCommand}" />
-    </Window.InputBindings>
+    <!-- Shortcuts live in MainWindow.Keys.cs (one table that knows which keys a terminal keeps). -->
 
     <Grid x:Name="Root">
         <Grid.RowDefinitions>

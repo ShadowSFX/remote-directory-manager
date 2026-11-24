@@ -38,7 +38,7 @@ public enum TerminalState
 /// One SSH terminal tab: the WebView2 screen (created once, kept across reconnects so history survives), the SSH
 /// connection and its shell channel, and everything that hangs off it (stats, forwards, log).
 /// </summary>
-public sealed partial class SshSessionViewModel : ObservableObject, IDisposable, ISshPrompts
+public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPrompts
 {
     private const int HighWater = 2 * 1024 * 1024;   // chars sent to the page and not yet rendered
     private const int LowWater = 512 * 1024;
@@ -90,33 +90,22 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
 
     private readonly DispatcherTimer _thumbTimer = new() { Interval = TimeSpan.FromSeconds(3) };
 
-    public SshSessionViewModel(MainViewModel main, ServerNodeViewModel server)
+    public SshSessionViewModel(MainViewModel main, ServerNodeViewModel server) : base(main, server)
     {
         _main = main;
         _svc = main.Services;
         _env = main.Ssh;
         _ui = Application.Current.Dispatcher;
-        Server = server;
         _reconnectTimer.Tick += ReconnectTick;
         _thumbTimer.Tick += async (_, _) => await CaptureThumbnailAsync();
         ThemeManager.Instance.ThemeChanged += OnThemeChanged;
         Loc.Instance.LanguageChanged += OnLanguageChanged;
     }
 
-    public ServerNodeViewModel Server { get; }
-
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsConnected), nameof(IsBusy), nameof(ShowIdle), nameof(StateText))]
     private TerminalState _state = TerminalState.Idle;
 
-    /// <summary>The WebView2 control (an HWND): placed by the window's session overlay, never re-parented.</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSurfaceVisible), nameof(ShowIdle))]
-    private HwndHost? _host;
-
-    /// <summary>Only for failures before a terminal exists (WebView2 missing); later errors show inside the terminal.</summary>
-    [ObservableProperty] private ErrorInfo? _error;
-    [ObservableProperty] private string _connectedAs = "";
     [ObservableProperty] private string? _remoteTitle;
     [ObservableProperty] private string? _currentDirectory;
     /// <summary>OSC 9;4 progress: null = none, 0-100, or -1 = indeterminate.</summary>
@@ -134,14 +123,24 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
     [ObservableProperty] private string _memText = "";
     [ObservableProperty] private string _diskText = "";
     public ObservableCollection<double> CpuHistory { get; } = new();
+    [ObservableProperty] private PointCollection? _cpuSparkline;
+    [ObservableProperty] private string _cpuLevel = "ok";
+    [ObservableProperty] private string _memLevel = "ok";
+    [ObservableProperty] private string _diskLevel = "ok";
 
     public ObservableCollection<ForwardViewModel> Forwards => _forwards.Items;
     public bool HasForwards => _forwards.Items.Count > 0;
 
-    public bool IsSurfaceVisible => Host is not null;
-    public bool IsConnected => State == TerminalState.Connected;
-    public bool IsBusy => State is TerminalState.Connecting or TerminalState.Reconnecting;
-    public bool ShowIdle => Host is null && State == TerminalState.Idle && Error is null;
+    // Host: the WebView2 control. Error: only failures before a terminal exists (WebView2 missing); later errors
+    // show inside the terminal, next to its history.
+    public override bool IsSurfaceVisible => Host is not null;
+    public override bool IsConnected => State == TerminalState.Connected;
+    public override bool IsBusy => State is TerminalState.Connecting or TerminalState.Reconnecting;
+    public override bool ShowIdle => Host is null && State == TerminalState.Idle && Error is null;
+    public override bool IsTerminal => true;
+    public override string IdleGlyph => "";
+    public override string IdleText => Loc.T("Term.Idle.Body");
+    public override string ConfirmLeaveText => Loc.F("Term.ConfirmLeave", Server.Name);
     public string? LogPath => _logger?.Path;
 
     public string StateText => State switch
@@ -153,17 +152,12 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
         _ => "",
     };
 
-    public event EventHandler? FocusReleased;
-    public event EventHandler? Activated;
-    public event EventHandler<bool>? FullScreenRequested;
     /// <summary>BEL from the server (tab badge, taskbar flash when the window isn't active).</summary>
     public event EventHandler? Bell;
     /// <summary>The server is waiting for the user (password, host key) — useful when the tab isn't visible.</summary>
     public event EventHandler<string>? AttentionRequested;
     /// <summary>Keystrokes typed in this terminal (for broadcast input).</summary>
     public event Action<SshSessionViewModel, string>? InputTyped;
-
-    partial void OnErrorChanged(ErrorInfo? value) => OnPropertyChanged(nameof(ShowIdle));
 
     partial void OnStateChanged(TerminalState value)
     {
@@ -174,7 +168,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
     // ───────────── Connect ─────────────
 
     [RelayCommand]
-    public void Connect()
+    public override void Connect()
     {
         if (_disposed || IsBusy || IsConnected) return;
         if (!Server.Server.HasTerminal)
@@ -756,7 +750,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
     }
 
     [RelayCommand]
-    public void Disconnect()
+    public override void Disconnect()
     {
         if (_link is null && !IsBusy) return;
         _generation++;
@@ -773,7 +767,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
     [RelayCommand]
     private void Reconnect()
     {
-        if (IsConnected && !Dialogs.Confirm(_main.Owner, Loc.T("Desktop.Reconnect"), Loc.F("Term.ConfirmReconnect", Server.Name), Loc.T("Desktop.Reconnect"), danger: false))
+        if (IsConnected && !Dialogs.Confirm(DialogOwner, Loc.T("Desktop.Reconnect"), Loc.F("Term.ConfirmReconnect", Server.Name), Loc.T("Desktop.Reconnect"), danger: false))
             return;
         _generation++;
         TearDownConnection();
@@ -785,7 +779,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
     [RelayCommand]
     private void FullScreen()
     {
-        if (IsSurfaceVisible) FullScreenRequested?.Invoke(this, true);
+        if (IsSurfaceVisible) RaiseFullScreenRequested(true);
     }
 
     private void TearDownConnection()
@@ -1000,7 +994,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
                 ProgressError = state == 2;
                 break;
             case "activate":
-                Activated?.Invoke(this, EventArgs.Empty);
+                RaiseActivated();
                 break;
             case "action":
                 var id = Str(m, "id");
@@ -1068,7 +1062,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
 
     private void OnHostFocusWithinChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
-        if (e.NewValue is true) Activated?.Invoke(this, EventArgs.Empty);
+        if (e.NewValue is true) RaiseActivated();
     }
 
     // ───────────── Cards, banners, lines ─────────────
@@ -1245,9 +1239,13 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
                 CpuPercent = c;
                 CpuHistory.Add(c);
                 while (CpuHistory.Count > 20) CpuHistory.RemoveAt(0);
+                CpuSparkline = Sparkline(CpuHistory);
+                CpuLevel = Level(c);
             }
             MemPercent = sample.MemUsedPercent;
             DiskPercent = sample.DiskUsedPercent;
+            MemLevel = Level(MemPercent);
+            DiskLevel = Level(DiskPercent);
             LoadText = sample.Load1.ToString("0.00", CultureInfo.InvariantCulture);
             UptimeText = ServerStats.FormatUptime(sample.UptimeSeconds);
             MemText = $"{FormatKb(sample.MemTotalKb - sample.MemAvailableKb)} / {FormatKb(sample.MemTotalKb)}";
@@ -1257,6 +1255,21 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
         _stats = probe;
         CpuHistory.Clear();
         probe.Start();
+    }
+
+    /// <summary>"ok" / "warn" (85 %+) / "danger" (95 %+): the stats chips color their value with it.</summary>
+    private static string Level(double percent) => percent >= 95 ? "danger" : percent >= 85 ? "warn" : "ok";
+
+    /// <summary>The last minute of CPU as a 40×14 line (0 % at the bottom).</summary>
+    private static PointCollection Sparkline(IReadOnlyList<double> values)
+    {
+        const double w = 40, h = 14;
+        var points = new PointCollection(values.Count);
+        if (values.Count == 1) points.Add(new Point(w, h - values[0] / 100 * h));
+        for (var i = 0; i < values.Count && values.Count > 1; i++)
+            points.Add(new Point(w * i / (values.Count - 1), h - Math.Clamp(values[i], 0, 100) / 100 * (h - 1) - 0.5));
+        points.Freeze();
+        return points;
     }
 
     private static string FormatKb(long kb)
@@ -1306,7 +1319,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
             Filter = Loc.T("Term.Save.Filter"),
             DefaultExt = ".txt",
         };
-        if (dlg.ShowDialog(_main.Owner) != true) return;
+        if (dlg.ShowDialog(DialogOwner) != true) return;
         var html = dlg.FilterIndex == 2;
         var text = await RequestSerializedAsync("serialize", html ? "html" : "text");
         if (text is null) return;
@@ -1332,14 +1345,14 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
         catch (TimeoutException) { _serialized.Remove(id); return null; }
     }
 
-    public void Focus()
+    public override void Focus()
     {
         if (_terminal is null) return;
         _terminal.Focus();
     }
 
     /// <summary>Keyboard released back to RDMan (Ctrl+Alt+←/→ inside the terminal).</summary>
-    public void ReleaseFocus() => FocusReleased?.Invoke(this, EventArgs.Empty);
+    public void ReleaseFocus() => RaiseFocusReleased();
 
     private async Task CaptureThumbnailAsync()
     {
@@ -1374,7 +1387,7 @@ public sealed partial class SshSessionViewModel : ObservableObject, IDisposable,
         _ui.BeginInvoke(host.Dispose, DispatcherPriority.Background);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         if (_disposed) return;
         _disposed = true;

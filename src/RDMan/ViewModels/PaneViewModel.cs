@@ -94,11 +94,12 @@ public sealed partial class PaneViewModel : ObservableObject
     {
         tab ??= SelectedTab;
         if (tab is null) return;
-        // A second session with the same server would sign the first one out: duplicate its files view instead.
+        // A second desktop with the same server would sign the first one out: duplicate its files view instead.
+        // A terminal duplicates as a new shell on the same server.
         var location = tab.Current is DesktopLocation
             ? tab.Server is { HasFiles: true } s ? new FolderLocation(s.RootPath) : new HomeLocation()
             : tab.Current;
-        AddTab(location, index: Tabs.IndexOf(tab) + 1);
+        AddTab(location, index: Tabs.IndexOf(tab) + 1, configure: location is TerminalLocation ? t => t.RequestConnect() : null);
     }
 
     public void SelectNext(int delta)

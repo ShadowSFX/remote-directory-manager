@@ -137,7 +137,12 @@ public partial class BrowserTabView : UserControl
 
     /// <summary>Ctrl+Alt+←/→ inside a session hands the keyboard back to RDMan: land on the desktop toolbar.</summary>
     private void OnSessionFocusReleased(object? sender, EventArgs e)
-        => Dispatcher.BeginInvoke(() => { DesktopFocusTarget.Focus(); Keyboard.Focus(DesktopFocusTarget); }, System.Windows.Threading.DispatcherPriority.Input);
+        => Dispatcher.BeginInvoke(() =>
+        {
+            var target = DataContext is BrowserTabViewModel { IsTerminal: true } ? TerminalFocusTarget : DesktopFocusTarget;
+            target.Focus();
+            Keyboard.Focus(target);
+        }, System.Windows.Threading.DispatcherPriority.Input);
 
     private void OnRequestFocusList(object? sender, EventArgs e) => Dispatcher.BeginInvoke(FocusList, System.Windows.Threading.DispatcherPriority.Input);
 

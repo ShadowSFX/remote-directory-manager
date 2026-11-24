@@ -534,10 +534,12 @@ public partial class MainWindow : Window
 
     protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        if (HandleShortcut(e, out var fromTerminal)) return;
         // Mouse back/forward-style keyboard navigation for the active tab, unless typing in a text box.
+        // A terminal keeps these keys (Alt+←, F5, Ctrl+L, Ctrl+F… mean something to the shell).
         var tab = _vm.ActiveTab;
         var typing = Keyboard.FocusedElement is TextBox;
-        if (tab is not null && !_vm.Palette.IsOpen)
+        if (tab is not null && !_vm.Palette.IsOpen && !fromTerminal)
         {
             var mods = Keyboard.Modifiers;
             var key = e.Key == Key.System ? e.SystemKey : e.Key;

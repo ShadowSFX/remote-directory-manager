@@ -18,7 +18,7 @@ using RDMan.Views;
 
 namespace RDMan.ViewModels;
 
-public enum TabMode { Dashboard, Folder, Error, Desktop }
+public enum TabMode { Dashboard, Folder, Error, Desktop, Terminal }
 
 public sealed record BreadcrumbSegment(string Label, Location Target, bool IsServer, Brush? Color);
 
@@ -154,8 +154,12 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         FolderLocation f when f.Target is { SubPath: null or "" } && Server is { Share: not null } => Server.Name,
         FolderLocation f => f.DisplayLeaf,
         DesktopLocation => Server?.Name ?? Loc.T("Cap.Desktop"),
+        TerminalLocation => Server?.Name ?? Loc.T("Cap.Terminal"),
         _ => "",
     };
+
+    /// <summary>The terminal's window title (OSC 0/2, e.g. "user@host: ~/app") is added to the tab's tooltip.</summary>
+    public string TabToolTip => Session is Terminal.SshSessionViewModel { RemoteTitle: { Length: > 0 } t } ? $"{Title}\n{t}" : Title;
 
     public string Glyph => Current switch
     {
@@ -166,31 +170,52 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         ThisPcLocation => "",
         FolderLocation { IsUnc: true } => "",
         DesktopLocation => "",
+        TerminalLocation => "\uE756",
         _ => "",
     };
 
     public Brush? IdentityBrush => Server?.ColorBrush;
     public bool HasIdentity => Server is not null || Folder is { IsUnc: true };
     public bool IsDesktop => Current is DesktopLocation;
+    public bool IsTerminal => Current is TerminalLocation;
+    /// <summary>A remote session tab (desktop or terminal): no file toolbar, a native surface in the content area.</summary>
+    public bool IsRemote => IsDesktop || IsTerminal;
+    public bool IsFilesView => !IsRemote;
 
-    /// <summary>The server offers both views: the identity band shows the Files | Desktop switch.</summary>
-    public bool ShowViewSwitch => Server is { HasBoth: true } && (IsDesktop || Folder is { IsUnc: true });
+    /// <summary>The server offers several views: the identity band shows the Files | Desktop | Terminal switch.</summary>
+    public bool ShowViewSwitch => Server is { CapabilityCount: > 1 } && (IsRemote || Folder is { IsUnc: true });
     public string IdentityName => Server?.Name ?? Folder?.Target?.Host ?? "";
-    public string IdentityAddress => Current is DesktopLocation && Server is { } ds
-        ? $"{ds.Host}:{ds.DesktopPort}"
-        : Folder?.Target is { } t ? (t.Share is null ? t.ServerRoot : t.ShareRoot!) : "";
+    public string IdentityAddress => Current switch
+    {
+        DesktopLocation when Server is { } ds => $"{ds.Host}:{ds.DesktopPort}",
+        TerminalLocation when Server is { } ts => _terminalAddress ?? ts.Host,
+        _ => Folder?.Target is { } t ? (t.Share is null ? t.ServerRoot : t.ShareRoot!) : "",
+    };
 
-    public HostHealth? Health => Current is DesktopLocation ? Server?.DesktopHealth : Folder?.Target is { } t ? _svc.Health.Get(t.Host) : null;
+    private string? _terminalAddress;
 
-    /// <summary>The embedded remote desktop of this tab (only in Desktop mode).</summary>
-    [ObservableProperty] private RdpSessionViewModel? _session;
+    public HostHealth? Health => Current switch
+    {
+        DesktopLocation => Server?.DesktopHealth,
+        TerminalLocation => Server?.TerminalHealth,
+        _ => Folder?.Target is { } t ? _svc.Health.Get(t.Host) : null,
+    };
+
+    /// <summary>The remote session of this tab: a remote desktop or an SSH terminal (only in those modes).</summary>
+    [ObservableProperty] private RemoteSessionViewModel? _session;
+
+    /// <summary>The SSH terminal session, when this is a terminal tab (toolbar bindings).</summary>
+    public Terminal.SshSessionViewModel? TerminalSession => Session as Terminal.SshSessionViewModel;
+
+    /// <summary>The terminal rang its bell or needs attention while this tab wasn't in front (tab badge).</summary>
+    [ObservableProperty] private bool _hasActivity;
     private bool _connectOnLoad;
 
     /// <summary>Next load of a desktop location connects right away (explicit "open desktop"); restored tabs wait for a click.</summary>
     public void RequestConnect() => _connectOnLoad = true;
 
     /// <summary>The native session surface is shown only for the selected tab of its pane, in desktop mode, while connecting/connected.</summary>
-    public bool IsSessionVisible => Mode == TabMode.Desktop && ReferenceEquals(Pane.SelectedTab, this) && Session is { IsSurfaceVisible: true };
+    public bool IsSessionVisible => Mode is TabMode.Desktop or TabMode.Terminal && ReferenceEquals(Pane.SelectedTab, this) && Session is { IsSurfaceVisible: true };
 
     public void NotifySessionVisibility() => OnPropertyChanged(nameof(IsSessionVisible));
 
@@ -202,6 +227,9 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private void ShowDesktop() => _main.OpenCompanion(this, ServerAction.Desktop);
+
+    [RelayCommand]
+    private void ShowTerminal() => _main.OpenCompanion(this, ServerAction.Terminal);
 
     public string StatusText
     {
@@ -264,7 +292,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     {
         FolderLocation f => f.Parent() is { } p ? p : ServerGroupFor(f),
         GroupLocation g => _main.FindGroup(g.GroupId)?.Parent is { } pg ? new GroupLocation(pg.Model.Id) : new HomeLocation(),
-        DesktopLocation => Server?.Parent is { } sg ? new GroupLocation(sg.Model.Id) : new HomeLocation(),
+        DesktopLocation or TerminalLocation => Server?.Parent is { } sg ? new GroupLocation(sg.Model.Id) : new HomeLocation(),
         ViewLocation or SmartGroupLocation => new HomeLocation(),
         _ => null,
     };
@@ -273,7 +301,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     public bool ConfirmLeaveDesktop()
     {
         if (Session is not { IsConnected: true } s) return true;
-        return Dialogs.Confirm(_main.Owner, Loc.T("Desktop.Disconnect"), Loc.F("Desktop.ConfirmLeave", s.Server.Name), Loc.T("Desktop.Disconnect"), danger: false);
+        return Dialogs.Confirm(_main.Owner, Loc.T("Desktop.Disconnect"), s.ConfirmLeaveText, Loc.T("Desktop.Disconnect"), danger: false);
     }
 
     private Location? ServerGroupFor(FolderLocation f)
@@ -355,7 +383,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         UpdateSelectionText();
         _sessionUp = false;
         Server = ResolveServer();
-        if (Current is not DesktopLocation) EndSession();
+        if (Current is not (DesktopLocation or TerminalLocation)) EndSession();
         UpdateConnectedAs();
         RebuildBreadcrumb();
         NotifyChrome();
@@ -372,23 +400,47 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
                 }
                 Dashboard = null;
                 ReplaceItems([]);
-                if (Session is null || !ReferenceEquals(Session.Server, Server))
+                if (Session is not RdpSessionViewModel || !ReferenceEquals(Session.Server, Server))
                 {
                     EndSession();
-                    Session = new RdpSessionViewModel(_main, Server);
-                    Session.PropertyChanged += OnSessionChanged;
-                    Session.FocusReleased += OnSessionFocusReleased;
-                    Session.Activated += OnSessionActivated;
-                    Session.FullScreenRequested += OnSessionFullScreenRequested;
+                    AttachSession(new RdpSessionViewModel(_main, Server));
                 }
                 Mode = TabMode.Desktop;
                 EndLoading();
-                if (_connectOnLoad && !Session.IsConnected && !Session.IsBusy)
+                if (_connectOnLoad && Session is { IsLive: false })
                 {
                     _connectOnLoad = false;
                     Session.Connect();
                 }
                 UpdateConnectedAs();
+                return;
+            case TerminalLocation:
+                if (Server is null)
+                {
+                    Current = new HomeLocation();
+                    await LoadAsync();
+                    return;
+                }
+                Dashboard = null;
+                ReplaceItems([]);
+                _terminalAddress = DescribeTerminalTarget(Server);
+                if (Session is not Terminal.SshSessionViewModel || !ReferenceEquals(Session.Server, Server))
+                {
+                    EndSession();
+                    var terminal = new Terminal.SshSessionViewModel(_main, Server);
+                    terminal.Bell += OnTerminalBell;
+                    terminal.AttentionRequested += OnTerminalAttention;
+                    AttachSession(terminal);
+                }
+                Mode = TabMode.Terminal;
+                EndLoading();
+                if (_connectOnLoad && Session is { IsLive: false })
+                {
+                    _connectOnLoad = false;
+                    Session.Connect();
+                }
+                UpdateConnectedAs();
+                NotifyChrome();
                 return;
             case HomeLocation:
                 ShowDashboard(new DashboardViewModel(Loc.T("Home.Title"), null, _main.RootNodes));
@@ -671,6 +723,35 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     private ServerNodeViewModel? _announcedServer;
 
+    private void AttachSession(RemoteSessionViewModel session)
+    {
+        session.PropertyChanged += OnSessionChanged;
+        session.FocusReleased += OnSessionFocusReleased;
+        session.Activated += OnSessionActivated;
+        session.FullScreenRequested += OnSessionFullScreenRequested;
+        Session = session;
+    }
+
+    private string? DescribeTerminalTarget(ServerNodeViewModel server)
+    {
+        try { return _main.Ssh.Resolve(server.Server).Display; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { return null; }
+    }
+
+    private void OnTerminalBell(object? sender, EventArgs e)
+    {
+        if (!ReferenceEquals(Pane.SelectedTab, this) || !_main.IsWindowActive) HasActivity = true;
+        if (!_main.IsWindowActive) _main.FlashWindow();
+    }
+
+    private void OnTerminalAttention(object? sender, string message)
+    {
+        if (ReferenceEquals(Pane.SelectedTab, this) && _main.IsWindowActive) return;
+        HasActivity = true;
+        _svc.Toasts.Show(message, ToastKind.Info, Loc.T("Term.Attention.Show"), () => _main.RevealTab(this));
+        if (!_main.IsWindowActive) _main.FlashWindow();
+    }
+
     private void EndSession()
     {
         if (Session is null) return;
@@ -679,6 +760,11 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         Session.FocusReleased -= OnSessionFocusReleased;
         Session.Activated -= OnSessionActivated;
         Session.FullScreenRequested -= OnSessionFullScreenRequested;
+        if (Session is Terminal.SshSessionViewModel terminal)
+        {
+            terminal.Bell -= OnTerminalBell;
+            terminal.AttentionRequested -= OnTerminalAttention;
+        }
         if (IsFullScreen) _main.SetFullScreen(this, false);
         Session.Dispose();
         Session = null;
@@ -687,11 +773,16 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     private void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(RdpSessionViewModel.State) && IsFullScreen && Session is not { IsConnected: true })
+        // Both session kinds name their state property "State".
+        if (e.PropertyName is "State" && IsFullScreen && Session is RdpSessionViewModel { IsConnected: false })
             _main.SetFullScreen(this, false); // disconnected/failed: bring the window back to show what happened
-        if (e.PropertyName is nameof(RdpSessionViewModel.State) && Session?.State is DesktopState.Connected or DesktopState.Idle or DesktopState.Error)
+        if (e.PropertyName is "State" && Session is { IsBusy: false })
             _main.NotifyConnectionsChanged();
-        if (e.PropertyName is nameof(RdpSessionViewModel.State) or nameof(RdpSessionViewModel.ConnectedAs))
+        if (e.PropertyName is nameof(Terminal.SshSessionViewModel.RemoteTitle))
+            OnPropertyChanged(nameof(TabToolTip));
+        if (e.PropertyName is nameof(RemoteSessionViewModel.IsSurfaceVisible))
+            NotifySessionVisibility();
+        if (e.PropertyName is "State" or nameof(RemoteSessionViewModel.ConnectedAs))
         {
             NotifySessionVisibility();
             UpdateConnectedAs();
@@ -715,11 +806,16 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     partial void OnModeChanged(TabMode value) => NotifySessionVisibility();
 
-    partial void OnSessionChanged(RdpSessionViewModel? value) => NotifySessionVisibility();
+    partial void OnSessionChanged(RemoteSessionViewModel? value)
+    {
+        NotifySessionVisibility();
+        OnPropertyChanged(nameof(TerminalSession));
+    }
 
     private ServerNodeViewModel? ResolveServer()
     {
         if (Current is DesktopLocation d) return _main.FindServer(d.ServerId);
+        if (Current is TerminalLocation tl) return _main.FindServer(tl.ServerId);
         if (Folder is not { IsUnc: true } f) return null;
         var node = _svc.State.FindServerForPath(f.Path);
         return node is null ? null : _main.FindServer(node.Id);
@@ -728,7 +824,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     public void RefreshIdentity()
     {
         Server = ResolveServer();
-        if (Current is DesktopLocation && Server is null)
+        if (Current is DesktopLocation or TerminalLocation && Server is null)
         {
             // The server was deleted: end its session and leave (LoadAsync sends a desktop without a server Home).
             EndSession();
@@ -742,9 +838,9 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     private void UpdateConnectedAs()
     {
-        if (Current is DesktopLocation)
+        if (Current is DesktopLocation or TerminalLocation)
         {
-            ConnectedAs = Session is { State: DesktopState.Connected or DesktopState.Connecting } s ? s.ConnectedAs : "";
+            ConnectedAs = Session is { IsLive: true } s ? s.ConnectedAs : "";
             return;
         }
         if (Folder is not { IsUnc: true })
@@ -845,7 +941,11 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(Health));
         OnPropertyChanged(nameof(IsLocal));
         OnPropertyChanged(nameof(IsDesktop));
+        OnPropertyChanged(nameof(IsTerminal));
+        OnPropertyChanged(nameof(IsRemote));
+        OnPropertyChanged(nameof(IsFilesView));
         OnPropertyChanged(nameof(ShowViewSwitch));
+        OnPropertyChanged(nameof(TabToolTip));
         BackCommand.NotifyCanExecuteChanged();
         _main.NotifyActiveTabChrome(this);
     }

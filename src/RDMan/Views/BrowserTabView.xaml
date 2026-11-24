@@ -212,6 +212,32 @@
                 </Grid>
             </Button>
         </DataTemplate>
+        <Style x:Key="StatChip" TargetType="Border">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Background" Value="{DynamicResource Bg.Hover}" />
+        </Style>
+        <Style x:Key="StatLabel" TargetType="TextBlock" BasedOn="{StaticResource Text.Caption}">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Foreground" Value="{DynamicResource Fg.Tertiary}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <!-- Tag = "warn" / "danger" (from the session's thresholds) tints the value. -->
+        <Style x:Key="StatValue" TargetType="TextBlock" BasedOn="{StaticResource Text.Mono}">
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="Foreground" Value="{DynamicResource Fg.Secondary}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="warn">
+                    <Setter Property="Foreground" Value="{DynamicResource Status.Warn}" />
+                </Trigger>
+                <Trigger Property="Tag" Value="danger">
+                    <Setter Property="Foreground" Value="{DynamicResource Danger}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
 
     <Grid x:Name="RootGrid">
@@ -279,23 +305,31 @@
                             Visibility="{Binding ShowViewSwitch, Converter={StaticResource Vis}}">
                         <StackPanel Orientation="Horizontal">
                             <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowFilesCommand}" AutomationProperties.Name="{ui:Tr Cap.Files}"
-                                    ui:Ui.IsOn="{Binding IsDesktop, Converter={StaticResource Not}}" ToolTip="{ui:Tr Cap.Files}">
+                                    ui:Ui.IsOn="{Binding IsFilesView}" ToolTip="{ui:Tr Cap.Files}"
+                                    Visibility="{Binding Server.HasFiles, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock x:Name="FilesIcon" Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
                                     <TextBlock x:Name="FilesLabel" Text="{ui:Tr Cap.Files}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
                             <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowDesktopCommand}" ui:Ui.IsOn="{Binding IsDesktop}" AutomationProperties.Name="{ui:Tr Cap.Desktop}"
-                                    ToolTip="{ui:Tr Cap.Desktop}">
+                                    ToolTip="{ui:Tr Cap.Desktop}" Visibility="{Binding Server.HasDesktop, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock x:Name="DesktopIcon" Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
                                     <TextBlock x:Name="DesktopLabel" Text="{ui:Tr Cap.Desktop}" VerticalAlignment="Center" />
                                 </StackPanel>
                             </Button>
+                            <Button Style="{StaticResource Btn.Segment}" Command="{Binding ShowTerminalCommand}" ui:Ui.IsOn="{Binding IsTerminal}" AutomationProperties.Name="{ui:Tr Cap.Terminal}"
+                                    ToolTip="{ui:Tr Cap.Terminal}" Visibility="{Binding Server.HasTerminal, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="TerminalIcon" Text="&#xE756;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,6,0" />
+                                    <TextBlock x:Name="TerminalLabel" Text="{ui:Tr Cap.Terminal}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </Border>
                     <Button x:Name="IdentityExplorer" Style="{StaticResource Btn.Icon}" Content="&#xEC50;" ToolTip="{ui:Tr Nav.OpenExplorer}" Command="{Binding OpenInExplorerCommand}"
-                            Visibility="{Binding IsDesktop, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+                            Visibility="{Binding IsRemote, Converter={StaticResource Vis}, ConverterParameter=invert}" />
                     <Button Style="{StaticResource Btn.Icon}" Content="&#xE70F;" ToolTip="{ui:Tr Tree.Ctx.Properties}" Click="EditServer_Click"
                             Visibility="{Binding Server, Converter={StaticResource VisIfAny}}" />
                 </StackPanel>
@@ -326,8 +360,103 @@
                        Visibility="{Binding Session.IsConnected, Converter={StaticResource Vis}}" TextTrimming="CharacterEllipsis" />
         </Grid>
 
+        <!-- ═══════════ Terminal toolbar ═══════════ -->
+        <Grid x:Name="TerminalBar" Grid.Row="1" Height="46" Margin="8,0,8,0" Visibility="{Binding IsTerminal, Converter={StaticResource Vis}}"
+              DataContext="{Binding}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE72B;" Command="{Binding BackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip="{ui:Tr Nav.Back}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE72A;" Command="{Binding ForwardCommand}" IsEnabled="{Binding CanGoForward}" ToolTip="{ui:Tr Nav.Forward}" />
+                <Border Width="1" Height="18" Background="{DynamicResource Line}" Margin="6,0" />
+                <Button x:Name="TerminalFocusTarget" Style="{StaticResource Btn.Icon}" Content="&#xE72C;" Command="{Binding TerminalSession.ReconnectCommand}" ToolTip="{ui:Tr Desktop.Reconnect}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE721;" Command="{Binding TerminalSession.SearchCommand}" ToolTip="{ui:Tr Term.Tip.Search}"
+                        IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE8C8;" Command="{Binding TerminalSession.CopyLastOutputCommand}" ToolTip="{ui:Tr Term.Tip.CopyOutput}"
+                        IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE74E;" Command="{Binding TerminalSession.SaveOutputCommand}" ToolTip="{ui:Tr Term.Tip.Save}"
+                        IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE740;" Command="{Binding TerminalSession.FullScreenCommand}" ToolTip="{ui:Tr Desktop.FullScreen}"
+                        IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE7E8;" Command="{Binding TerminalSession.DisconnectCommand}" ToolTip="{ui:Tr Desktop.Disconnect}"
+                        IsEnabled="{Binding TerminalSession.IsLive, FallbackValue=False}" />
+            </StackPanel>
+
+            <!-- Port forwards: one chip each, live state, menu on click -->
+            <ItemsControl Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center" ItemsSource="{Binding TerminalSession.Forwards}" Focusable="False" ClipToBounds="True">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button x:Name="Chip" Style="{StaticResource Btn.Subtle}" Height="26" Padding="8,0" Margin="0,0,6,0" ToolTip="{Binding ToolTip}" Click="ForwardChip_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="Dot" Width="7" Height="7" Fill="{DynamicResource Status.Unknown}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Label}" Style="{StaticResource Text.Mono}" FontSize="11.5" Margin="7,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsListening}" Value="True">
+                                <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource Status.Online}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                <Setter TargetName="Dot" Property="Fill" Value="{DynamicResource Status.Offline}" />
+                            </DataTrigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Live server stats (Linux), or the connection state -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,6,0" DataContext="{Binding TerminalSession}">
+                <TextBlock Text="{Binding StateText}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center"
+                           Visibility="{Binding HasStats, Converter={StaticResource Vis}, ConverterParameter=invert, FallbackValue=Collapsed}" />
+                <StackPanel x:Name="StatsPanel" Orientation="Horizontal" Visibility="{Binding HasStats, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
+                    <TextBlock x:Name="StatsOs" Text="{Binding OsName}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="0,0,12,0"
+                               MaxWidth="180" TextTrimming="CharacterEllipsis" ToolTip="{Binding OsName}" />
+                    <Border Style="{StaticResource StatChip}" ToolTip="{ui:Tr Term.Stats.Cpu}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="CPU" Style="{StaticResource StatLabel}" />
+                            <Polyline Points="{Binding CpuSparkline}" Stroke="{DynamicResource Accent}" StrokeThickness="1.25" Width="40" Height="14"
+                                      Margin="6,0" VerticalAlignment="Center" StrokeLineJoin="Round" />
+                            <TextBlock Text="{Binding CpuPercent, StringFormat={}{0:0}%}" Style="{StaticResource StatValue}" Tag="{Binding CpuLevel}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatChip}" ToolTip="{Binding MemText}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="RAM" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{Binding MemPercent, StringFormat={}{0:0}%}" Style="{StaticResource StatValue}" Margin="6,0,0,0" Tag="{Binding MemLevel}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatChip}" ToolTip="{Binding DiskText}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="/" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{Binding DiskPercent, StringFormat={}{0:0}%}" Style="{StaticResource StatValue}" Margin="6,0,0,0" Tag="{Binding DiskLevel}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatChip}" ToolTip="{ui:Tr Term.Stats.Load}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{ui:Tr Term.Stats.LoadShort}" Style="{StaticResource StatLabel}" />
+                            <TextBlock Text="{Binding LoadText}" Style="{StaticResource StatValue}" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource StatChip}" ToolTip="{ui:Tr Term.Stats.Uptime}" Margin="0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE823;" Style="{StaticResource Icon}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding UptimeText}" Style="{StaticResource StatValue}" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+
         <!-- ═══════════ Toolbar ═══════════ -->
-        <Grid Grid.Row="1" Height="46" Margin="8,0,8,0" Visibility="{Binding IsDesktop, Converter={StaticResource Vis}, ConverterParameter=invert}">
+        <Grid Grid.Row="1" Height="46" Margin="8,0,8,0" Visibility="{Binding IsRemote, Converter={StaticResource Vis}, ConverterParameter=invert}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -407,15 +536,15 @@
             <StackPanel x:Name="IdlePanel" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460" Margin="32"
                         Visibility="{Binding Session.ShowIdle, Converter={StaticResource Vis}, FallbackValue=Collapsed}">
                 <Border x:Name="IdleIcon" Width="64" Height="64" CornerRadius="32" Background="{DynamicResource Accent.Subtle}" HorizontalAlignment="Center">
-                    <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="26" Foreground="{DynamicResource Accent.Text}" />
+                    <TextBlock Text="{Binding Session.IdleGlyph}" Style="{StaticResource Icon}" FontSize="26" Foreground="{DynamicResource Accent.Text}" />
                 </Border>
                 <TextBlock Style="{StaticResource Text.Title}" HorizontalAlignment="Center" Margin="0,18,0,8" TextAlignment="Center" TextWrapping="Wrap"
                            Text="{Binding Session.Server.Name}" />
-                <TextBlock x:Name="IdleBody" Text="{ui:Tr Desktop.Idle.Body}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" TextWrapping="Wrap" />
+                <TextBlock x:Name="IdleBody" Text="{Binding Session.IdleText}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" TextWrapping="Wrap" />
                 <Button Style="{StaticResource Btn.Primary}" HorizontalAlignment="Center" Margin="0,20,0,0" MinWidth="140" Height="36"
                         Command="{Binding Session.ConnectCommand}" AutomationProperties.Name="{ui:Tr Desktop.Connect}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                        <TextBlock Text="{Binding Session.IdleGlyph}" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
                         <TextBlock Text="{ui:Tr Desktop.Connect}" />
                     </StackPanel>
                 </Button>

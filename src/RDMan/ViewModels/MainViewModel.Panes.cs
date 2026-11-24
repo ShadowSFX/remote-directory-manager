@@ -248,10 +248,12 @@ public sealed partial class MainViewModel
         Location location = tab?.Current switch
         {
             DesktopLocation => tab.Server is { HasFiles: true } s ? new FolderLocation(s.RootPath) : new HomeLocation(),
+            TerminalLocation tl => tl, // a second shell on the same server
             { } current => current,
             null => new HomeLocation(),
         };
-        SplitPane(pane, side, p => p.AddTab(location));
+        // A terminal split opens a second, connected shell (like duplicating a terminal tab).
+        SplitPane(pane, side, p => p.AddTab(location, configure: location is TerminalLocation ? t => t.RequestConnect() : null));
     }
 
     [RelayCommand]
