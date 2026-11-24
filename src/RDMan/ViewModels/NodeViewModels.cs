@@ -118,6 +118,8 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     public int DesktopPort => Server.Desktop?.Port ?? DesktopEndpoint.DefaultPort;
     public ServerAction DefaultAction => Server.EffectiveDefaultAction;
     public bool IsFavorite => Server.IsFavorite;
+    /// <summary>The tree shows the address next to the name, unless the name already is the address.</summary>
+    public bool ShowHostInTree => !string.Equals(Name, Host, StringComparison.OrdinalIgnoreCase);
 
     private System.Windows.Media.ImageSource? _thumbnail;
 

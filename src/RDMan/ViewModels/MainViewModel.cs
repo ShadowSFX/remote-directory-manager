@@ -358,7 +358,11 @@ public sealed partial class MainViewModel : ObservableObject
         if (node is null) return;
         foreach (var a in node.Ancestors()) a.IsExpanded = true;
         node.IsSelected = true;
+        RevealInTree?.Invoke(this, node);
     }
+
+    /// <summary>The tree should scroll to this node (it may be virtualized away and have no row yet).</summary>
+    public event EventHandler<NodeViewModel>? RevealInTree;
 
     public void CheckHealth(ServerNodeViewModel server)
     {

@@ -14,7 +14,50 @@ public partial class SidebarView : UserControl
     private bool _dragging;
     private NodeViewModel? _dropHighlight;
 
-    public SidebarView() => InitializeComponent();
+    public SidebarView()
+    {
+        InitializeComponent();
+        DataContextChanged += (_, e) =>
+        {
+            if (e.OldValue is MainViewModel old) old.RevealInTree -= OnRevealInTree;
+            if (e.NewValue is MainViewModel vm) vm.RevealInTree += OnRevealInTree;
+        };
+    }
+
+    private void OnRevealInTree(object? sender, NodeViewModel node)
+        => Dispatcher.BeginInvoke(() => Reveal(node), System.Windows.Threading.DispatcherPriority.Background);
+
+    /// <summary>
+    /// Scrolls the (virtualized) tree to a node: realizes the row of every ancestor in turn — asking the panel to
+    /// bring its index into view when the row doesn't exist yet — then brings the node's row into view.
+    /// </summary>
+    private void Reveal(NodeViewModel node)
+    {
+        ItemsControl parent = Tree;
+        foreach (var step in node.Ancestors().Reverse().Cast<NodeViewModel>().Append(node))
+        {
+            if (Realize(parent, step) is not { } row) return;
+            if (ReferenceEquals(step, node))
+            {
+                row.BringIntoView();
+                return;
+            }
+            row.IsExpanded = true;
+            parent = row;
+        }
+    }
+
+    private static TreeViewItem? Realize(ItemsControl parent, object item)
+    {
+        if (parent.ItemContainerGenerator.ContainerFromItem(item) is TreeViewItem ready) return ready;
+        var index = parent.Items.IndexOf(item);
+        if (index < 0) return null;
+        parent.ApplyTemplate();
+        parent.UpdateLayout();
+        if (Ui.FindDescendant<VirtualizingStackPanel>(parent) is { } panel) panel.BringIndexIntoViewPublic(index);
+        parent.UpdateLayout();
+        return parent.ItemContainerGenerator.ContainerFromItem(item) as TreeViewItem;
+    }
 
     private MainViewModel Vm => (MainViewModel)DataContext;
 
