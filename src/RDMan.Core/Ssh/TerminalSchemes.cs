@@ -32,11 +32,13 @@ public static class TerminalSchemes
             "#4A5262", "#FF7A77", "#6FDC92", "#F2C462", "#8FB2FF", "#D6A6FF", "#6ADBE8", "#F4F6FA",
         ]);
 
+    // Like every light scheme, "white" is light: text drawn in it on the white background is kept readable by the
+    // contrast floor (RecommendedMinimumContrast), and light-on-dark segments (prompts, status bars) stay crisp.
     public static readonly TerminalScheme Day = new(DayId, "RDMan Day", false,
         "#FFFFFF", "#1F2430", "#4F5BD5", "#4F5BD540",
         [
-            "#191D25", "#C8323A", "#1E8A46", "#9A6A12", "#2F5FD0", "#8E44C4", "#0E7F92", "#A8AEB9",
-            "#4E5767", "#D63C3C", "#23A055", "#B7791F", "#4F5BD5", "#A35AD8", "#138FA5", "#7D8595",
+            "#191D25", "#C8323A", "#1E8A46", "#9A6A12", "#2F5FD0", "#8E44C4", "#0E7F92", "#E4E7EC",
+            "#4E5767", "#D63C3C", "#23A055", "#B7791F", "#4F5BD5", "#A35AD8", "#138FA5", "#FFFFFF",
         ]);
 
     public static readonly IReadOnlyList<TerminalScheme> All =

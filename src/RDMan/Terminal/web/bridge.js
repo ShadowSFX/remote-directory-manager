@@ -22,6 +22,7 @@
   let bell = 'visual';
   let baseFontSize = 13;
   let zoom = 0;
+  let themeContrast = 1;
   let resizeTimer = 0;
   let lastSize = '';
   let pendingAck = 0;
@@ -73,7 +74,7 @@
       cursorBlink: options.cursorBlink !== false,
       cursorInactiveStyle: 'outline',
       scrollback: options.scrollback ?? 10000,
-      minimumContrastRatio: options.minimumContrast || 1,
+      minimumContrastRatio: Math.max(options.minimumContrast || 1, (msg.theme && msg.theme.minimumContrast) || 1),
       wordSeparator: options.wordSeparators,
       customGlyphs: true,
       rescaleOverlappingGlyphs: true,
@@ -192,7 +193,7 @@
     term.options.cursorStyle = options.cursor || 'bar';
     term.options.cursorBlink = options.cursorBlink !== false;
     term.options.scrollback = options.scrollback ?? 10000;
-    term.options.minimumContrastRatio = options.minimumContrast || 1;
+    term.options.minimumContrastRatio = Math.max(options.minimumContrast || 1, themeContrast);
     if (options.wordSeparators !== undefined) term.options.wordSeparator = options.wordSeparators;
     setRenderer(options.renderer || 'gpu');
     applyBehavior(options);
@@ -204,10 +205,10 @@
     if (!theme) return;
     const root = document.documentElement.style;
     for (const [k, v] of Object.entries(theme.css || {})) root.setProperty(k, v);
+    themeContrast = theme.minimumContrast || 1;
     if (term && theme.xterm) {
       term.options.theme = theme.xterm;
-      if (term.options.minimumContrastRatio !== theme.minimumContrast && theme.minimumContrast)
-        term.options.minimumContrastRatio = theme.minimumContrast;
+      term.options.minimumContrastRatio = Math.max(options.minimumContrast || 1, themeContrast);
     }
   }
 
