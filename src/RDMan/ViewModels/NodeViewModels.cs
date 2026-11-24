@@ -122,9 +122,13 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     public int CapabilityCount => Server.CapabilityCount;
     public int DesktopPort => Server.Desktop?.Port ?? DesktopEndpoint.DefaultPort;
     public ServerAction DefaultAction => Server.EffectiveDefaultAction;
+    // The tree highlights the badge a click opens, only when there's a choice.
+    public bool FilesIsDefault => CapabilityCount > 1 && DefaultAction == ServerAction.Files;
+    public bool DesktopIsDefault => CapabilityCount > 1 && DefaultAction == ServerAction.Desktop;
+    public bool TerminalIsDefault => CapabilityCount > 1 && DefaultAction == ServerAction.Terminal;
     public bool IsFavorite => Server.IsFavorite;
-    /// <summary>The tree shows the address next to the name, unless the name already is the address.</summary>
-    public bool ShowHostInTree => !string.Equals(Name, Host, StringComparison.OrdinalIgnoreCase);
+    /// <summary>The tree row shows only the alias (full width); the address only when there's no alias.</summary>
+    public string TreeLabel => string.IsNullOrWhiteSpace(Name) ? Host : Name;
 
     private System.Windows.Media.ImageSource? _thumbnail;
 
