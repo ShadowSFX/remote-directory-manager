@@ -88,7 +88,7 @@ public partial class MainWindow
                 else _vm.MoveTabToNewPane(tab, target.Pane, target.Side);
                 break;
             case NodeViewModel node:
-                _vm.OpenNodeAt(node, target.Pane, target.StripIndex is null ? target.Side : DropSide.Center);
+                _vm.OpenNodeAt(node, target.Pane, target.StripIndex is null ? target.Side : DropSide.Center, target.StripIndex);
                 break;
         }
     }

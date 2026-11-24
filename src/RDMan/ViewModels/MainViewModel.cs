@@ -505,9 +505,12 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Opens in the pane used before this one; with a single pane, splits it to the right.</summary>
     public void OpenInOtherPane(Location location, PaneViewModel from, Action<BrowserTabViewModel>? configure = null)
     {
+        ExitFullScreen(); // the other pane is hidden while one session fills the screen
         if (OtherPane(from) is not { } other)
         {
-            SplitPane(from, Core.Layout.DropSide.Right, p => p.AddTab(location, configure: configure));
+            // No other pane yet: split to the right; if there's no room for that, at least open it here.
+            if (SplitPane(from, Core.Layout.DropSide.Right, p => p.AddTab(location, configure: configure), quiet: true) is null)
+                OpenInNewTab(location, from, configure);
             return;
         }
         if (other.SelectedTab is null || other.SelectedTab.Session is { IsConnected: true })

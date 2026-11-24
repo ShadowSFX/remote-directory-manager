@@ -14,10 +14,14 @@ Portable WPF (.NET 9) app: RDCMan-style tree of SMB servers + tabbed/split file 
 
 ## Remote desktop
 - Sessions: `ViewModels/RdpSessionViewModel.cs` wraps RoyalApps `RdpControl` (MsRdpEx legacy COM interop: `MsRdpExComInterop=Legacy`, `MsRdpExGeneratedWinForms=false` in the csproj) inside a `WindowsFormsHost`.
-- The ActiveX dies if re-parented: `PaneView.SessionLayer` keeps every tab's host alive and only toggles visibility; never move a session host to another parent.
+- The ActiveX dies if re-parented. Every tab's host lives in the window-level `SessionOverlay` (MainWindow) bound to `MainViewModel.LiveTabs`, which is append/remove only (never Move/Clear/sort/CollectionView, never re-template the overlay); `PositionSessions` places each host over its pane's content area. Moving tabs or rebuilding the pane grid must never touch that collection.
 - A session HWND paints over WPF content (airspace). Anything that must appear above a session (palette, toasts) lives in a `Popup`.
 - RoyalApps raises OnConnected/OnDisconnected with the inner client as sender: bind handlers per control (see RdpSessionViewModel.Connect).
 - Verify RDP changes against a real Windows server (unit tests can't cover the ActiveX).
+
+## Pane grid
+- `RDMan.Core/Layout/PaneLayout.cs` is the split tree (tested); `MainViewModel.Panes.cs` owns panes, MRU "other pane", split/close/move; `Views/PaneLayoutHost.cs` renders it and caches one `PaneView` per pane.
+- Drag & drop of tabs/tree nodes: `Views/PaneDragSession.cs` + `MainWindow.PaneDrag.cs`. The drop overlay Popup is the drop target (works over sessions); actions run after `DoDragDrop` returns.
 
 ## Conventions
 - Never edit source files through Windows PowerShell 5.1 `Get-Content/Set-Content` (it corrupts UTF-8). Use the editor tools or Python.

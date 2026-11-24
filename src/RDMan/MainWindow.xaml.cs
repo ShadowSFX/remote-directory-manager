@@ -136,8 +136,10 @@ public partial class MainWindow : Window
     private void UpdateMinimumSize()
     {
         var grid = LayoutHost.MinimumSize;
-        MinWidth = Math.Max(760, SidebarColumn.ActualWidth + 6 + grid.Width + 2);
-        MinHeight = Math.Max(460, 40 + 28 + grid.Height + 2);
+        var sidebar = _restore is not null ? 0 : SidebarColumn.Width.IsAbsolute ? SidebarColumn.Width.Value : SidebarColumn.ActualWidth;
+        var area = SystemParameters.WorkArea;
+        MinWidth = Math.Min(area.Width, Math.Max(760, sidebar + 6 + grid.Width + 2));
+        MinHeight = Math.Min(area.Height, Math.Max(460, 40 + 28 + grid.Height + 2));
     }
 
     /// <summary>Gives the keyboard to a pane's content (its file list, else the pane itself).</summary>
@@ -258,6 +260,7 @@ public partial class MainWindow : Window
             if (r.State == WindowState.Maximized) WindowState = WindowState.Maximized;
             UpdateMaximizeState();
             LayoutHost.Zoom(null);
+            UpdateMinimumSize();
         }
     }
 
@@ -469,6 +472,7 @@ public partial class MainWindow : Window
     {
         _vm.State.Settings.SidebarWidth = SidebarColumn.ActualWidth;
         _vm.State.MarkSettingsDirty();
+        UpdateMinimumSize();
     }
 
     // ───────────── Menu ─────────────

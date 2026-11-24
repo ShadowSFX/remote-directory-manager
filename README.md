@@ -27,7 +27,7 @@
 - **Nombres en vez de IPs.** Cada servidor tiene nombre, color de identificación, etiquetas y notas. La franja superior de cada pestaña te dice siempre en qué servidor estás, con qué usuario y con qué latencia.
 - **Grupos y subgrupos** (cliente, ambiente, datacenter) con **credenciales heredadas**, igual que RDCMan. También credenciales guardadas reutilizables, invitado o tu usuario de Windows.
 - **Copiar y pegar idéntico a Windows.** Usa el mismo motor que el Explorador: el diálogo de progreso, la resolución de conflictos, la papelera, `Ctrl+C`/`Ctrl+X`/`Ctrl+V` entre RDMan y el Explorador en ambos sentidos, y arrastrar y soltar desde o hacia el escritorio.
-- **Pestañas y doble panel** (`F3`) para copiar entre servidores o desde tu PC.
+- **Paneles como VS Code.** Arrastra una pestaña (o un servidor del árbol) al borde de un panel para dividirlo a ese lado, al centro para moverla ahí, o a una tira de pestañas para reordenar. Tantos paneles como quepan, en filas y columnas; un escritorio remoto se mueve entre paneles sin desconectarse. `F3` divide a la derecha y el diseño se recuerda al reabrir.
 - **Estado en vivo.** Cada servidor muestra si responden sus archivos (puerto 445) y su escritorio (puerto RDP), con la latencia real; los grupos se ven como tarjetas.
 - **`Ctrl+K`** para saltar a cualquier servidor por nombre, IP, etiqueta o grupo.
 - **Importa** las conexiones que Windows ya conoce (`net use`) o una colección `.rdm`.
@@ -42,7 +42,7 @@
 |---|---|
 | `Ctrl+K` | Buscar conexión |
 | `Ctrl+T` / `Ctrl+W` | Nueva pestaña / cerrar pestaña |
-| `F3` / `F6` | Doble panel / cambiar de panel |
+| `F3` / `F6` | Dividir a la derecha / pasar al siguiente panel |
 | `Alt+←` `Alt+→` `Alt+↑` `Retroceso` | Atrás, adelante, subir |
 | `Ctrl+L` | Escribir una ruta (o el nombre de un servidor) |
 | `Ctrl+F` | Filtrar la carpeta |

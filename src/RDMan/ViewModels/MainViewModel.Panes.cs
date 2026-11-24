@@ -102,27 +102,42 @@ public sealed partial class MainViewModel
     /// Opens a new pane next to <paramref name="target"/>. <paramref name="fill"/> puts its first tab in (a moved
     /// tab, or a location); without one the pane starts at Home. Null when the grid is full.
     /// </summary>
-    public PaneViewModel? SplitPane(PaneViewModel target, DropSide side, Action<PaneViewModel>? fill = null)
+    public PaneViewModel? SplitPane(PaneViewModel target, DropSide side, Action<PaneViewModel>? fill = null,
+        bool quiet = false, bool homeIfEmpty = true)
     {
         if (side == DropSide.Center || !Panes.Contains(target)) return null;
         if (Panes.Count >= PaneLayout.MaxPanes)
         {
-            Toasts.Show(Loc.F("Pane.Max", PaneLayout.MaxPanes));
+            if (!quiet) Toasts.Show(Loc.F("Pane.Max", PaneLayout.MaxPanes));
             return null;
+        }
+        // Measure the grid as it will be: full screen shows a single, monitor-sized pane.
+        if (FullScreenTab is not null)
+        {
+            ExitFullScreen();
+            Owner?.UpdateLayout();
         }
         if (CanSplitPane?.Invoke(target, side) == false)
         {
-            Toasts.Show(Loc.T("Pane.NoRoom"));
+            if (!quiet) Toasts.Show(Loc.T("Pane.NoRoom"));
             return null;
         }
-        ExitFullScreen();
         var pane = CreatePane();
         LayoutChanging?.Invoke(this, EventArgs.Empty);
         Layout.Split(target.Id, pane.Id, side);
         Panes.Add(pane);
         RaiseLayoutChanged();
         fill?.Invoke(pane);
-        if (pane.Tabs.Count == 0) pane.AddTab(new HomeLocation());
+        if (pane.Tabs.Count == 0)
+        {
+            if (!homeIfEmpty)
+            {
+                // The fill showed something that already lives elsewhere: no empty pane, no stolen focus.
+                ClosePane(pane);
+                return null;
+            }
+            pane.AddTab(new HomeLocation());
+        }
         Activate(pane);
         return pane;
     }
@@ -191,7 +206,7 @@ public sealed partial class MainViewModel
     /// A server or group dropped from the tree onto a pane: the middle opens it as a new tab there, an edge opens it
     /// in a new pane on that side. A server whose desktop is already open elsewhere just shows that session.
     /// </summary>
-    public void OpenNodeAt(NodeViewModel node, PaneViewModel pane, DropSide side)
+    public void OpenNodeAt(NodeViewModel node, PaneViewModel pane, DropSide side, int? index = null)
     {
         if (!Panes.Contains(pane)) return;
         if (node is ServerNodeViewModel { DefaultAction: Core.Models.ServerAction.Desktop, HasDesktop: true } desktop
@@ -203,14 +218,18 @@ public sealed partial class MainViewModel
         if (side == DropSide.Center)
         {
             Activate(pane);
+            var before = pane.Tabs.ToList();
             OpenNodeHere(node, OpenTarget.NewTab);
+            // Dropped on the tab strip: put the new tab where the marker was.
+            if (index is { } at && pane.Tabs.FirstOrDefault(t => !before.Contains(t)) is { } added)
+                MoveTab(added, pane, Math.Min(at, pane.Tabs.Count));
             return;
         }
         SplitPane(pane, side, p =>
         {
             Activate(p);
             OpenNodeHere(node, OpenTarget.Current);
-        });
+        }, homeIfEmpty: false);
     }
 
     private void OpenNodeHere(NodeViewModel node, OpenTarget target)
@@ -272,6 +291,7 @@ public sealed partial class MainViewModel
     {
         // F6 walks the panes in reading order.
         if (Panes.Count < 2) return;
+        ExitFullScreen();
         var i = Panes.IndexOf(ActivePane);
         var next = Panes[(i + 1) % Panes.Count];
         Activate(next);
