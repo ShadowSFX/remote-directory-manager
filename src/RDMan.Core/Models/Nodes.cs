@@ -43,6 +43,9 @@ public sealed class CredentialProfile
 [JsonDerivedType(typeof(ServerNode), "server")]
 public abstract class TreeNode
 {
+    /// <summary>Properties written by a newer RDMan: kept as-is so saving here never drops them.</summary>
+    [JsonExtensionData] public Dictionary<string, System.Text.Json.JsonElement>? Extra { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
     public string? Description { get; set; }
@@ -120,6 +123,8 @@ public sealed class ConnectionDocument
     public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+    /// <summary>Properties written by a newer RDMan: kept as-is so saving here never drops them.</summary>
+    [JsonExtensionData] public Dictionary<string, System.Text.Json.JsonElement>? Extra { get; set; }
     public GroupNode Root { get; set; } = new() { Name = "root" };
     public List<CredentialProfile> Profiles { get; set; } = new();
 

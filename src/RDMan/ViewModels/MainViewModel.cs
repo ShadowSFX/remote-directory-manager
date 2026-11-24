@@ -733,16 +733,28 @@ public sealed partial class MainViewModel : ObservableObject
         return group;
     }
 
+    /// <summary>Adds several new servers under one group (bulk add) and shows them.</summary>
+    public void AddServers(GroupNodeViewModel? parent, IReadOnlyList<ServerNode> servers)
+    {
+        if (servers.Count == 0) return;
+        if (parent is not null) parent.IsExpanded = true;
+        ServerNodeViewModel? last = null;
+        foreach (var s in servers)
+        {
+            last = (ServerNodeViewModel)CreateVm(s, parent);
+            Insert(last, parent);
+            CheckHealth(last);
+        }
+        Changed();
+        SelectInTree(last);
+    }
+
     /// <summary>Adds a whole imported group (keeping its own credentials and settings) at the top of the tree.</summary>
     public GroupNodeViewModel AddImportedGroup(GroupNode group, IEnumerable<SmartGroup> smartGroups)
     {
         var vm = (GroupNodeViewModel)CreateVm(group, null);
         Insert(vm, null);
-        foreach (var g in smartGroups)
-        {
-            State.Document.SmartGroups.Add(g);
-            SmartGroups.Add(new SmartGroupViewModel(g));
-        }
+        TryAddSmartGroups(smartGroups.ToList());
         Changed();
         foreach (var s in vm.AllServers()) CheckHealth(s);
         SelectInTree(vm);
@@ -779,11 +791,7 @@ public sealed partial class MainViewModel : ObservableObject
         var name = Path.GetFileNameWithoutExtension(dlg.FileName);
         var count = TreeIndex.AllServers(doc.Root).Count();
         AddImported(name, doc.Root.Children);
-        foreach (var g in doc.SmartGroups)
-        {
-            State.Document.SmartGroups.Add(g);
-            SmartGroups.Add(new SmartGroupViewModel(g));
-        }
+        TryAddSmartGroups(doc.SmartGroups);
         RefreshViewCounts();
         Toasts.Show(Loc.F("Toast.Imported", count), ToastKind.Success);
     }

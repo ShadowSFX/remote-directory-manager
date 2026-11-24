@@ -15,23 +15,25 @@ public sealed class RdgImportResult
     public int Groups { get; set; }
     /// <summary>Credentials (on servers, groups or profiles) that came with a password RDMan could decrypt.</summary>
     public int PasswordsRecovered { get; set; }
-    /// <summary>Credentials whose password couldn't be decrypted (other PC/user, certificate encryption): re-enter them.</summary>
+    /// <summary>Credentials RDMan will ask for: undecryptable passwords, or profiles that live outside the file.</summary>
     public int PasswordsToReenter { get; set; }
-    /// <summary>Smart-group rules that used regular expressions and were turned into plain "contains" text.</summary>
+    /// <summary>Smart-group rules that used regular expressions and were turned into plain text.</summary>
     public int RulesSimplified { get; set; }
     /// <summary>Settings RDMan doesn't have (gateway, start program…) found and skipped.</summary>
     public int SettingsSkipped { get; set; }
+    /// <summary>The file was bigger or deeper than RDMan reads; the rest was left out.</summary>
+    public bool Truncated { get; set; }
 }
 
 /// <summary>
 /// Reads Remote Desktop Connection Manager (.rdg) files — schema 3 (RDCMan 2.7+, Sysinternals) and the older 2.2
 /// layout. Parsing is hardened: no DTDs, no external entities, a size cap. Passwords (DPAPI, current user) are handed
-/// to <c>unprotect</c> and re-protected with <c>protect</c>; nothing is ever kept in clear text.
+/// to <c>unprotect</c> and re-protected with <c>protect</c>; nothing is kept in clear text.
 /// </summary>
 public static class RdgImporter
 {
     public const long MaxFileBytes = 20 * 1024 * 1024;
-    private const int MaxNodes = 5000;
+    private const int MaxServersAndGroups = 5000;
     private const int MaxDepth = 30;
 
     public static RdgImportResult Parse(Stream stream, string fallbackName, Func<byte[], string?> unprotect, Func<string, string> protect)
@@ -49,49 +51,67 @@ public static class RdgImporter
         var file = rdc.Element("file") ?? throw new FormatException("The file has no <file> element.");
 
         var ctx = new Context(unprotect, protect);
-        // Credential profiles stored in the file (scope "File").
+        // Credential profiles stored in the file. Passwords are decrypted only for profiles something uses.
         foreach (var p in file.Element("credentialsProfiles")?.Elements("credentialsProfile") ?? [])
         {
             var name = p.Element("profileName")?.Value?.Trim();
-            if (string.IsNullOrEmpty(name)) continue;
-            var profile = new CredentialProfile
-            {
-                Name = name,
-                Username = Join(p.Element("domain")?.Value, p.Element("userName")?.Value) ?? "",
-                ProtectedPassword = ctx.Password(p.Element("password")?.Value),
-            };
-            ctx.Profiles[name] = profile;
+            if (string.IsNullOrEmpty(name) || ctx.FileProfiles.ContainsKey(name)) continue; // first definition wins
+            ctx.FileProfiles[name] = p;
         }
 
         var root = new GroupNode { Name = NameOf(file) ?? fallbackName };
         var result = new RdgImportResult { Root = root };
-        ApplySettings(file, root, ctx);
-        ReadChildren(file, root, ctx, result, 0);
-        result.Profiles.AddRange(ctx.Profiles.Values.Where(p => ctx.UsedProfiles.Contains(p)));
+        var rootPort = ApplySettings(file, root, ctx, inheritedPort: null);
+        ReadChildren(file, root, ctx, result, 0, rootPort);
+        result.Profiles.AddRange(ctx.Profiles.Values);
+        // Smart groups from this file only search the servers that came with it.
+        foreach (var g in result.SmartGroups) g.ScopeId = root.Id;
         result.PasswordsRecovered = ctx.Recovered;
         result.PasswordsToReenter = ctx.Lost;
         result.RulesSimplified = ctx.Simplified;
         result.SettingsSkipped = ctx.Skipped;
+        result.Truncated = ctx.Truncated;
         return result;
     }
 
     private sealed class Context(Func<byte[], string?> unprotect, Func<string, string> protect)
     {
+        public Dictionary<string, XElement> FileProfiles { get; } = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Profiles turned into RDMan credential profiles, by name (created on first use).</summary>
         public Dictionary<string, CredentialProfile> Profiles { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public HashSet<CredentialProfile> UsedProfiles { get; } = new();
         public int Recovered, Lost, Simplified, Skipped, Nodes;
+        public bool Truncated;
 
-        /// <summary>RDCMan stores Base64(DPAPI(UTF-16 text)). Returns RDMan's protected form, or null.</summary>
-        public string? Password(string? base64)
+        public CredentialProfile Profile(string name)
         {
-            if (string.IsNullOrWhiteSpace(base64)) return null;
-            string? clear = null;
-            try
+            if (Profiles.TryGetValue(name, out var existing)) return existing;
+            var p = FileProfiles[name];
+            var profile = new CredentialProfile
             {
-                var bytes = Convert.FromBase64String(base64.Trim());
-                clear = unprotect(bytes);
+                Name = name,
+                Username = Join(p.Element("domain")?.Value, p.Element("userName")?.Value) ?? "",
+                ProtectedPassword = Password(p.Element("password")),
+            };
+            Profiles[name] = profile;
+            return profile;
+        }
+
+        /// <summary>
+        /// RDCMan stores Base64(DPAPI(UTF-16 text)), or the plain text when <c>storeAsClearText="True"</c> (2.2).
+        /// Returns RDMan's protected form, or null (counted as "re-enter").
+        /// </summary>
+        public string? Password(XElement? el)
+        {
+            var value = el?.Value;
+            if (string.IsNullOrEmpty(value)) return null;
+            string? clear = null;
+            if (string.Equals(el!.Attribute("storeAsClearText")?.Value, "True", StringComparison.OrdinalIgnoreCase))
+                clear = value;
+            else
+            {
+                try { clear = unprotect(Convert.FromBase64String(value.Trim())); }
+                catch (FormatException) { }
             }
-            catch (FormatException) { }
             if (clear is null)
             {
                 Lost++;
@@ -102,13 +122,23 @@ public static class RdgImporter
         }
     }
 
-    private static void ReadChildren(XElement parent, GroupNode into, Context ctx, RdgImportResult result, int depth)
+    private static void ReadChildren(XElement parent, GroupNode into, Context ctx, RdgImportResult result, int depth, int? inheritedPort)
     {
-        if (depth > MaxDepth) return;
+        if (depth > MaxDepth)
+        {
+            ctx.Truncated = true;
+            return;
+        }
         foreach (var el in parent.Elements())
         {
-            if (++ctx.Nodes > MaxNodes) return;
-            switch (el.Name.LocalName)
+            var kind = el.Name.LocalName;
+            if (kind is not ("group" or "server" or "smartGroup")) continue;
+            if (++ctx.Nodes > MaxServersAndGroups)
+            {
+                ctx.Truncated = true;
+                return;
+            }
+            switch (kind)
             {
                 case "group":
                     var group = new GroupNode
@@ -116,25 +146,27 @@ public static class RdgImporter
                         Name = NameOf(el) ?? "Group",
                         IsExpanded = !string.Equals(PropertyOf(el, "expanded"), "False", StringComparison.OrdinalIgnoreCase),
                     };
-                    ApplySettings(el, group, ctx);
+                    var groupPort = ApplySettings(el, group, ctx, inheritedPort);
                     into.Children.Add(group);
                     result.Groups++;
-                    ReadChildren(el, group, ctx, result, depth + 1);
+                    ReadChildren(el, group, ctx, result, depth + 1, groupPort);
                     break;
                 case "server":
-                    var host = HostOf(el);
+                    var host = PropertyOf(el, "name");
                     if (string.IsNullOrWhiteSpace(host)) break;
-                    var (h, port) = SplitPort(host.Trim());
+                    var (h, namePort) = SplitPort(host.Trim());
                     var server = new ServerNode
                     {
                         Name = PropertyOf(el, "displayName") is { Length: > 0 } display ? display : h,
                         Host = h,
                         Description = PropertyOf(el, "comment") is { Length: > 0 } c ? c : null,
                         Files = false,
-                        Desktop = new DesktopEndpoint { Enabled = true, Port = port ?? DesktopEndpoint.DefaultPort },
+                        Desktop = new DesktopEndpoint { Enabled = true },
                         DefaultAction = ServerAction.Desktop,
                     };
-                    ApplySettings(el, server, ctx);
+                    // Port: the server's own connection settings, else "host:port", else what its groups set.
+                    var port = ApplySettings(el, server, ctx, inheritedPort: null) ?? namePort ?? inheritedPort;
+                    if (port is { } p) server.Desktop.Port = p;
                     into.Children.Add(server);
                     result.Servers++;
                     break;
@@ -146,14 +178,15 @@ public static class RdgImporter
     }
 
     // ───────────── Settings (inherit="None" means "set here") ─────────────
-    private static void ApplySettings(XElement el, TreeNode node, Context ctx)
+    /// <summary>Applies the node's own settings; returns the RDP port in effect for its children.</summary>
+    private static int? ApplySettings(XElement el, TreeNode node, Context ctx, int? inheritedPort)
     {
+        var port = inheritedPort;
         if (Own(el, "logonCredentials") is { } cred) node.Credentials = Credentials(cred, ctx);
 
         if (Own(el, "connectionSettings") is { } conn)
         {
-            if (node is ServerNode s && int.TryParse(conn.Element("port")?.Value, out var port) && port is > 0 and <= 65535 && s.Desktop is not null)
-                s.Desktop.Port = port;
+            if (int.TryParse(conn.Element("port")?.Value, out var p) && p is > 0 and <= 65535) port = p;
             if (Bool(conn.Element("connectToConsole")) is { } console) node.Rdp.AdminSession = console;
             if (!string.IsNullOrWhiteSpace(conn.Element("startProgram")?.Value)) ctx.Skipped++;
         }
@@ -181,8 +214,7 @@ public static class RdgImporter
             node.Rdp.ColorDepth = depth;
         if (Own(el, "securitySettings") is { } sec)
         {
-            var auth = (sec.Element("authentication")?.Value ?? "").Trim();
-            node.Rdp.ServerCheck = auth switch
+            node.Rdp.ServerCheck = (sec.Element("authentication")?.Value ?? "").Trim() switch
             {
                 "None" or "0" => RdpServerCheck.Skip,
                 "Required" or "Require" or "1" => RdpServerCheck.Require,
@@ -191,31 +223,33 @@ public static class RdgImporter
             };
         }
         if (Own(el, "gatewaySettings") is { } gw && Bool(gw.Element("enabled")) == true) ctx.Skipped++;
+        return node is ServerNode ? (port != inheritedPort ? port : null) : port;
     }
 
     private static CredentialSettings Credentials(XElement cred, Context ctx)
     {
-        var profileName = cred.Element("profileName")?.Value?.Trim() ?? "";
-        var scope = cred.Element("profileName")?.Attribute("scope")?.Value ?? "";
+        var nameEl = cred.Element("profileName");
+        var profileName = nameEl?.Value?.Trim() ?? "";
+        var scope = nameEl?.Attribute("scope")?.Value ?? "";
+        var isCustom = profileName.Length == 0 || string.Equals(profileName, "Custom", StringComparison.OrdinalIgnoreCase);
+        if (!isCustom)
+        {
+            // Scope "File" (or none, 2.2) = a profile defined in this file. "Local"/"Global" profiles live in the
+            // user's RDCMan settings, not in the file.
+            if (!string.Equals(scope, "Local", StringComparison.OrdinalIgnoreCase) && !string.Equals(scope, "Global", StringComparison.OrdinalIgnoreCase)
+                && ctx.FileProfiles.ContainsKey(profileName))
+                return new CredentialSettings { Mode = CredentialMode.Profile, ProfileId = ctx.Profile(profileName).Id };
+            // A profile RDMan can't see. Never fall back to the parent's account for this server: ask instead.
+            ctx.Lost++;
+            return new CredentialSettings { Mode = CredentialMode.Custom, Username = "" };
+        }
         var user = Join(cred.Element("domain")?.Value, cred.Element("userName")?.Value);
-        // A named profile from this file.
-        if (profileName.Length > 0 && !string.Equals(profileName, "Custom", StringComparison.OrdinalIgnoreCase)
-            && ctx.Profiles.TryGetValue(profileName, out var profile))
-        {
-            ctx.UsedProfiles.Add(profile);
-            return new CredentialSettings { Mode = CredentialMode.Profile, ProfileId = profile.Id };
-        }
-        // Custom (or a profile from RDCMan's own global store, which isn't in the file): keep what's written here.
-        if (user is null)
-        {
-            if (scope.Length > 0 && profileName.Length > 0 && !string.Equals(profileName, "Custom", StringComparison.OrdinalIgnoreCase)) ctx.Skipped++;
-            return new CredentialSettings { Mode = CredentialMode.Inherit };
-        }
+        if (user is null) return new CredentialSettings { Mode = CredentialMode.Inherit };
         return new CredentialSettings
         {
             Mode = CredentialMode.Custom,
             Username = user,
-            ProtectedPassword = ctx.Password(cred.Element("password")?.Value),
+            ProtectedPassword = ctx.Password(cred.Element("password")),
         };
     }
 
@@ -228,45 +262,100 @@ public static class RdgImporter
             Name = NameOf(el) ?? "Smart group",
             Match = string.Equals(ruleGroup?.Attribute("operator")?.Value, "Any", StringComparison.OrdinalIgnoreCase) ? SmartMatch.Any : SmartMatch.All,
         };
-        foreach (var rule in ruleGroup?.Elements("rule") ?? [])
+        var rules = (ruleGroup?.Elements("rule") ?? []).ToList();
+        foreach (var rule in rules)
         {
-            if (group.Rules.Count >= SmartGroup.MaxRules) break;
             var value = rule.Element("value")?.Value ?? "";
-            var plain = Unregex(value);
-            if (plain != value) ctx.Simplified++;
-            if (plain.Length == 0) continue;
-            group.Rules.Add(new SmartRule
+            var field = (rule.Element("property")?.Value ?? "").Trim() switch
             {
-                Field = (rule.Element("property")?.Value ?? "").Trim() switch
-                {
-                    "DisplayName" => SmartField.Name,
-                    "Server" or "ServerName" => SmartField.Host,
-                    "Comment" => SmartField.Notes,
-                    "Parent" => SmartField.Group,
-                    _ => SmartField.Any,
-                },
-                Op = string.Equals(rule.Element("operator")?.Value?.Trim(), "DoesNotMatch", StringComparison.OrdinalIgnoreCase) ? SmartOp.NotContains : SmartOp.Contains,
-                Value = plain,
-            });
+                "DisplayName" => SmartField.Name,
+                "Server" or "ServerName" => SmartField.Host,
+                "Comment" => SmartField.Notes,
+                "Parent" => SmartField.Group,
+                _ => SmartField.Any,
+            };
+            var op = string.Equals(rule.Element("operator")?.Value?.Trim(), "DoesNotMatch", StringComparison.OrdinalIgnoreCase) ? SmartOp.NotContains : SmartOp.Contains;
+            // "web|db": alternatives become separate rules when that keeps the meaning (a single "matches" rule).
+            var alternatives = SplitAlternatives(value);
+            if (alternatives.Count > 1 && rules.Count == 1 && op == SmartOp.Contains)
+            {
+                group.Match = SmartMatch.Any;
+                ctx.Simplified++;
+            }
+            else if (alternatives.Count > 1)
+            {
+                alternatives = [alternatives[0]];
+                ctx.Simplified++;
+            }
+            foreach (var alt in alternatives)
+            {
+                if (group.Rules.Count >= SmartGroup.MaxRules) break;
+                var plain = Unregex(alt);
+                if (plain != alt) ctx.Simplified++;
+                if (plain.Length == 0) continue;
+                group.Rules.Add(new SmartRule { Field = field, Op = op, Value = plain });
+            }
         }
         return group;
     }
 
-    /// <summary>RDCMan rules are regular expressions; keep the literal text ("^web.*" → "web").</summary>
+    private static List<string> SplitAlternatives(string pattern)
+    {
+        var parts = new List<string>();
+        var depth = 0;
+        var start = 0;
+        for (var i = 0; i < pattern.Length; i++)
+        {
+            var c = pattern[i];
+            if (c == '\\') { i++; continue; }
+            if (c is '(' or '[') depth++;
+            else if (c is ')' or ']') depth = Math.Max(0, depth - 1);
+            else if (c == '|' && depth == 0)
+            {
+                parts.Add(pattern[start..i]);
+                start = i + 1;
+            }
+        }
+        parts.Add(pattern[start..]);
+        return parts.Where(p => p.Trim().Length > 0).ToList();
+    }
+
+    /// <summary>
+    /// RDCMan rules are regular expressions; keep the literal text: "^web.*" → "web", "srv01.contoso.com" stays,
+    /// "web[0-9]+" → "web", "db\.prod" → "db.prod".
+    /// </summary>
     public static string Unregex(string pattern)
     {
         var sb = new StringBuilder();
         for (var i = 0; i < pattern.Length; i++)
         {
             var c = pattern[i];
-            if (c == '\\' && i + 1 < pattern.Length)
+            switch (c)
             {
-                var next = pattern[++i];
-                if (!char.IsLetterOrDigit(next)) sb.Append(next); // \. → .   (\d, \w… are classes: dropped)
-                continue;
+                case '\\' when i + 1 < pattern.Length:
+                    var next = pattern[++i];
+                    if (!char.IsLetterOrDigit(next)) sb.Append(next); // \. → .   (\d, \w… are classes: dropped)
+                    break;
+                case '[':
+                    // A character class matches one unknown character: drop it (and its quantifier).
+                    var close = pattern.IndexOf(']', i + 1);
+                    i = close < 0 ? pattern.Length : close;
+                    break;
+                case '.' when i + 1 < pattern.Length && pattern[i + 1] is '*' or '+' or '?':
+                    break; // ".*" = anything
+                case '.':
+                    sb.Append('.'); // a literal dot in a host name, most of the time
+                    break;
+                case '{':
+                    var end = pattern.IndexOf('}', i + 1);
+                    i = end < 0 ? pattern.Length : end; // {2,3} quantifier
+                    break;
+                case '^' or '$' or '*' or '+' or '?' or '(' or ')' or '|' or ']' or '}':
+                    break;
+                default:
+                    sb.Append(c);
+                    break;
             }
-            if ("^$.*+?()[]{}|".IndexOf(c) >= 0) continue;
-            sb.Append(c);
         }
         return sb.ToString().Trim();
     }
@@ -276,8 +365,6 @@ public static class RdgImporter
         => (el.Element("properties")?.Element(name) ?? el.Element(name))?.Value?.Trim();
 
     private static string? NameOf(XElement el) => PropertyOf(el, "name") is { Length: > 0 } n ? n : null;
-
-    private static string? HostOf(XElement server) => PropertyOf(server, "name");
 
     /// <summary>A setting block defined on this node (not inherited from its parent).</summary>
     private static XElement? Own(XElement el, string name)
@@ -304,9 +391,20 @@ public static class RdgImporter
         return $@"{domain}\{user}";
     }
 
-    /// <summary>"host:3390" (RDCMan allows the port in the name); IPv6 literals keep their colons.</summary>
+    /// <summary>"host:3390" or "[fe80::1]:3390" (RDCMan allows the port in the name); bare IPv6 keeps its colons.</summary>
     private static (string Host, int? Port) SplitPort(string host)
     {
+        if (host.StartsWith('['))
+        {
+            var close = host.IndexOf(']');
+            if (close > 1)
+            {
+                var inner = host[1..close];
+                var rest = host[(close + 1)..];
+                if (rest.StartsWith(':') && int.TryParse(rest[1..], out var bp) && bp is > 0 and <= 65535) return (inner, bp);
+                return (inner, null);
+            }
+        }
         var colon = host.LastIndexOf(':');
         if (colon > 0 && host.IndexOf(':') == colon && int.TryParse(host[(colon + 1)..], out var p) && p is > 0 and <= 65535)
             return (host[..colon], p);

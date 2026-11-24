@@ -310,14 +310,15 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private void OnConnected(RoyalApps.Community.Rdp.WinForms.Controls.Events.ConnectedEventArgs e)
     {
         if (_disposed) return;
+        // Before State: the state change refreshes Recent/Connected, which read LastConnected.
+        Server.Server.LastConnected = DateTimeOffset.Now;
+        _svc.State.MarkDirty();
         State = DesktopState.Connected;
         _resizeConfirmed = false;
         _scaledView = false;
         _connectSize = RemoteSize();
         WatchSize();
         _promptedAfterFailure = false;
-        Server.Server.LastConnected = DateTimeOffset.Now;
-        _svc.State.MarkDirty();
     }
 
     private void OnDisconnected(RoyalApps.Community.Rdp.WinForms.Controls.Events.DisconnectedEventArgs e)

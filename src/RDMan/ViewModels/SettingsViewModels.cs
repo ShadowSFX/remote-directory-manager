@@ -273,7 +273,7 @@ public sealed partial class ImportViewModel : ObservableObject
         var hosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (host, user) in Interop.WindowsCredentialLookup.SavedRemoteDesktopTargets())
         {
-            if (!hosts.Add(host)) continue;
+            if (host.Contains('*') || !hosts.Add(host)) continue; // TERMSRV/* is a wildcard credential, not a server
             var exists = main.AllServers().Any(s => s.HasDesktop && UncPath.SameHost(s.Host, host));
             Add(new ImportRowViewModel(host, user, exists));
         }
@@ -306,8 +306,20 @@ public sealed partial class ImportViewModel : ObservableObject
             Credentials = new CredentialSettings { Mode = CredentialMode.Inherit },
         }).ToList();
         var nodes = new List<TreeNode>(shares);
+        var enabled = 0;
         foreach (var d in selected.Where(r => r.IsDesktop))
         {
+            // Already in the tree with files only: turn its desktop on instead of adding a second server.
+            if (_main.AllServers().FirstOrDefault(s => !s.HasDesktop && UncPath.SameHost(s.Host, d.Host)) is { } existing)
+            {
+                existing.Server.Desktop = new DesktopEndpoint { Enabled = true };
+                if (existing.Server.DesktopCredentials.Mode == CredentialMode.Inherit)
+                    existing.Server.DesktopCredentials = new CredentialSettings { Mode = CredentialMode.CurrentUser };
+                existing.Refresh();
+                _main.CheckHealth(existing);
+                enabled++;
+                continue;
+            }
             // Same host as an imported share: one server offering both views.
             var sameHost = shares.FirstOrDefault(s => UncPath.SameHost(s.Host, d.Host));
             var target = sameHost ?? new ServerNode { Name = d.Host, Host = d.Host, Files = false, DefaultAction = ServerAction.Desktop };
@@ -316,7 +328,11 @@ public sealed partial class ImportViewModel : ObservableObject
             target.DesktopCredentials = new CredentialSettings { Mode = CredentialMode.CurrentUser };
             if (sameHost is null) nodes.Add(target);
         }
-        if (nodes.Count == 0) return 0;
+        if (nodes.Count == 0)
+        {
+            if (enabled > 0) _main.State.MarkDirty();
+            return enabled;
+        }
         _main.AddImported(Loc.T("Import.GroupName"), nodes);
         return nodes.Count;
     }

@@ -34,8 +34,8 @@ public sealed partial class RdgImportViewModel : ObservableObject
     public string PasswordsText => (Result.PasswordsRecovered == 1 ? Loc.T("Rdg.Passwords.One") : Loc.F("Rdg.Passwords", Result.PasswordsRecovered));
     public bool HasLostPasswords => Result.PasswordsToReenter > 0;
     public string LostPasswordsText => (Result.PasswordsToReenter == 1 ? Loc.T("Rdg.PasswordsLost.One") : Loc.F("Rdg.PasswordsLost", Result.PasswordsToReenter));
-    public bool HasNotes => Result.RulesSimplified > 0 || Result.SettingsSkipped > 0;
-    public string NotesText => Loc.T("Rdg.Notes");
+    public bool HasNotes => Result.RulesSimplified > 0 || Result.SettingsSkipped > 0 || Result.Truncated;
+    public string NotesText => Result.Truncated ? Loc.T("Rdg.Notes") + " " + Loc.T("Rdg.Truncated") : Loc.T("Rdg.Notes");
 
     /// <summary>RDCMan only knows remote desktops; RDMan can also offer each server's shared folders.</summary>
     [ObservableProperty] private bool _offerFiles;
@@ -53,6 +53,13 @@ public sealed partial class RdgImportViewModel : ObservableObject
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or FormatException or InvalidDataException or System.Xml.XmlException)
         {
+            main.Toasts.Show(Loc.F("Rdg.Unreadable", Path.GetFileName(path), ex.Message), Services.ToastKind.Error);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            // Anything else (e.g. re-protecting a password failed): never crash the import, say what happened.
+            App.Log(ex);
             main.Toasts.Show(Loc.F("Rdg.Unreadable", Path.GetFileName(path), ex.Message), Services.ToastKind.Error);
             return null;
         }

@@ -108,4 +108,30 @@ public sealed class SmartGroupTests
         Assert.Empty(doc.SmartGroups);
         Assert.False(((ServerNode)doc.Root.Children[0]).IsFavorite);
     }
+
+    [Fact]
+    public void Scope_limits_the_search_to_a_group_and_count_matches_evaluate()
+    {
+        var root = Tree();
+        var client = (GroupNode)root.Children[0];
+        var everywhere = new SmartGroup { Rules = { new SmartRule { Field = SmartField.Host, Value = "." } } };
+        var scoped = new SmartGroup { ScopeId = client.Id, Rules = { new SmartRule { Field = SmartField.Host, Value = "." } } };
+        var missing = new SmartGroup { ScopeId = Guid.NewGuid(), Rules = { new SmartRule { Field = SmartField.Host, Value = "." } } };
+        Assert.Equal(4, SmartGroupEvaluator.Evaluate(root, everywhere).Count);
+        Assert.Equal(["Web principal", "Base de datos", "Staging API"], Names(root, scoped));
+        Assert.Equal("Cliente Aurora / Producción", SmartGroupEvaluator.Evaluate(root, scoped)[0].GroupPath);
+        Assert.Equal(4, SmartGroupEvaluator.Evaluate(root, missing).Count); // missing scope = whole tree
+        Assert.Equal([4, 3, 4, 0], SmartGroupEvaluator.Count(root, [everywhere, scoped, missing, new SmartGroup()]));
+    }
+
+    [Fact]
+    public void Unknown_properties_from_a_newer_build_survive_a_save()
+    {
+        var json = """{"schemaVersion":2,"future":{"x":1},"root":{"kind":"group","name":"root","children":[{"kind":"server","name":"a","host":"h","laterField":true}]},"profiles":[],"smartGroups":[{"name":"s","match":"all","rules":[],"newThing":5}]}""";
+        var doc = System.Text.Json.JsonSerializer.Deserialize<ConnectionDocument>(json, JsonFileStore.Options)!;
+        var back = System.Text.Json.JsonSerializer.Serialize(doc, JsonFileStore.Options);
+        Assert.Contains("\"future\"", back);
+        Assert.Contains("\"laterField\"", back);
+        Assert.Contains("\"newThing\"", back);
+    }
 }

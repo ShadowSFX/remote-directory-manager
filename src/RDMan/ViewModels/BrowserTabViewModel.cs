@@ -441,7 +441,12 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
             {
                 Server.Server.LastConnected = DateTimeOffset.Now;
                 _svc.State.MarkDirty();
-                _main.NotifyConnectionsChanged(); // Recent / Connected
+                // Recent / Connected change when this tab reaches a server, not on every subfolder it browses.
+                if (!ReferenceEquals(_announcedServer, Server))
+                {
+                    _announcedServer = Server;
+                    _main.NotifyConnectionsChanged();
+                }
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -664,9 +669,12 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         return LoadAsync();
     }
 
+    private ServerNodeViewModel? _announcedServer;
+
     private void EndSession()
     {
         if (Session is null) return;
+        var wasConnected = Session.IsConnected;
         Session.PropertyChanged -= OnSessionChanged;
         Session.FocusReleased -= OnSessionFocusReleased;
         Session.Activated -= OnSessionActivated;
@@ -674,6 +682,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         if (IsFullScreen) _main.SetFullScreen(this, false);
         Session.Dispose();
         Session = null;
+        if (wasConnected) _main.NotifyConnectionsChanged(); // closed/navigated away from a live desktop
     }
 
     private void OnSessionChanged(object? sender, PropertyChangedEventArgs e)

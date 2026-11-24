@@ -273,6 +273,10 @@ public static partial class Strings
         T("Smart.Preview.More", "{0} y {1} más", "{0} and {1} more");
         T("Smart.Validation.Name", "Ponle un nombre.", "Give it a name.");
         T("Smart.Validation.Rule", "Escribe al menos una regla.", "Write at least one rule.");
+        T("Smart.Max", "Ya hay {0} grupos inteligentes: elimina alguno para agregar más.", "There are already {0} smart groups: delete one to add more.");
+        T("Smart.Scope", "Buscar en", "Search in");
+        T("Smart.ScopeAll", "Todas las conexiones", "All connections");
+        T("Rdg.Truncated", "El archivo es muy grande: se importaron los primeros 5000 elementos.", "The file is very large: the first 5000 items were imported.");
         T("Smart.ConfirmDelete", "¿Eliminar el grupo inteligente «{0}»? Los servidores no se tocan.", "Delete the smart group “{0}”? The servers aren't touched.");
         T("Smart.Empty.Title", "Ningún servidor cumple estas reglas", "No server matches these rules");
         T("Smart.Empty.Body", "Edita el grupo para cambiar sus reglas; se actualiza solo cuando agregas o cambias servidores.", "Edit the group to change its rules; it updates by itself when you add or change servers.");

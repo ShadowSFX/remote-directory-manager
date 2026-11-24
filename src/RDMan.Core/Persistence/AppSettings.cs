@@ -46,6 +46,9 @@ public sealed class AppSettings
     public const int CurrentSchemaVersion = 1;
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
+    /// <summary>Settings written by a newer RDMan: kept as-is so saving here never drops them.</summary>
+    [System.Text.Json.Serialization.JsonExtensionData] public Dictionary<string, System.Text.Json.JsonElement>? Extra { get; set; }
+
     /// <summary>"system", "es" or "en".</summary>
     public string Language { get; set; } = "system";
     public ThemePreference Theme { get; set; } = ThemePreference.System;

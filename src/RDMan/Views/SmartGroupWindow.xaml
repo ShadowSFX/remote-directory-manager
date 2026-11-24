@@ -12,10 +12,30 @@
         </Grid.RowDefinitions>
         <ScrollViewer MaxHeight="600" VerticalScrollBarVisibility="Auto">
             <StackPanel Style="{StaticResource Dialog.Body}">
-                <StackPanel Style="{StaticResource Field}">
-                    <TextBlock Text="{ui:Tr Smart.Name}" Style="{StaticResource Text.Label}" />
-                    <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="{ui:Tr Smart.NameHint}" />
-                </StackPanel>
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{ui:Tr Smart.Name}" Style="{StaticResource Text.Label}" />
+                        <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="{ui:Tr Smart.NameHint}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{ui:Tr Smart.Scope}" Style="{StaticResource Text.Label}" />
+                        <ComboBox ItemsSource="{Binding Scopes}" SelectedItem="{Binding SelectedScope}" MaxDropDownHeight="320" AutomationProperties.Name="{ui:Tr Smart.Scope}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:GroupChoice}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="{Binding Depth, Converter={StaticResource Mul}, ConverterParameter=14}" />
+                                        <TextBlock Text="{Binding Display}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                    </StackPanel>
+                </Grid>
 
                 <Grid Margin="0,0,0,12">
                     <TextBlock Text="{ui:Tr Smart.Rules}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0" />

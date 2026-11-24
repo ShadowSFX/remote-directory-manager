@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using RDMan.Core.Models;
 using RDMan.Core.Search;
 using RDMan.Infrastructure;
+using RDMan.Services;
 using RDMan.Views;
 
 namespace RDMan.ViewModels;
@@ -50,14 +51,16 @@ public sealed partial class MainViewModel
         ViewFavorites => AllServers().Where(s => s.Server.IsFavorite).OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase).ToList(),
         ViewRecent => AllServers().Where(s => s.Server.LastConnected is not null)
             .OrderByDescending(s => s.Server.LastConnected).Take(RecentLimit).ToList(),
-        ViewConnected => AllServers().Where(IsConnected).OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase).ToList(),
+        ViewConnected => ConnectedServers().OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase).ToList(),
         _ => [],
     };
 
     /// <summary>A server is "connected" while RDMan holds its desktop session or a file session it opened.</summary>
-    private bool IsConnected(ServerNodeViewModel s)
-        => AllTabs.Any(t => t.Session is { IsConnected: true } session && ReferenceEquals(session.Server, s))
-           || Services.Connections.HasOpenSession(s.Host);
+    private IEnumerable<ServerNodeViewModel> ConnectedServers()
+    {
+        var live = LiveDesktopServers();
+        return AllServers().Where(s => live.Contains(s) || Services.Connections.HasOpenSession(s.Host));
+    }
 
     public IReadOnlyList<ServerNodeViewModel> SmartGroupServers(SmartGroup group)
         => SmartGroupEvaluator.Evaluate(State.Document.Root, group).Select(h => FindServer(h.Server.Id)).OfType<ServerNodeViewModel>().ToList();
@@ -79,13 +82,53 @@ public sealed partial class MainViewModel
         _ => "",
     };
 
-    /// <summary>Recounts the sidebar badges (cheap: a pass over the servers).</summary>
+    public const int MaxSmartGroups = 100;
+    private bool _countsQueued;
+
+    /// <summary>Recounts the sidebar badges once the current burst of changes is over (one pass, any number of calls).</summary>
     public void RefreshViewCounts()
     {
-        FavoriteCount = AllServers().Count(s => s.Server.IsFavorite);
-        RecentCount = Math.Min(RecentLimit, AllServers().Count(s => s.Server.LastConnected is not null));
-        ConnectedCount = AllServers().Count(IsConnected);
-        foreach (var g in SmartGroups) g.Count = SmartGroupEvaluator.Evaluate(State.Document.Root, g.Model).Count;
+        if (_countsQueued) return;
+        _countsQueued = true;
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            _countsQueued = false;
+            RecountNow();
+        }, System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    private void RecountNow()
+    {
+        int favorites = 0, recent = 0, connected = 0;
+        var live = LiveDesktopServers();
+        foreach (var s in AllServers())
+        {
+            if (s.Server.IsFavorite) favorites++;
+            if (s.Server.LastConnected is not null) recent++;
+            if (live.Contains(s) || Services.Connections.HasOpenSession(s.Host)) connected++;
+        }
+        FavoriteCount = favorites;
+        RecentCount = Math.Min(RecentLimit, recent);
+        ConnectedCount = connected;
+        var counts = SmartGroupEvaluator.Count(State.Document.Root, SmartGroups.Select(g => g.Model).ToList());
+        for (var i = 0; i < SmartGroups.Count && i < counts.Count; i++) SmartGroups[i].Count = counts[i];
+    }
+
+    private HashSet<ServerNodeViewModel> LiveDesktopServers()
+        => AllTabs.Where(t => t.Session is { IsConnected: true }).Select(t => t.Session!.Server).ToHashSet();
+
+    /// <summary>Adds smart groups (new or imported) up to the limit; false (with a message) when there's no room.</summary>
+    public bool TryAddSmartGroups(IReadOnlyList<SmartGroup> groups)
+    {
+        var room = MaxSmartGroups - State.Document.SmartGroups.Count;
+        foreach (var g in groups.Take(Math.Max(0, room)))
+        {
+            State.Document.SmartGroups.Add(g);
+            SmartGroups.Add(new SmartGroupViewModel(g));
+        }
+        if (groups.Count <= room) return true;
+        Toasts.Show(Loc.F("Smart.Max", MaxSmartGroups), ToastKind.Error);
+        return false;
     }
 
     /// <summary>A session opened or closed somewhere: the Connected view and badges follow.</summary>
@@ -125,14 +168,17 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private void NewSmartGroup()
     {
+        if (State.Document.SmartGroups.Count >= MaxSmartGroups)
+        {
+            Toasts.Show(Loc.F("Smart.Max", MaxSmartGroups), ToastKind.Error);
+            return;
+        }
         var model = new SmartGroup { Rules = { new SmartRule() } };
         var editor = new SmartGroupEditorViewModel(this, model, isNew: true);
         if (Dialogs.ShowSmartGroupEditor(Owner, editor) != true) return;
-        State.Document.SmartGroups.Add(model);
-        var vm = new SmartGroupViewModel(model);
-        SmartGroups.Add(vm);
+        TryAddSmartGroups([model]);
         Changed();
-        OpenSmartGroup(vm);
+        OpenSmartGroup(SmartGroups[^1]);
     }
 
     [RelayCommand]

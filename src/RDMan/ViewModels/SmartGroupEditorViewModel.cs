@@ -46,6 +46,9 @@ public sealed partial class SmartGroupEditorViewModel : ObservableObject
         IsNew = isNew;
         _name = model.Name;
         _matchAll = model.Match != SmartMatch.Any;
+        Scopes.Add(new GroupChoice(Loc.T("Smart.ScopeAll"), null, 0));
+        AddScopes(main.RootNodes, 0);
+        _selectedScope = Scopes.FirstOrDefault(s => s.Group?.Model.Id == model.ScopeId) ?? Scopes[0];
         foreach (var r in model.Rules) Rules.Add(new SmartRuleRowViewModel(r, UpdatePreview));
         if (Rules.Count == 0) Rules.Add(new SmartRuleRowViewModel(new SmartRule(), UpdatePreview));
         Rules.CollectionChanged += (_, _) => { UpdatePreview(); OnPropertyChanged(nameof(CanRemoveRule)); };
@@ -60,6 +63,20 @@ public sealed partial class SmartGroupEditorViewModel : ObservableObject
     public IReadOnlyList<SmartOption> Ops { get; } = SmartOp.All.Select(o => new SmartOption(o, Loc.T("Smart.Op." + o))).ToList();
 
     public ObservableCollection<SmartRuleRowViewModel> Rules { get; } = new();
+
+    /// <summary>Where the group searches: everything, or one group (and its subgroups).</summary>
+    public ObservableCollection<GroupChoice> Scopes { get; } = new();
+    [ObservableProperty] private GroupChoice _selectedScope;
+    partial void OnSelectedScopeChanged(GroupChoice value) => UpdatePreview();
+
+    private void AddScopes(IEnumerable<NodeViewModel> nodes, int depth)
+    {
+        foreach (var g in nodes.OfType<GroupNodeViewModel>())
+        {
+            Scopes.Add(new GroupChoice(g.Name, g, depth + 1));
+            AddScopes(g.Children, depth + 1);
+        }
+    }
     public bool CanAddRule => Rules.Count < SmartGroup.MaxRules;
     public bool CanRemoveRule => Rules.Count > 1;
 
@@ -106,6 +123,7 @@ public sealed partial class SmartGroupEditorViewModel : ObservableObject
         Name = Name.Trim(),
         Match = MatchAll ? SmartMatch.All : SmartMatch.Any,
         Rules = Rules.Select(r => r.ToRule()).ToList(),
+        ScopeId = SelectedScope?.Group?.Model.Id,
     };
 
     private void UpdatePreview()
@@ -138,6 +156,7 @@ public sealed partial class SmartGroupEditorViewModel : ObservableObject
         }
         _model.Name = draft.Name;
         _model.Match = draft.Match;
+        _model.ScopeId = draft.ScopeId;
         _model.Rules = draft.Rules.Where(r => r.Value.Length > 0).ToList();
         return true;
     }

@@ -9,17 +9,22 @@ public sealed class SmartGroup
 {
     public const int MaxRules = 20;
 
+    [System.Text.Json.Serialization.JsonExtensionData] public Dictionary<string, System.Text.Json.JsonElement>? Extra { get; set; }
+
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
     /// <summary>"all" (every rule must match) or "any".</summary>
     public string Match { get; set; } = SmartMatch.All;
     public List<SmartRule> Rules { get; set; } = new();
+    /// <summary>Only servers inside this group (any depth); null = the whole tree. A missing group also means the whole tree.</summary>
+    public Guid? ScopeId { get; set; }
 
     public SmartGroup Clone() => new()
     {
         Id = Id,
         Name = Name,
         Match = Match,
+        ScopeId = ScopeId,
         Rules = Rules.Select(r => r.Clone()).ToList(),
     };
 }

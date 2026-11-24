@@ -180,6 +180,84 @@ public sealed class RdgImporterTests
     [InlineData("^web.*", "web")]
     [InlineData(@"db\.prod", "db.prod")]
     [InlineData(@"srv\d+", "srv")]
+    [InlineData("srv01.contoso.com", "srv01.contoso.com")]
+    [InlineData("web[0-9]+", "web")]
+    [InlineData("db{2}x", "dbx")]
     [InlineData("plain", "plain")]
     public void Unregex_keeps_the_literal_text(string pattern, string expected) => Assert.Equal(expected, RdgImporter.Unregex(pattern));
+
+    [Fact]
+    public void Profiles_outside_the_file_never_fall_back_to_the_parent_account()
+    {
+        var r = Parse("""
+            <RDCMan><file><properties><name>F</name></properties>
+              <logonCredentials inherit="None"><profileName scope="Local">Custom</profileName><userName>parent</userName><password /></logonCredentials>
+              <server><properties><name>h1</name></properties>
+                <logonCredentials inherit="None"><profileName scope="Local">MyLocalProfile</profileName></logonCredentials></server>
+            </file></RDCMan>
+            """);
+        var s = (ServerNode)r.Root.Children[0];
+        Assert.Equal(CredentialMode.Custom, s.Credentials.Mode);
+        Assert.Equal("", s.Credentials.Username); // resolver treats it as "ask"
+        Assert.Equal(1, r.PasswordsToReenter);
+    }
+
+    [Fact]
+    public void Group_port_is_inherited_by_its_servers()
+    {
+        var r = Parse("""
+            <RDCMan><file>
+              <group><properties><name>G</name></properties>
+                <connectionSettings inherit="None"><port>3390</port></connectionSettings>
+                <server><properties><name>a</name></properties></server>
+                <server><properties><name>b:4000</name></properties></server>
+                <group><properties><name>Sub</name></properties><server><properties><name>c</name></properties></server></group>
+              </group>
+              <server><properties><name>d</name></properties></server>
+            </file></RDCMan>
+            """);
+        var g = (GroupNode)r.Root.Children[0];
+        Assert.Equal(3390, ((ServerNode)g.Children[0]).Desktop!.Port);
+        Assert.Equal(4000, ((ServerNode)g.Children[1]).Desktop!.Port);
+        Assert.Equal(3390, ((ServerNode)((GroupNode)g.Children[2]).Children[0]).Desktop!.Port);
+        Assert.Equal(3389, ((ServerNode)r.Root.Children[1]).Desktop!.Port);
+    }
+
+    [Fact]
+    public void Clear_text_passwords_ipv6_ports_and_unused_profiles()
+    {
+        var r = Parse($"""
+            <RDCMan><file>
+              <credentialsProfiles>
+                <credentialsProfile><profileName>Unused</profileName><userName>x</userName><password>{Foreign}</password></credentialsProfile>
+              </credentialsProfiles>
+              <server><properties><name>[fe80::1]:3390</name></properties>
+                <logonCredentials inherit="None"><profileName>Custom</profileName><userName>u</userName><password storeAsClearText="True">pw</password></logonCredentials>
+              </server>
+            </file></RDCMan>
+            """);
+        var s = (ServerNode)r.Root.Children[0];
+        Assert.Equal("fe80::1", s.Host);
+        Assert.Equal(3390, s.Desktop!.Port);
+        Assert.Equal("prot:pw", s.Credentials.ProtectedPassword);
+        Assert.Empty(r.Profiles);              // unused profile: not imported, not decrypted, not counted
+        Assert.Equal(1, r.PasswordsRecovered);
+        Assert.Equal(0, r.PasswordsToReenter);
+    }
+
+    [Fact]
+    public void Alternatives_split_into_any_rules_and_groups_are_scoped_to_the_import()
+    {
+        var r = Parse("""
+            <RDCMan><file><properties><name>F</name></properties>
+              <smartGroup><properties><name>S</name></properties>
+                <ruleGroup operator="All"><rule><property>Server</property><operator>Matches</operator><value>web|db</value></rule></ruleGroup>
+              </smartGroup>
+            </file></RDCMan>
+            """);
+        var g = Assert.Single(r.SmartGroups);
+        Assert.Equal(SmartMatch.Any, g.Match);
+        Assert.Equal(["web", "db"], g.Rules.Select(x => x.Value));
+        Assert.Equal(r.Root.Id, g.ScopeId);
+    }
 }
