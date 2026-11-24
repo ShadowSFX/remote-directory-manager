@@ -19,7 +19,9 @@ public sealed record EffectiveRdpSettings(
     Resolved<RdpServerCheck> ServerCheck,
     Resolved<RdpSignInProtection> SignInProtection,
     Resolved<bool> AdminSession,
-    Resolved<int> ColorDepth);
+    Resolved<int> ColorDepth,
+    /// <summary>The gateway in effect (null value = direct connection).</summary>
+    Resolved<RdpGateway?> Gateway);
 
 /// <summary>
 /// Merges <see cref="RdpProfile"/> field by field from the node up to the root, keeping the origin of each value
@@ -61,6 +63,15 @@ public static class RdpSettingsResolver
             return new Resolved<T>(get(Defaults)!.Value, null);
         }
 
+        var gateway = new Resolved<RdpGateway?>(null, null);
+        foreach (var n in chain)
+        {
+            if (n.Rdp?.Gateway is not { } g) continue;
+            // An explicit "off" (or a gateway without a host) means direct, overriding parents.
+            gateway = new Resolved<RdpGateway?>(g.Usage == RdpGatewayUsage.Off || string.IsNullOrWhiteSpace(g.Host) ? null : g, n);
+            break;
+        }
+
         var depth = Pick(p => p.ColorDepth);
         if (depth.Value is not (16 or 24 or 32)) depth = new Resolved<int>(32, depth.Source);
 
@@ -75,6 +86,7 @@ public static class RdpSettingsResolver
             Pick(p => p.ServerCheck),
             Pick(p => p.SignInProtection),
             Pick(p => p.AdminSession),
-            depth);
+            depth,
+            gateway);
     }
 }

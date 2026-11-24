@@ -222,7 +222,27 @@ public static class RdgImporter
                 _ => node.Rdp.ServerCheck,
             };
         }
-        if (Own(el, "gatewaySettings") is { } gw && Bool(gw.Element("enabled")) == true) ctx.Skipped++;
+        if (Own(el, "gatewaySettings") is { } gw)
+        {
+            var host = gw.Element("hostName")?.Value?.Trim() ?? "";
+            if (Bool(gw.Element("enabled")) == true && host.Length > 0)
+            {
+                var logon = (gw.Element("logonMethod")?.Value ?? "").Trim();
+                var shared = Bool(gw.Element("credSharing")) ?? true;
+                var user = Join(gw.Element("domain")?.Value, gw.Element("userName")?.Value);
+                node.Rdp.Gateway = new RdpGateway
+                {
+                    Host = host,
+                    Usage = Bool(gw.Element("localBypass")) == true ? RdpGatewayUsage.BypassLocal : RdpGatewayUsage.Always,
+                    Logon = shared ? RdpGatewayLogon.SameAsServer : user is not null ? RdpGatewayLogon.Custom : RdpGatewayLogon.Windows,
+                    Username = shared ? null : user,
+                    ProtectedPassword = shared || user is null ? null : ctx.Password(gw.Element("password")),
+                };
+                if (logon is "SmartCard" or "1") ctx.Skipped++; // RDMan doesn't do smart-card gateway sign-in
+            }
+            else if (Bool(gw.Element("enabled")) == false)
+                node.Rdp.Gateway = new RdpGateway { Usage = RdpGatewayUsage.Off }; // explicit "no gateway" here
+        }
         return node is ServerNode ? (port != inheritedPort ? port : null) : port;
     }
 

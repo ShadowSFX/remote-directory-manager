@@ -25,6 +25,41 @@ public enum RdpServerCheck
     Skip,
 }
 
+/// <summary>When the Remote Desktop Gateway is used.</summary>
+public enum RdpGatewayUsage
+{
+    /// <summary>Connect directly (an explicit "no gateway" that overrides a parent's).</summary>
+    Off,
+    /// <summary>Always through the gateway.</summary>
+    Always,
+    /// <summary>Through the gateway, except for addresses on the local network.</summary>
+    BypassLocal,
+}
+
+/// <summary>How RDMan signs in to the gateway.</summary>
+public enum RdpGatewayLogon
+{
+    /// <summary>The same account as the server (credential sharing).</summary>
+    SameAsServer,
+    /// <summary>The Windows user signed in on this PC.</summary>
+    Windows,
+    /// <summary>Its own user name and password.</summary>
+    Custom,
+}
+
+/// <summary>Remote Desktop Gateway (RD Gateway) settings; set as a whole on a group or server.</summary>
+public sealed class RdpGateway
+{
+    public RdpGatewayUsage Usage { get; set; } = RdpGatewayUsage.Always;
+    public string Host { get; set; } = "";
+    public RdpGatewayLogon Logon { get; set; } = RdpGatewayLogon.SameAsServer;
+    public string? Username { get; set; }
+    /// <summary>DPAPI-protected (see <c>SecretProtector</c>). Never plaintext.</summary>
+    public string? ProtectedPassword { get; set; }
+
+    public RdpGateway Clone() => (RdpGateway)MemberwiseClone();
+}
+
 /// <summary>
 /// Remote desktop options of a group or server. Every property is nullable: null means "inherit from the
 /// parent group" (the root falls back to <c>RdpSettingsResolver</c> defaults). One editor, one rule — instead
@@ -51,11 +86,19 @@ public sealed class RdpProfile
     /// <summary>16, 24 or 32.</summary>
     public int? ColorDepth { get; set; }
 
-    public RdpProfile Clone() => (RdpProfile)MemberwiseClone();
+    /// <summary>Remote Desktop Gateway; null = inherit (the default is a direct connection).</summary>
+    public RdpGateway? Gateway { get; set; }
+
+    public RdpProfile Clone()
+    {
+        var copy = (RdpProfile)MemberwiseClone();
+        copy.Gateway = Gateway?.Clone();
+        return copy;
+    }
 
     [JsonIgnore]
     public bool IsEmpty =>
         RedirectClipboard is null && RedirectDrives is null && RedirectPrinters is null && RedirectSmartCards is null &&
         Audio is null && WindowsKeysToServer is null && NetworkLevelAuthentication is null && ServerCheck is null &&
-        SignInProtection is null && AdminSession is null && ColorDepth is null;
+        SignInProtection is null && AdminSession is null && ColorDepth is null && Gateway is null;
 }

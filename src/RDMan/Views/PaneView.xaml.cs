@@ -40,7 +40,7 @@ public partial class PaneView : UserControl
 
     private PaneViewModel? Pane => DataContext as PaneViewModel;
 
-    private static MainViewModel? Main => Application.Current.MainWindow?.DataContext as MainViewModel;
+    private static MainViewModel? Main => Application.Current?.MainWindow?.DataContext as MainViewModel; // null while shutting down
 
     /// <summary>The active tab's content area: remote-desktop surfaces are placed over it by the window's session overlay.</summary>
     public FrameworkElement ContentArea => TabView.ContentArea;
@@ -155,6 +155,11 @@ public partial class PaneView : UserControl
         menu.Items.Add(new MenuItem { Header = Loc.T("Pane.SplitRight"), Tag = "", Command = Pane.SplitRightCommand, CommandParameter = tab, InputGestureText = "F3" });
         menu.Items.Add(new MenuItem { Header = Loc.T("Pane.SplitDown"), Tag = "", Command = Pane.SplitDownCommand, CommandParameter = tab });
         if (Pane.CanClose) menu.Items.Add(new MenuItem { Header = Loc.T("Pane.Close"), Tag = "", Command = Pane.ClosePaneCommand });
+        if (tab.IsDesktop)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = Loc.T("Undock.Open"), Tag = "", Command = tab.UndockCommand });
+        }
     }
 
     // Hovering a dragged file over a tab switches to it, like Explorer/browsers.

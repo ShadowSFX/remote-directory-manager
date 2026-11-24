@@ -119,8 +119,10 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:BrowserTabViewModel}">
+                                <!-- Hidden, not collapsed: a session in a background tab keeps its pane's size, so it connects
+                                     at the right resolution instead of 0×0 (which the server turns into 200×200). -->
                                 <ContentControl Content="{Binding Session.Host}" Focusable="False"
-                                                Visibility="{Binding IsSessionVisible, Converter={StaticResource Vis}}" />
+                                                Visibility="{Binding IsSessionVisible, Converter={StaticResource Vis}, ConverterParameter=hidden}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

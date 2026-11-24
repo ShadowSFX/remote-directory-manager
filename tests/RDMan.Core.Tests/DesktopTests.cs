@@ -263,4 +263,36 @@ public sealed class DesktopTests : IDisposable
         Assert.DoesNotContain("hasDesktop", json, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("redirectDrives", json, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void Gateway_is_inherited_as_a_whole_and_off_overrides()
+    {
+        var (doc, group, server) = Tree();
+        var index = new TreeIndex(doc.Root);
+        Assert.Null(RdpSettingsResolver.Resolve(server, index).Gateway.Value);
+        group.Rdp.Gateway = new RdpGateway { Host = "gw.corp", Usage = RdpGatewayUsage.BypassLocal };
+        var eff = RdpSettingsResolver.Resolve(server, index).Gateway;
+        Assert.Equal("gw.corp", eff.Value!.Host);
+        Assert.Same(group, eff.Source);
+        server.Rdp.Gateway = new RdpGateway { Usage = RdpGatewayUsage.Off };
+        var off = RdpSettingsResolver.Resolve(server, index).Gateway;
+        Assert.Null(off.Value);
+        Assert.Same(server, off.Source);
+    }
+
+    [Fact]
+    public void Gateway_is_normalized_cloned_and_its_password_never_exported()
+    {
+        var (doc, group, server) = Tree();
+        group.Rdp.Gateway = new RdpGateway { Host = "  gw  ", Logon = RdpGatewayLogon.Custom, Username = "u", ProtectedPassword = "secret" };
+        server.Rdp.Gateway = new RdpGateway { Host = " ", Usage = RdpGatewayUsage.Always };
+        ConnectionStore.Normalize(doc);
+        Assert.Equal("gw", group.Rdp.Gateway!.Host);
+        Assert.Null(server.Rdp.Gateway); // "always" without a host means nothing
+        var clone = group.Rdp.Clone();
+        clone.Gateway!.Host = "changed";
+        Assert.Equal("gw", group.Rdp.Gateway.Host);
+        var export = ConnectionStore.CloneForExport(doc, includeSecrets: false);
+        Assert.Null(((GroupNode)export.Root.Children[0]).Rdp.Gateway!.ProtectedPassword);
+    }
 }

@@ -12,7 +12,8 @@ public sealed class BoolToVisibility : IValueConverter
     {
         var b = value is true;
         if (parameter as string == "invert") b = !b;
-        return b ? Visibility.Visible : Visibility.Collapsed;
+        // "hidden": keeps the element's layout slot (a hidden session surface still gets its pane's size).
+        return b ? Visibility.Visible : parameter as string == "hidden" ? Visibility.Hidden : Visibility.Collapsed;
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)

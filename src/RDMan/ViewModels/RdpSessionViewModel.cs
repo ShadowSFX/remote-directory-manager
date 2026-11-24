@@ -111,11 +111,32 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
 
         var host = new WindowsFormsHost { Child = control, Focusable = true };
         host.IsKeyboardFocusWithinChanged += OnHostFocusWithinChanged;
-        // The ActiveX needs a window handle: connect once the host is in the visual tree.
+        // The ActiveX needs a window handle: connect once the host is in the visual tree — and has its real size:
+        // connecting at 0×0 makes the server pick 200×200, and some servers then refuse to change it (seen when a
+        // session starts with the window, e.g. "RDMan.exe /c Name").
         void OnLoaded(object? s, System.Windows.RoutedEventArgs e)
         {
             host.Loaded -= OnLoaded;
             if (!ReferenceEquals(_control, control) || _disposed) return;
+            if (control.ClientSize.Width < 64 || control.ClientSize.Height < 64)
+            {
+                control.SizeChanged += OnSized;
+                return;
+            }
+            Start();
+        }
+        void OnSized(object? s, EventArgs e)
+        {
+            if (control.ClientSize.Width < 64 || control.ClientSize.Height < 64) return;
+            control.SizeChanged -= OnSized;
+            // Raised during a layout pass, where connecting (it pumps messages) isn't allowed: queue it.
+            System.Windows.Application.Current.Dispatcher.BeginInvoke(() =>
+            {
+                if (ReferenceEquals(_control, control) && !_disposed && State == DesktopState.Connecting) Start();
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+        void Start()
+        {
             try
             {
                 control.Connect();
@@ -179,7 +200,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         // "Remember" stores the account on this server; say so when that replaces an inherited or shared one.
         var overrides = Server.Model.DesktopCredentials.Mode != CredentialMode.Custom;
         var dlg = new CredentialPromptWindow(Server.Name, $"{Server.Host}:{Server.DesktopPort}", Server.ColorBrush, user, overrides);
-        if (Dialogs.Show(dlg, _main.Owner) != true || dlg.Result is null)
+        if (Dialogs.Show(dlg, DialogOwner) != true || dlg.Result is null)
         {
             cancelled = true;
             // Keep an error panel if one is showing (never stack the error and idle panels).
@@ -255,6 +276,8 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         cfg.Security.RestrictedAdminMode = s.SignInProtection.Value == RdpSignInProtection.RestrictedAdmin;
         cfg.Security.RemoteCredentialGuard = s.SignInProtection.Value == RdpSignInProtection.RemoteCredentialGuard;
 
+        ConfigureGateway(cfg, s.Gateway.Value);
+
         cfg.Connection.EnableAutoReconnect = true;
         cfg.Connection.MaxReconnectAttempts = 20;
 
@@ -263,6 +286,42 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
             control.InitialConnectOverlayBackColor = System.Drawing.Color.FromArgb(bg.Color.A, bg.Color.R, bg.Color.G, bg.Color.B);
         if (System.Windows.Application.Current.TryFindResource("Fg.Secondary") is SolidColorBrush fg)
             control.InitialConnectOverlayForeColor = System.Drawing.Color.FromArgb(fg.Color.A, fg.Color.R, fg.Color.G, fg.Color.B);
+    }
+
+    /// <summary>
+    /// RD Gateway, the way RDCMan sets it: explicit profile, "always" (1) or "detect" (2, which is what mstsc's
+    /// "bypass for local addresses" writes), and the gateway sign-in shared with the server unless it has its own.
+    /// </summary>
+    private void ConfigureGateway(RdpClientConfiguration cfg, RdpGateway? gateway)
+    {
+        var g = cfg.Gateway;
+        if (gateway is null)
+        {
+            g.GatewayUsageMethod = GatewayUsageMethod.Never;
+            return;
+        }
+        g.GatewayHostname = gateway.Host;
+        g.GatewayProfileUsageMethod = GatewayProfileUsageMethod.Explicit;
+        g.GatewayUsageMethod = gateway.Usage == RdpGatewayUsage.BypassLocal ? GatewayUsageMethod.OnDemand : GatewayUsageMethod.Always;
+        switch (gateway.Logon)
+        {
+            case RdpGatewayLogon.Windows:
+                g.GatewayCredSharing = false;
+                g.GatewayCredsSource = GatewayCredentialSource.UseLoggedOnUserCredentials;
+                break;
+            case RdpGatewayLogon.Custom:
+                var (user, domain) = CredentialResolver.SplitUser(gateway.Username ?? "");
+                g.GatewayCredSharing = false;
+                g.GatewayCredsSource = GatewayCredentialSource.UsernameAndPassword;
+                g.GatewayUsername = user;
+                g.GatewayDomain = domain;
+                if (_svc.State.Secrets.TryUnprotect(gateway.ProtectedPassword) is { Length: > 0 } pwd) g.GatewayPassword = new SensitiveString(pwd);
+                break;
+            default:
+                g.GatewayCredSharing = true;
+                g.GatewayCredsSource = GatewayCredentialSource.UsernameAndPassword;
+                break;
+        }
     }
 
     private void OnClientConfigured(object? sender, EventArgs e)
@@ -289,6 +348,10 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
         if (type.GetEvent(name) is { EventHandlerType: { } t } ev && t == typeof(EventHandler))
             ev.AddEventHandler(target, new EventHandler((_, _) => action()));
     }
+
+    /// <summary>The window showing this session (RDMan's, or its own when undocked): prompts open there.</summary>
+    private System.Windows.Window? DialogOwner
+        => (Host is not null ? System.Windows.Window.GetWindow(Host) : null) ?? _main.Owner;
 
     /// <summary>Keeps the control's own full-screen flag in step with RDMan's, so Ctrl+Alt+Pause toggles correctly.</summary>
     public void SyncFullScreen(bool on)
@@ -404,7 +467,7 @@ public sealed partial class RdpSessionViewModel : ObservableObject, IDisposable
     private void Reconnect()
     {
         // The toolbar's Reconnect is where the keyboard lands after Ctrl+Alt+←: never drop a live session on a stray Enter.
-        if (IsConnected && !Dialogs.Confirm(_main.Owner, Loc.T("Desktop.Reconnect"), Loc.F("Desktop.ConfirmReconnect", Server.Name), Loc.T("Desktop.Reconnect"), danger: false))
+        if (IsConnected && !Dialogs.Confirm(DialogOwner, Loc.T("Desktop.Reconnect"), Loc.F("Desktop.ConfirmReconnect", Server.Name), Loc.T("Desktop.Reconnect"), danger: false))
             return;
         _promptedAfterFailure = false;
         Connect();

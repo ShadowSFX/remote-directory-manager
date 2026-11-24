@@ -703,6 +703,10 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
 
     private void OnSessionFullScreenRequested(object? sender, bool on) => _main.SetFullScreen(this, on);
 
+    /// <summary>Moves this desktop to its own window (it reconnects there).</summary>
+    [RelayCommand]
+    private void Undock() => _main.UndockDesktop(this);
+
     // Clicks inside the remote desktop never reach WPF's mouse events: activate the pane from the session's focus.
     private void OnSessionActivated(object? sender, EventArgs e)
     {

@@ -115,7 +115,7 @@ public sealed partial class MainViewModel
     }
 
     private HashSet<ServerNodeViewModel> LiveDesktopServers()
-        => AllTabs.Where(t => t.Session is { IsConnected: true }).Select(t => t.Session!.Server).ToHashSet();
+        => AllSessions.Where(s => s.IsConnected).Select(s => s.Server).ToHashSet();
 
     /// <summary>Adds smart groups (new or imported) up to the limit; false (with a message) when there's no room.</summary>
     public bool TryAddSmartGroups(IReadOnlyList<SmartGroup> groups)

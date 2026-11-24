@@ -394,6 +394,12 @@ public sealed partial class MainViewModel : ObservableObject
             Toasts.Show(Loc.F("Desktop.NotEnabled", server.Name), ToastKind.Info, Loc.T("Tree.Ctx.Properties"), () => EditNode(server));
             return;
         }
+        if (FindWindow(server) is { } window)
+        {
+            window.BringToFront();
+            if (window.Session is { IsConnected: false, IsBusy: false } idle) idle.Connect();
+            return;
+        }
         // One session per server: a second embedded session with the same account would take over the first
         // (Windows: "replaced by another connection"), so an existing desktop tab is reused.
         var existing = FindTab(t => t.Current is DesktopLocation d && d.ServerId == server.Model.Id);
@@ -463,6 +469,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// </summary>
     public bool RevealOtherSession(RdpSessionViewModel session)
     {
+        if (RevealDetached(session.Server, session)) return true;
         var hit = FindTab(t => t.Session is { State: DesktopState.Connecting or DesktopState.Connected } s
                                && !ReferenceEquals(s, session) && ReferenceEquals(s.Server, session.Server));
         if (hit is not { } h) return false;
@@ -473,11 +480,15 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Asks once before ending the connected desktop sessions among <paramref name="tabs"/>.</summary>
     public bool ConfirmEndSessions(IEnumerable<BrowserTabViewModel> tabs)
+        => ConfirmEndSessions(tabs.Select(t => t.Session).OfType<RdpSessionViewModel>());
+
+    /// <summary>Asks once before ending the connected sessions among <paramref name="sessions"/>.</summary>
+    public bool ConfirmEndSessions(IEnumerable<RdpSessionViewModel> sessions)
     {
-        var live = tabs.Where(t => t.Session is { IsConnected: true }).ToList();
+        var live = sessions.Where(s => s.IsConnected).ToList();
         if (live.Count == 0) return true;
         var message = live.Count == 1
-            ? Loc.F("Desktop.ConfirmLeave", live[0].Session!.Server.Name)
+            ? Loc.F("Desktop.ConfirmLeave", live[0].Server.Name)
             : Loc.F("Desktop.ConfirmLeaveMany", live.Count);
         return Dialogs.Confirm(Owner, Loc.T("Desktop.Disconnect"), message, Loc.T("Desktop.Disconnect"), danger: false);
     }
@@ -756,16 +767,16 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (group is null) return;
         var servers = group.AllServers().ToHashSet();
-        var tabs = AllTabs.Where(t => t.Session is { IsConnected: true } s && servers.Contains(s.Server)).ToList();
-        if (tabs.Count == 0 || !ConfirmEndSessions(tabs)) return;
-        foreach (var t in tabs) t.Session?.Disconnect();
+        var live = AllSessions.Where(s => s.IsConnected && servers.Contains(s.Server)).ToList();
+        if (live.Count == 0 || !ConfirmEndSessions(live)) return;
+        foreach (var s in live) s.Disconnect();
     }
 
     /// <summary>Live desktop sessions among a group's servers (for its context menu).</summary>
     public int ConnectedDesktops(GroupNodeViewModel group)
     {
         var servers = group.AllServers().ToHashSet();
-        return AllTabs.Count(t => t.Session is { IsConnected: true } s && servers.Contains(s.Server));
+        return AllSessions.Count(s => s.IsConnected && servers.Contains(s.Server));
     }
 
     [RelayCommand]
@@ -905,7 +916,7 @@ public sealed partial class MainViewModel : ObservableObject
             Toasts.Show(Loc.T("Update.Busy"));
             return;
         }
-        if (!ConfirmEndSessions(AllTabs)) return;
+        if (!ConfirmEndAllSessions()) return;
         SessionsEndConfirmed = true;
         // Persist tabs/settings first (the relaunched instance restores them), but keep the app fully alive
         // until the swap succeeded: on failure the user simply keeps working.
@@ -970,6 +981,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var s = State.Settings;
         SaveSession();
+        CloseDetachedWindows();
         foreach (var pane in Panes) pane.DisposeAll();
         if (s.DisconnectOnExit) Services.Connections.DisconnectAllOpenedByUs();
     }

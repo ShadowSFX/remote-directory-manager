@@ -198,6 +198,7 @@ public partial class SidebarView : UserControl
         }
         else menu.Items.Add(Item("Tree.Ctx.Open", "\uE8A7", Vm.OpenNodeCommand, node, "Enter"));
         menu.Items.Add(Item("Tree.Ctx.OpenNewTab", "\uECCD", Vm.OpenNodeInNewTabCommand, node, "Ctrl+Clic"));
+        if (node is ServerNodeViewModel { HasDesktop: true }) menu.Items.Add(Item("Tree.Ctx.OpenDesktopWindow", "\uE8A7", Vm.OpenNodeDesktopWindowCommand, node));
         menu.Items.Add(Item("Tree.Ctx.OpenOtherPane", "\uE89F", Vm.OpenNodeInOtherPaneCommand, node));
         if (node is ServerNodeViewModel)
         {

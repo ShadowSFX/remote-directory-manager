@@ -84,4 +84,9 @@ public partial class NodeEditorWindow : DialogWindow
     /// <summary>A pasted "\host\shareolder" or "host:port" is split right away (after the text lands in the box).</summary>
     private void AddressBox_Pasting(object sender, DataObjectPastingEventArgs e)
         => Dispatcher.BeginInvoke(() => (AddressBox.DataContext as ServerEditorViewModel)?.CommitAddress(), System.Windows.Threading.DispatcherPriority.Input);
+
+    private void GatewayPassword_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox { DataContext: GatewayEditorViewModel gateway } box) gateway.NewPassword = box.Password;
+    }
 }

@@ -311,6 +311,63 @@
                             </ItemsControl>
                         </StackPanel>
                     </Border>
+                    <!-- Remote Desktop Gateway -->
+                    <Border Style="{StaticResource Panel}" IsEnabled="{Binding ServerFields.DesktopEnabled, FallbackValue=True}">
+                        <StackPanel DataContext="{Binding Gateway}">
+                            <TextBlock Text="{ui:Tr Gateway.Section}" Style="{StaticResource Text.Subtitle}" FontSize="14" />
+                            <TextBlock Text="{ui:Tr Gateway.SectionNote}" Style="{StaticResource Text.Caption}" Margin="0,4,0,12" TextWrapping="Wrap" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="250" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" Margin="0,0,8,0"
+                                             Visibility="{Binding IsOverridden, Converter={StaticResource Vis}}" />
+                                    <TextBlock Text="{ui:Tr Gateway.Use}" />
+                                </StackPanel>
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding Modes}" SelectedItem="{Binding SelectedMode}" DisplayMemberPath="Label"
+                                          AutomationProperties.Name="{ui:Tr Gateway.Use}" />
+                            </Grid>
+                            <StackPanel Visibility="{Binding IsGateway, Converter={StaticResource Vis}}" Margin="0,16,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="250" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{ui:Tr Gateway.Host}" Style="{StaticResource Text.Label}" />
+                                        <TextBox Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="rdgw.empresa.com"
+                                                 AutomationProperties.Name="{ui:Tr Gateway.Host}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="{ui:Tr Gateway.Logon}" Style="{StaticResource Text.Label}" />
+                                        <ComboBox ItemsSource="{Binding Logons}" SelectedItem="{Binding SelectedLogon}" DisplayMemberPath="Label"
+                                                  AutomationProperties.Name="{ui:Tr Gateway.Logon}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Visibility="{Binding IsCustomLogon, Converter={StaticResource Vis}}" Margin="0,16,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="12" />
+                                        <ColumnDefinition Width="250" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{ui:Tr Gateway.User}" Style="{StaticResource Text.Label}" />
+                                        <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="DOMINIO\usuario"
+                                                 AutomationProperties.Name="{ui:Tr Gateway.User}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="{ui:Tr Gateway.Password}" Style="{StaticResource Text.Label}" />
+                                        <PasswordBox PasswordChanged="GatewayPassword_PasswordChanged" AutomationProperties.Name="{ui:Tr Gateway.Password}" />
+                                        <TextBlock Text="{ui:Tr Gateway.PasswordKept}" Style="{StaticResource Text.Caption}" Margin="0,4,0,0"
+                                                   Visibility="{Binding HasStoredPassword, Converter={StaticResource Vis}}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- Notes -->

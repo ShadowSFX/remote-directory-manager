@@ -260,4 +260,23 @@ public sealed class RdgImporterTests
         Assert.Equal(["web", "db"], g.Rules.Select(x => x.Value));
         Assert.Equal(r.Root.Id, g.ScopeId);
     }
+
+    [Fact]
+    public void Gateway_settings_are_imported()
+    {
+        var r = Parse($"""
+            <RDCMan><file>
+              <gatewaySettings inherit="None"><enabled>True</enabled><hostName>gw.corp</hostName><localBypass>True</localBypass><credSharing>False</credSharing>
+                <userName>gwuser</userName><password>{Pwd("gwpw")}</password><domain>CORP</domain></gatewaySettings>
+              <server><properties><name>a</name></properties><gatewaySettings inherit="None"><enabled>False</enabled></gatewaySettings></server>
+            </file></RDCMan>
+            """);
+        var gw = r.Root.Rdp.Gateway!;
+        Assert.Equal("gw.corp", gw.Host);
+        Assert.Equal(RdpGatewayUsage.BypassLocal, gw.Usage);
+        Assert.Equal(RdpGatewayLogon.Custom, gw.Logon);
+        Assert.Equal(@"CORP\gwuser", gw.Username);
+        Assert.Equal("prot:gwpw", gw.ProtectedPassword);
+        Assert.Equal(RdpGatewayUsage.Off, ((ServerNode)r.Root.Children[0]).Rdp.Gateway!.Usage);
+    }
 }

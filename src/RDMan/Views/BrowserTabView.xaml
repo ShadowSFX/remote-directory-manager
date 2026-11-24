@@ -318,6 +318,7 @@
                         IsEnabled="{Binding Session.IsConnected}" />
                 <Button Style="{StaticResource Btn.Icon}" Content="&#xE740;" Command="{Binding Session.FullScreenCommand}" ToolTip="{ui:Tr Desktop.FullScreen}"
                         IsEnabled="{Binding Session.IsConnected}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE8A7;" Command="{Binding UndockCommand}" ToolTip="{ui:Tr Undock.Open}" />
                 <Button Style="{StaticResource Btn.Icon}" Content="&#xE7E8;" Command="{Binding Session.DisconnectCommand}" ToolTip="{ui:Tr Desktop.Disconnect}"
                         IsEnabled="{Binding Session.IsConnected}" />
             </StackPanel>

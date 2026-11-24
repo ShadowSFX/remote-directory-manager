@@ -233,6 +233,7 @@ public abstract partial class NodeEditorViewModel : ObservableObject
         foreach (var (key, _) in TagColors.All)
             Colors.Add(new ColorChoice(key, NodeViewModel.BrushFor(key)!, key));
         BuildRdpOptions(node.Rdp ?? new RdpProfile());
+        Gateway = new GatewayEditorViewModel(main, node.Rdp?.Gateway);
         RefreshRdpInherited();
         // Placeholder until the derived editor declares its sections (AddSections selects the first one).
         _selectedSection = new SectionChoice(EditorSection.General, "", "");
@@ -273,6 +274,7 @@ public abstract partial class NodeEditorViewModel : ObservableObject
     public CredentialEditorViewModel Credentials { get; }
     public CredentialEditorViewModel DesktopCredentials { get; }
     public ObservableCollection<RdpOptionRowViewModel> RdpOptions { get; } = new();
+    public GatewayEditorViewModel Gateway { get; }
 
     partial void OnSelectedParentChanged(GroupChoice value)
     {
@@ -343,6 +345,7 @@ public abstract partial class NodeEditorViewModel : ObservableObject
     {
         var parent = RdpSettingsResolver.ResolveUnder(SelectedParent?.Group?.Group, Main.State.Index);
         foreach (var row in RdpOptions) row.RefreshInherited(parent);
+        Gateway.RefreshInherited(parent);
     }
 
     private IEnumerable<GroupChoice> GroupChoicesFor(TreeNode editing)
@@ -370,6 +373,7 @@ public abstract partial class NodeEditorViewModel : ObservableObject
         DesktopCredentials.ApplyTo(Node.DesktopCredentials);
         var rdp = new RdpProfile();
         foreach (var row in RdpOptions) row.ApplyTo(rdp);
+        Gateway.ApplyTo(rdp);
         Node.Rdp = rdp;
     }
 
@@ -523,6 +527,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
         {
             if (!TryPort(out port)) return Fail(Loc.T("Server.Validation.RdpPort"), EditorSection.Desktop);
             if (DesktopCredentials.Validate() is { } deskErr) return Fail(deskErr, EditorSection.Desktop);
+            if (Gateway.Validate() is { } gwErr) return Fail(gwErr, EditorSection.Desktop);
         }
 
         ApplyCommon();
@@ -627,6 +632,7 @@ public sealed partial class GroupEditorViewModel : NodeEditorViewModel
         if (string.IsNullOrWhiteSpace(Name)) return Fail(Loc.T("Server.Validation.Name"), EditorSection.General);
         if (Credentials.Validate() is { } fileErr) return Fail(fileErr, EditorSection.Files);
         if (DesktopCredentials.Validate() is { } deskErr) return Fail(deskErr, EditorSection.Desktop);
+        if (Gateway.Validate() is { } gwErr) return Fail(gwErr, EditorSection.Desktop);
         ApplyCommon();
         return true;
     }

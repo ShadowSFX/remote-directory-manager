@@ -16,6 +16,8 @@ Portable WPF (.NET 9) app: RDCMan-style tree of SMB servers + tabbed/split file 
 - Sessions: `ViewModels/RdpSessionViewModel.cs` wraps RoyalApps `RdpControl` (MsRdpEx legacy COM interop: `MsRdpExComInterop=Legacy`, `MsRdpExGeneratedWinForms=false` in the csproj) inside a `WindowsFormsHost`.
 - The ActiveX dies if re-parented. Every tab's host lives in the window-level `SessionOverlay` (MainWindow) bound to `MainViewModel.LiveTabs`, which is append/remove only (never Move/Clear/sort/CollectionView, never re-template the overlay); `PositionSessions` places each host over its pane's content area. Moving tabs or rebuilding the pane grid must never touch that collection.
 - A session HWND paints over WPF content (airspace). Anything that must appear above a session (palette, toasts) lives in a `Popup`.
+- Undocked desktops (`Views/SessionWindow`, `MainViewModel.Detached.cs`) get a new session in their own window; moving between tab and window always reconnects. One-session-per-server checks and "live sessions" must use `MainViewModel.AllSessions` (tabs + windows), not `AllTabs`.
+- The overlay hides background sessions with `Visibility.Hidden` (not Collapsed) so they keep their pane's size; `Connect` waits for a real control size (0x0 makes the server pick 200x200).
 - RoyalApps raises OnConnected/OnDisconnected with the inner client as sender: bind handlers per control (see RdpSessionViewModel.Connect).
 - Verify RDP changes against a real Windows server (unit tests can't cover the ActiveX).
 

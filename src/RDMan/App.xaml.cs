@@ -23,11 +23,12 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         var updated = e.Args.Contains("--updated", StringComparer.OrdinalIgnoreCase);
-        var pathArg = e.Args.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
+        var connectArg = ConnectArgument(e.Args, out var rest);
+        var pathArg = rest.FirstOrDefault(a => !a.StartsWith("--", StringComparison.Ordinal));
         _instance = new SingleInstance();
         if (!_instance.TryAcquire(waitForPrevious: updated))
         {
-            _instance.Forward(pathArg ?? "");
+            _instance.Forward(connectArg is not null ? ConnectPrefix + connectArg : pathArg ?? "");
             _instance = null;
             Shutdown();
             return;
@@ -76,6 +77,9 @@ public partial class App : Application
         // "RDMan.exe \\host\share" (or a local folder) opens it in a new tab.
         if (!string.IsNullOrWhiteSpace(pathArg))
             _main.OpenInNewTab(new FolderLocation(pathArg), _main.ActivePane);
+        // "RDMan.exe /c Name" connects to that server (like mstsc /v, by RDMan name or address).
+        // Once the window has laid out, so the session starts at its real size.
+        if (connectArg is not null) Dispatcher.BeginInvoke(() => _main.ConnectByName(connectArg), DispatcherPriority.ContextIdle);
 
         Services.Health.Start(() => _main.AllServers().SelectMany(s => s.Endpoints()), settings.HealthCheckIntervalSeconds);
         Services.Updates.StartBackgroundChecks(() => state.Settings.AutoUpdate);
@@ -108,8 +112,32 @@ public partial class App : Application
     private void OnActivatedByAnotherLaunch(string path)
     {
         (MainWindow as MainWindow)?.BringToFront();
-        if (_main is not null && !string.IsNullOrWhiteSpace(path))
-            _main.OpenInNewTab(new FolderLocation(path), _main.ActivePane);
+        if (_main is null || string.IsNullOrWhiteSpace(path)) return;
+        if (path.StartsWith(ConnectPrefix, StringComparison.Ordinal)) _main.ConnectByName(path[ConnectPrefix.Length..]);
+        else _main.OpenInNewTab(new FolderLocation(path), _main.ActivePane);
+    }
+
+    // Not a valid path start, so a forwarded folder can never be mistaken for it.
+    private const string ConnectPrefix = "\u0001connect:";
+
+    /// <summary>The server name after /c (or /connect, --connect); <paramref name="rest"/> is every other argument.</summary>
+    private static string? ConnectArgument(string[] args, out List<string> rest)
+    {
+        rest = new List<string>();
+        string? name = null;
+        for (var i = 0; i < args.Length; i++)
+        {
+            var a = args[i];
+            if (a.Equals("/c", StringComparison.OrdinalIgnoreCase) || a.Equals("/connect", StringComparison.OrdinalIgnoreCase)
+                || a.Equals("--connect", StringComparison.OrdinalIgnoreCase))
+            {
+                if (i + 1 < args.Length) name = args[++i];
+                continue;
+            }
+            if (a.StartsWith("/c:", StringComparison.OrdinalIgnoreCase)) { name = a[3..]; continue; }
+            rest.Add(a);
+        }
+        return string.IsNullOrWhiteSpace(name) ? null : name.Trim();
     }
 
     /// <summary>Called by MainWindow.Closing so tabs/settings are saved while the window still exists.</summary>

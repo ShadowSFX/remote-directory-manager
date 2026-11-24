@@ -58,6 +58,14 @@ public static class ConnectionStore
         node.DesktopCredentials ??= new CredentialSettings();
         node.Rdp ??= new RdpProfile();
         if (node.Rdp.ColorDepth is { } depth && depth is not (16 or 24 or 32)) node.Rdp.ColorDepth = null;
+        if (node.Rdp.Gateway is { } gateway)
+        {
+            if (!Enum.IsDefined(gateway.Usage)) gateway.Usage = RdpGatewayUsage.Always;
+            if (!Enum.IsDefined(gateway.Logon)) gateway.Logon = RdpGatewayLogon.SameAsServer;
+            gateway.Host = (gateway.Host ?? "").Trim();
+            gateway.Username = string.IsNullOrWhiteSpace(gateway.Username) ? null : gateway.Username.Trim();
+            if (gateway.Usage != RdpGatewayUsage.Off && gateway.Host.Length == 0) node.Rdp.Gateway = null; // nothing to use
+        }
         switch (node)
         {
             case GroupNode g:
@@ -98,6 +106,7 @@ public static class ConnectionStore
     {
         node.Credentials.ProtectedPassword = null;
         node.DesktopCredentials.ProtectedPassword = null;
+        if (node.Rdp?.Gateway is { } gw) gw.ProtectedPassword = null;
         if (node is GroupNode g) foreach (var c in g.Children) StripSecrets(c);
     }
 

@@ -20,6 +20,8 @@
 - **Credencial guardada de Windows**: usa la que ya guardó *Conexión a Escritorio remoto* para ese equipo, sin copiar el secreto; o usuario y contraseña, credenciales guardadas reutilizables, o igual que para archivos.
 - **Opciones heredables en un solo lugar** (portapapeles, unidades, impresoras, sonido, atajos de Windows, NLA, verificación del servidor, Admin restringido / Remote Credential Guard, sesión de administración, colores): cada opción muestra qué valor heredará y de qué grupo, en vez de las casillas "heredar" de RDCMan en cada pestaña.
 - **Errores explicados** (credenciales, cuenta bloqueada, contraseña vencida, sesión tomada por otro equipo, inactividad, licencias…) con la acción para resolverlos.
+- **Escritorio en una ventana aparte** (botón de la barra, menú de la pestaña o del servidor): llévalo a otro monitor, con su propia pantalla completa; vuelve a una pestaña cuando quieras. Al moverse se reconecta, y lo que tenías abierto en el servidor sigue ahí.
+- **Puerta de enlace (RD Gateway)** por grupo o servidor, heredable: siempre o salvo direcciones locales, iniciando sesión con la cuenta del servidor, tu usuario de Windows o una propia (también se importa desde RDCMan).
 - Ctrl+Alt+Supr, pantalla completa (F11) y `Ctrl+Alt+←` para devolverle el teclado a RDMan.
 
 ### Archivos
@@ -55,7 +57,7 @@
 | `Shift+Enter` en `Ctrl+K` | Abrir la otra vista (archivos ↔ escritorio) |
 | `Ctrl+Alt+←` | Dentro de una sesión: devolver el teclado a RDMan |
 
-`RDMan.exe \\servidor\recurso` abre esa ruta en una pestaña (en la ventana que ya esté abierta).
+`RDMan.exe \\servidor\recurso` abre esa ruta en una pestaña (en la ventana que ya esté abierta). `RDMan.exe /c Nombre` conecta al escritorio de ese servidor (por su nombre en RDMan o su dirección).
 
 ### Notas
 

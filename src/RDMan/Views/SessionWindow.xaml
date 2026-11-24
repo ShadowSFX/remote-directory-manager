@@ -1,0 +1,100 @@
+<Window x:Class="RDMan.Views.SessionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:RDMan.Infrastructure"
+        xmlns:vm="clr-namespace:RDMan.ViewModels"
+        Background="{DynamicResource Bg.Content}" Foreground="{DynamicResource Fg.Primary}"
+        FontFamily="{DynamicResource Font.UI}" FontSize="{DynamicResource Size.Body}"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display"
+        MinWidth="480" MinHeight="320" ShowInTaskbar="True" WindowStartupLocation="Manual">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ═══════════ Toolbar (hidden in full screen) ═══════════ -->
+        <Grid x:Name="Toolbar" Height="46" Margin="8,0,8,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Identity: the server's color and name -->
+                <Border Width="3" Height="18" CornerRadius="1.5" Background="{Binding Server.ColorBrush}" Margin="6,0,10,0" />
+                <TextBlock Text="{Binding Server.Name}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,10,0" />
+                <Border Width="1" Height="18" Background="{DynamicResource Line}" Margin="2,0,6,0" />
+                <Button x:Name="FocusTarget" Style="{StaticResource Btn.Icon}" Content="&#xE72C;" Command="{Binding ReconnectCommand}" ToolTip="{ui:Tr Desktop.Reconnect}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE765;" Command="{Binding SendCtrlAltDelCommand}" ToolTip="{ui:Tr Desktop.CtrlAltDel}"
+                        IsEnabled="{Binding IsConnected}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE740;" Command="{Binding FullScreenCommand}" ToolTip="{ui:Tr Undock.FullScreen}"
+                        IsEnabled="{Binding IsConnected}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE7E8;" Command="{Binding DisconnectCommand}" ToolTip="{ui:Tr Desktop.Disconnect}"
+                        IsEnabled="{Binding IsConnected}" />
+                <Border Width="1" Height="18" Background="{DynamicResource Line}" Margin="6,0" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE90C;" Click="Dock_Click" ToolTip="{ui:Tr Undock.Dock}" />
+            </StackPanel>
+            <TextBlock Grid.Column="2" Text="{Binding ConnectedAs}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="12,0,6,0"
+                       Visibility="{Binding IsConnected, Converter={StaticResource Vis}}" TextTrimming="CharacterEllipsis" />
+        </Grid>
+        <Border x:Name="ToolbarLine" Grid.Row="1" Height="1" Background="{DynamicResource Line}" />
+
+        <!-- ═══════════ Content ═══════════ -->
+        <Grid Grid.Row="2">
+            <ContentControl x:Name="Surface" Content="{Binding Host}" Focusable="False"
+                            Visibility="{Binding IsSurfaceVisible, Converter={StaticResource Vis}}" />
+
+            <!-- Not connected -->
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460" Margin="32"
+                        Visibility="{Binding ShowIdle, Converter={StaticResource Vis}}">
+                <Border Width="64" Height="64" CornerRadius="32" Background="{DynamicResource Accent.Subtle}" HorizontalAlignment="Center">
+                    <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="26" Foreground="{DynamicResource Accent.Text}" />
+                </Border>
+                <TextBlock Style="{StaticResource Text.Title}" HorizontalAlignment="Center" Margin="0,18,0,8" TextAlignment="Center" TextWrapping="Wrap"
+                           Text="{Binding Server.Name}" />
+                <TextBlock Text="{ui:Tr Undock.Idle.Body}" Style="{StaticResource Text.Secondary}" TextAlignment="Center" TextWrapping="Wrap" />
+                <Button Style="{StaticResource Btn.Primary}" HorizontalAlignment="Center" Margin="0,20,0,0" MinWidth="140" Height="36"
+                        Command="{Binding ConnectCommand}" AutomationProperties.Name="{ui:Tr Desktop.Connect}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="13" Margin="0,0,8,0" />
+                        <TextBlock Text="{ui:Tr Desktop.Connect}" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <!-- Error -->
+            <ContentControl Content="{Binding Error}" Focusable="False"
+                            Visibility="{Binding Error, Converter={StaticResource VisIfAny}, FallbackValue=Collapsed, TargetNullValue=Collapsed}">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate DataType="{x:Type vm:ErrorInfo}">
+                        <StackPanel MaxWidth="480" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="32">
+                            <Border Width="52" Height="52" CornerRadius="26" Background="{DynamicResource Danger.Subtle}" HorizontalAlignment="Left">
+                                <TextBlock Text="&#xE7BA;" Style="{StaticResource Icon}" FontSize="22" Foreground="{DynamicResource Danger}" />
+                            </Border>
+                            <TextBlock Text="{Binding Title}" Style="{StaticResource Text.Title}" Margin="0,18,0,8" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Detail}" Style="{StaticResource Text.Secondary}" FontSize="14" LineHeight="21" />
+                            <TextBlock Text="{Binding CodeText}" Style="{StaticResource Text.Mono}" FontSize="11.5" Foreground="{DynamicResource Fg.Tertiary}"
+                                       Margin="0,12,0,0" TextWrapping="Wrap" TextTrimming="None" />
+                            <StackPanel Orientation="Horizontal" Margin="0,22,0,0">
+                                <Button Style="{StaticResource Btn.Primary}" Content="{Binding PrimaryText}"
+                                        Command="{Binding DataContext.ErrorPrimaryCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+        </Grid>
+
+        <!-- Full screen: the way out, above the session (airspace: a Popup) -->
+        <Popup x:Name="FullScreenBar" Placement="Top" AllowsTransparency="True" StaysOpen="True" PopupAnimation="Fade">
+            <Border Background="{DynamicResource Bg.Raised}" BorderBrush="{DynamicResource Line.Strong}" BorderThickness="1,0,1,1" CornerRadius="0,0,8,8" Padding="6,4">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="{Binding Server.Name}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,10,0" />
+                    <Button Style="{StaticResource Btn.Icon}" Content="&#xE73F;" Click="ExitFullScreen_Click" ToolTip="{ui:Tr Desktop.ExitFullScreen}" />
+                </StackPanel>
+            </Border>
+        </Popup>
+    </Grid>
+</Window>

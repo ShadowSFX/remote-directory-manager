@@ -447,7 +447,7 @@ public partial class MainWindow : Window
         // Closing ends every embedded desktop session: ask once (not when Windows itself is signing out).
         if (!App.IsWindowsSessionEnding && !_vm.SessionsEndConfirmed)
         {
-            if (!_vm.ConfirmEndSessions(_vm.AllTabs))
+            if (!_vm.ConfirmEndAllSessions())
             {
                 e.Cancel = true;
                 return;
