@@ -43,6 +43,12 @@ elif [ -r ~/.bash_login ]; then . ~/.bash_login
 elif [ -r ~/.profile ]; then . ~/.profile
 fi
 
+# What a login shows (updates, "System restart required"…) unless the user silenced it with ~/.hushlogin.
+if [ ! -e ~/.hushlogin ]; then
+  for __rdman_motd in /run/motd.dynamic /etc/motd; do [ -s "$__rdman_motd" ] && cat "$__rdman_motd"; done
+  unset __rdman_motd
+fi
+
 __rdman_arrow={{Arrow}}
 __rdman_thin={{Thin}}
 __rdman_branch={{Branch}}

@@ -6,38 +6,37 @@ using RDMan.Infrastructure;
 namespace RDMan;
 
 /// <summary>
-/// Window shortcuts. They used to be Window.InputBindings, but a terminal (WebView2) re-raises its accelerator keys
-/// as WPF key events, so bindings would steal keys the shell needs (Ctrl+W deletes a word, Ctrl+K kills the line,
-/// F3/F6 belong to mc/htop). One table decides: everywhere else every shortcut works; inside a terminal only the
-/// ones marked <c>InTerminal</c> (Ctrl+Shift combos, Ctrl+Tab, F11) — everything else goes to the server.
+/// Window shortcuts, one table (formerly Window.InputBindings). Keys typed in a terminal never come through here: the
+/// WebView2 doesn't hand them to the window reliably, so the terminal page recognizes the few RDMan keeps inside a
+/// terminal (bridge.js appShortcut → MainViewModel.RunTerminalShortcut) and everything else goes to the shell.
 /// </summary>
 public partial class MainWindow
 {
-    private sealed record Shortcut(Key Key, ModifierKeys Modifiers, Func<ICommand> Command, bool InTerminal);
+    private sealed record Shortcut(Key Key, ModifierKeys Modifiers, Func<ICommand> Command);
 
     private Shortcut[]? _shortcuts;
 
     private Shortcut[] Shortcuts => _shortcuts ??=
     [
-        new(Key.K, ModifierKeys.Control, () => _vm.OpenPaletteCommand, false),
-        new(Key.P, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.OpenPaletteCommand, true),
-        new(Key.K, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.OpenPaletteCommand, true),
-        new(Key.T, ModifierKeys.Control, () => _vm.NewTabCommand, false),
-        new(Key.T, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.NewTerminalTabCommand, true),
-        new(Key.W, ModifierKeys.Control, () => _vm.CloseTabCommand, false),
-        new(Key.W, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.CloseTabCommand, true),
-        new(Key.F4, ModifierKeys.Control, () => _vm.CloseTabCommand, true),
-        new(Key.Tab, ModifierKeys.Control, () => _vm.NextTabCommand, true),
-        new(Key.Tab, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.PreviousTabCommand, true),
-        new(Key.F3, ModifierKeys.None, () => _vm.SplitRightCommand, false),
-        new(Key.F6, ModifierKeys.None, () => _vm.FocusOtherPaneCommand, false),
-        new(Key.N, ModifierKeys.Control, () => _vm.NewServerCommand, false),
-        new(Key.G, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.NewGroupCommand, false),
-        new(Key.OemComma, ModifierKeys.Control, () => _vm.OpenSettingsCommand, true),
-        new(Key.D, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.OpenActiveServerDesktopCommand, true),
-        new(Key.F11, ModifierKeys.None, () => _vm.ToggleFullScreenCommand, true),
-        new(Key.E, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.ToggleTerminalSftpCommand, true),
-        new(Key.B, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.ToggleTerminalBroadcastCommand, true),
+        new(Key.K, ModifierKeys.Control, () => _vm.OpenPaletteCommand),
+        new(Key.P, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.OpenPaletteCommand),
+        new(Key.K, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.OpenPaletteCommand),
+        new(Key.T, ModifierKeys.Control, () => _vm.NewTabCommand),
+        new(Key.T, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.NewTerminalTabCommand),
+        new(Key.W, ModifierKeys.Control, () => _vm.CloseTabCommand),
+        new(Key.W, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.CloseTabCommand),
+        new(Key.F4, ModifierKeys.Control, () => _vm.CloseTabCommand),
+        new(Key.Tab, ModifierKeys.Control, () => _vm.NextTabCommand),
+        new(Key.Tab, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.PreviousTabCommand),
+        new(Key.F3, ModifierKeys.None, () => _vm.SplitRightCommand),
+        new(Key.F6, ModifierKeys.None, () => _vm.FocusOtherPaneCommand),
+        new(Key.N, ModifierKeys.Control, () => _vm.NewServerCommand),
+        new(Key.G, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.NewGroupCommand),
+        new(Key.OemComma, ModifierKeys.Control, () => _vm.OpenSettingsCommand),
+        new(Key.D, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.OpenActiveServerDesktopCommand),
+        new(Key.F11, ModifierKeys.None, () => _vm.ToggleFullScreenCommand),
+        new(Key.E, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.ToggleTerminalSftpCommand),
+        new(Key.B, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.ToggleTerminalBroadcastCommand),
     ];
 
     /// <summary>The key comes from a terminal's WebView2 (the page has the keyboard).</summary>
@@ -48,21 +47,15 @@ public partial class MainWindow
     private bool HandleShortcut(KeyEventArgs e, out bool fromTerminal)
     {
         fromTerminal = FromTerminal(e);
+        // Inside a terminal the page itself recognizes RDMan's shortcuts (bridge.js appShortcut) and everything else
+        // belongs to the shell: never act on a key event that comes from there (it would run twice or steal it).
+        if (fromTerminal) return false;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         var mods = Keyboard.Modifiers;
-
-        // Ctrl+Alt+←/→ gives the keyboard back to RDMan, like inside a remote desktop.
-        if (fromTerminal && mods == (ModifierKeys.Control | ModifierKeys.Alt) && key is Key.Left or Key.Right)
-        {
-            if (_vm.ActiveTab?.Session is ViewModels.Terminal.SshSessionViewModel terminal) terminal.ReleaseFocus();
-            e.Handled = true;
-            return true;
-        }
 
         foreach (var s in Shortcuts)
         {
             if (s.Key != key || s.Modifiers != mods) continue;
-            if (fromTerminal && !s.InTerminal) return false;
             var command = s.Command();
             if (command.CanExecute(null)) command.Execute(null);
             e.Handled = true;

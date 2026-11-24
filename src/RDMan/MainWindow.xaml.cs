@@ -47,6 +47,10 @@ public partial class MainWindow : Window
                 }
                 Dispatcher.BeginInvoke(() => { PaletteInput.Focus(); Keyboard.Focus(PaletteInput); }, System.Windows.Threading.DispatcherPriority.Input);
             }
+            // Back to the terminal it was opened from (unless what was chosen moved the focus elsewhere).
+            if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen) && !vm.Palette.IsOpen
+                && vm.ActiveTab?.Session is ViewModels.Terminal.SshSessionViewModel { IsSurfaceVisible: true } terminal)
+                Dispatcher.BeginInvoke(() => { if (Keyboard.FocusedElement is null or Window) terminal.Focus(); }, System.Windows.Threading.DispatcherPriority.Input);
             if (e.PropertyName == nameof(CommandPaletteViewModel.Selected) && vm.Palette.Selected is { } sel)
                 PaletteList.ScrollIntoView(sel);
         };

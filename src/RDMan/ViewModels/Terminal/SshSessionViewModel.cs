@@ -85,7 +85,6 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
 
     // In-page cards and banners: action id → handler.
     private readonly Dictionary<string, Action<JsonElement>> _actions = new();
-    private int _actionSeq;
     private readonly Dictionary<string, TaskCompletionSource<string>> _serialized = new();
 
     private readonly DispatcherTimer _thumbTimer = new() { Interval = TimeSpan.FromSeconds(3) };
@@ -1048,6 +1047,10 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
             case "activate":
                 RaiseActivated();
                 break;
+            case "shortcut":
+                if (Str(m, "k") == "release") ReleaseFocus();
+                else _main.RunTerminalShortcut(Str(m, "k"));
+                break;
             case "prompt":
                 _sawPrompt = true;
                 SendStartupCommand();
@@ -1210,16 +1213,22 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
 
     // ───────────── Cards, banners, lines ─────────────
 
+    // Buttons of the card/banner being built carry its generation ("c7:…"). Their handlers are registered while the
+    // card's object is built, i.e. before Card()/Banner() runs: those calls drop only older generations.
+    private int _cardSeq;
+    private int _bannerSeq;
+    private int _shownCard = -1;
+
     private object CardAction(string label, string style, Action<JsonElement> run, bool cancel = false, bool isDefault = false, bool focus = false)
     {
-        var id = $"c{_actionSeq}:{Guid.NewGuid():N}";
+        var id = $"c{_cardSeq}:{Guid.NewGuid():N}";
         _actions[id] = run;
         return new { id, label, style, cancel, @default = isDefault, focus };
     }
 
     private object BannerAction(string label, string style, Action run)
     {
-        var id = $"b{_actionSeq}:{Guid.NewGuid():N}";
+        var id = $"b{_bannerSeq}:{Guid.NewGuid():N}";
         _actions[id] = _ => run();
         return new { id, label, style };
     }
@@ -1230,18 +1239,26 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         var pending = _cancelPendingCard;
         _cancelPendingCard = null;
         pending?.Invoke();
-        _actionSeq++;
-        foreach (var k in _actions.Keys.Where(k => k.StartsWith('c')).ToList()) _actions.Remove(k);
+        DropActions('c', card is null ? null : $"c{_cardSeq}:");
+        _shownCard = card is null ? -1 : _cardSeq;
+        _cardSeq++;
         _terminal?.Send(new { t = "card", card });
     }
 
     /// <summary>Shows a banner; null clears it — and brings back the broadcast warning when it applies.</summary>
     private void Banner(object? banner)
     {
-        foreach (var k in _actions.Keys.Where(k => k.StartsWith('b')).ToList()) _actions.Remove(k);
-        _actionSeq++;
         banner ??= IsConnected ? BroadcastBanner() : null;
+        DropActions('b', banner is null ? null : $"b{_bannerSeq}:");
+        _bannerSeq++;
         _terminal?.Send(new { t = "banner", banner });
+    }
+
+    /// <summary>Forgets the handlers of cards (or banners) no longer shown, keeping the ones of <paramref name="keep"/>.</summary>
+    private void DropActions(char kind, string? keep)
+    {
+        foreach (var k in _actions.Keys.Where(k => k[0] == kind && (keep is null || !k.StartsWith(keep, StringComparison.Ordinal))).ToList())
+            _actions.Remove(k);
     }
 
     private void Line(string text) => _terminal?.Write(text + "\r\n");
@@ -1356,14 +1373,14 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
             {
                 if (_terminal is null || _disposed) { tcs.TrySetResult(null); return; }
                 show(r => tcs.TrySetResult(r), ct);
-                mySeq = _actionSeq;
+                mySeq = _shownCard;
                 _cancelPendingCard = () => tcs.TrySetResult(null);
                 AttentionRequested?.Invoke(this, attention);
             });
             await using var reg = ct.Register(() =>
             {
                 tcs.TrySetResult(null);
-                _ui.BeginInvoke(() => { if (_actionSeq == mySeq) Card(null); });
+                _ui.BeginInvoke(() => { if (_shownCard == mySeq) Card(null); });
             });
             return await tcs.Task.ConfigureAwait(false);
         }

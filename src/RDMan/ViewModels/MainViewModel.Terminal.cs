@@ -111,6 +111,34 @@ public sealed partial class MainViewModel
         if ((node ?? TreeSelection) is ServerNodeViewModel s) OpenTerminal(s, OpenTarget.OtherPane, newShell: true);
     }
 
+    /// <summary>An RDMan shortcut pressed inside a terminal (the page recognizes them; see bridge.js appShortcut).</summary>
+    public void RunTerminalShortcut(string key)
+    {
+        if (key == "palette")
+        {
+            // The terminal (WebView2, another process) holds the keyboard: take it back into RDMan's window first, or the
+            // palette opens without focus and closes at once (it closes whenever it isn't focused).
+            Owner?.Focus();
+            Owner?.Dispatcher.BeginInvoke(() => OpenPaletteCommand.Execute(null), System.Windows.Threading.DispatcherPriority.Input);
+            return;
+        }
+        System.Windows.Input.ICommand? command = key switch
+        {
+            "palette" => OpenPaletteCommand,
+            "new-terminal" => NewTerminalTabCommand,
+            "close-tab" => CloseTabCommand,
+            "sftp" => ToggleTerminalSftpCommand,
+            "broadcast" => ToggleTerminalBroadcastCommand,
+            "desktop" => OpenActiveServerDesktopCommand,
+            "next-tab" => NextTabCommand,
+            "prev-tab" => PreviousTabCommand,
+            "settings" => OpenSettingsCommand,
+            "fullscreen" => ToggleFullScreenCommand,
+            _ => null,
+        };
+        if (command?.CanExecute(null) == true) command.Execute(null);
+    }
+
     /// <summary>Ctrl+Shift+E: the SFTP panel of the terminal in front.</summary>
     [RelayCommand]
     private void ToggleTerminalSftp()

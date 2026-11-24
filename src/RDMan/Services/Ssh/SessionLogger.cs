@@ -12,7 +12,8 @@ public sealed class SessionLogger : IDisposable
 {
     private readonly AnsiStripper _stripper = new();
     private readonly StreamWriter _writer;
-    private readonly System.Threading.Channels.Channel<string> _queue = System.Threading.Channels.Channel.CreateUnbounded<string>(new() { SingleReader = true });
+    // Multi-reader flavor on purpose: it supports Reader.Count (the single-reader one throws), used to flush when idle.
+    private readonly System.Threading.Channels.Channel<string> _queue = System.Threading.Channels.Channel.CreateUnbounded<string>();
     private readonly Task _pump;
 
     private SessionLogger(string path)
@@ -68,8 +69,9 @@ public sealed class SessionLogger : IDisposable
                 if (_queue.Reader.Count == 0) await _writer.FlushAsync().ConfigureAwait(false);
             }
         }
-        catch (Exception ex) when (ex is IOException or ObjectDisposedException)
+        catch (Exception ex)
         {
+            // Never die silently: an empty log with no reason is worse than a logged failure.
             App.Log(ex);
         }
     }

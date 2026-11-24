@@ -357,6 +357,7 @@ public static partial class Strings
         T("Term.Forward.Listening", "Reenviando {0}", "Forwarding {0}");
         T("Term.Forward.Failed", "No se pudo reenviar {0}: {1}", "Couldn't forward {0}: {1}");
         T("Term.Forward.Stopped", "Detenido: {0}", "Stopped: {0}");
+        T("Term.Forward.OtherTab", "ya lo reenvía otra terminal de RDMan", "another RDMan terminal already forwards it");
         T("Term.Forward.InUse", "el puerto local ya está en uso", "the local port is already in use");
         T("Term.Forward.Start", "Iniciar", "Start");
         T("Term.Forward.Stop", "Detener", "Stop");

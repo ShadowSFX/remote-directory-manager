@@ -54,7 +54,7 @@ public sealed partial class ForwardViewModel : ObservableObject
     {
         ForwardState.Listening => Loc.F("Term.Forward.Listening", Forward.ToString()),
         ForwardState.Failed => Loc.F("Term.Forward.Failed", Forward.ToString(), Problem ?? ""),
-        _ => Loc.F("Term.Forward.Stopped", Forward.ToString()),
+        _ => Loc.F("Term.Forward.Stopped", Forward.ToString()) + (Problem is null ? "" : $" ({Problem})"),
     };
 
     /// <summary>Web-ish ports open in the browser from the chip menu.</summary>
@@ -86,6 +86,9 @@ public sealed partial class ForwardViewModel : ObservableObject
 /// <summary>Starts and stops a session's port forwards on its SSH client; failures stay visible per chip.</summary>
 public sealed class ForwardingManager : IDisposable
 {
+    /// <summary>Local ports RDMan is already listening on (any terminal), so a second shell doesn't fight for them.</summary>
+    private static readonly Dictionary<string, ForwardingManager> Taken = new(StringComparer.OrdinalIgnoreCase);
+
     private SshClient? _client;
 
     public ObservableCollection<ForwardViewModel> Items { get; } = new();
@@ -120,6 +123,13 @@ public sealed class ForwardingManager : IDisposable
         if (_client is not { IsConnected: true } client || item.IsListening) return;
         var f = item.Forward;
         var bind = string.IsNullOrWhiteSpace(f.BindAddress) ? "127.0.0.1" : f.BindAddress == "*" ? "0.0.0.0" : f.BindAddress!;
+        var key = TakenKey(f, bind);
+        if (key is not null && Taken.TryGetValue(key, out var owner) && !ReferenceEquals(owner, this))
+        {
+            item.Problem = Loc.T("Term.Forward.OtherTab");
+            item.State = ForwardState.Stopped;
+            return;
+        }
         ForwardedPort? port = null;
         try
         {
@@ -139,6 +149,7 @@ public sealed class ForwardingManager : IDisposable
             item.Port = port;
             item.Problem = null;
             item.State = ForwardState.Listening;
+            if (key is not null) Taken[key] = this;
         }
         catch (Exception ex) when (ex is SocketException or SshException or InvalidOperationException or ArgumentException)
         {
@@ -149,8 +160,15 @@ public sealed class ForwardingManager : IDisposable
         }
     }
 
+    /// <summary>Local listeners only (-L, -D); a remote forward listens on the server.</summary>
+    private static string? TakenKey(SshForward f, string bind)
+        => f.Kind == SshForwardKind.Remote ? null : $"{bind}:{f.BindPort}";
+
     public void Stop(ForwardViewModel item)
     {
+        var f = item.Forward;
+        var bind = string.IsNullOrWhiteSpace(f.BindAddress) ? "127.0.0.1" : f.BindAddress == "*" ? "0.0.0.0" : f.BindAddress!;
+        if (TakenKey(f, bind) is { } key && Taken.TryGetValue(key, out var owner) && ReferenceEquals(owner, this)) Taken.Remove(key);
         if (item.Port is { } port)
         {
             try { port.Stop(); } catch (Exception ex) when (ex is SshException or ObjectDisposedException or SocketException) { }

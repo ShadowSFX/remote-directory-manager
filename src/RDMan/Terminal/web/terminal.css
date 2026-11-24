@@ -229,6 +229,7 @@ button:focus-visible, input:focus-visible {
 #card-detail dt { color: var(--ui-fg3); }
 #card-detail dd { margin: 0; font-family: "Cascadia Code NF", monospace; color: var(--ui-fg); word-break: break-all; }
 #card-pre {
+  font-variant-ligatures: none; /* randomart and code must keep one glyph per column */
   margin: 16px 0 0;
   padding: 10px 12px;
   border-radius: 6px;

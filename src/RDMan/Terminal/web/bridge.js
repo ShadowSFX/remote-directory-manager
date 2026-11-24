@@ -135,6 +135,25 @@
       }
     });
 
+    // RDMan's shortcuts also work when the focus is on a card, banner or menu of the page (not in xterm's input).
+    document.addEventListener('keydown', (e) => {
+      if (e.target === term.textarea) return; // xterm's own handler (onKey) takes care of it
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      const app = appShortcut(e.ctrlKey, e.shiftKey, e.altKey, k);
+      if (!app) return;
+      e.preventDefault();
+      e.stopPropagation();
+      post({ t: 'shortcut', k: app });
+    }, true);
+
+    // Every paste (Ctrl+V, Shift+Insert, the browser's own) goes through RDMan: multi-line guard, CRLF cleanup.
+    document.addEventListener('paste', (e) => {
+      if (e.target instanceof HTMLInputElement) return; // the search box and card fields paste normally
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      post({ t: 'paste-request' });
+    }, true);
+
     new ResizeObserver(scheduleFit).observe($('term'));
     $('term').addEventListener('wheel', onWheel, { passive: false });
     $('term').addEventListener('contextmenu', onContextMenu);
@@ -249,8 +268,19 @@
   // ───────────── Keyboard ─────────────
   function onKey(e) {
     if (e.type !== 'keydown') return true;
+    const handled = handleKey(e);
+    // The browser must not also act on a key RDMan took (Ctrl+Shift+V would paste natively, bypassing the guard).
+    if (!handled) e.preventDefault();
+    return handled;
+  }
+
+  function handleKey(e) {
     const ctrl = e.ctrlKey, shift = e.shiftKey, alt = e.altKey;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+
+    // RDMan's own shortcuts. The WPF WebView2 doesn't hand these keys to the window, so the page asks for them.
+    const app = appShortcut(ctrl, shift, alt, k);
+    if (app) { post({ t: 'shortcut', k: app }); return false; }
 
     if (ctrl && shift && !alt && k === 'c') { copySelection(); return false; }
     if (ctrl && !shift && !alt && k === 'c' && smartCtrlC && term.hasSelection()) { copySelection(); term.clearSelection(); return false; }
@@ -268,6 +298,28 @@
     if (ctrl && shift && !alt && k === 'Home') { term.scrollToTop(); return false; }
     if (ctrl && shift && !alt && k === 'End') { term.scrollToBottom(); return false; }
     return true;
+  }
+
+  /** The few keys RDMan keeps inside a terminal (everything else belongs to the shell). */
+  function appShortcut(ctrl, shift, alt, k) {
+    if (ctrl && shift && !alt) {
+      switch (k) {
+        case 'p': case 'k': return 'palette';
+        case 't': return 'new-terminal';
+        case 'w': return 'close-tab';
+        case 'e': return 'sftp';
+        case 'b': return 'broadcast';
+        case 'd': return 'desktop';
+        case 'Tab': return 'prev-tab';
+      }
+    }
+    if (ctrl && !shift && !alt && k === 'Tab') return 'next-tab';
+    if (ctrl && !shift && !alt && k === 'F4') return 'close-tab';
+    if (ctrl && !shift && !alt && k === ',') return 'settings';
+    if (!ctrl && !shift && !alt && k === 'F11') return 'fullscreen';
+    // Ctrl+Alt+arrows only: other Ctrl+Alt keys are AltGr characters (@, #, € on many layouts).
+    if (ctrl && alt && !shift && (k === 'ArrowLeft' || k === 'ArrowRight')) return 'release';
+    return null;
   }
 
   function copySelection() {
