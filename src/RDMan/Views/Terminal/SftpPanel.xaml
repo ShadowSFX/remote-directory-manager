@@ -1,0 +1,124 @@
+<UserControl x:Class="RDMan.Views.SftpPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:RDMan.Infrastructure"
+             xmlns:tvm="clr-namespace:RDMan.ViewModels.Terminal"
+             Background="{DynamicResource Bg.Content}" AllowDrop="True" DragOver="Panel_DragOver" Drop="Panel_Drop">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Grid Height="44" Margin="12,0,6,0">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Secondary}" />
+                <TextBlock Text="{ui:Tr Sftp.Title}" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button Style="{StaticResource Btn.IconToggle}" Content="&#xE8B5;" ToolTip="{ui:Tr Sftp.Follow}" ui:Ui.IsOn="{Binding FollowTerminal}"
+                        Click="Follow_Click" AutomationProperties.Name="{ui:Tr Sftp.Follow}" />
+                <Button Style="{StaticResource Btn.IconToggle}" Content="&#xE890;" ToolTip="{ui:Tr Sftp.Hidden}" ui:Ui.IsOn="{Binding ShowHidden}"
+                        Click="Hidden_Click" AutomationProperties.Name="{ui:Tr Sftp.Hidden}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE898;" ToolTip="{ui:Tr Sftp.Upload}" Command="{Binding UploadPickedCommand}"
+                        AutomationProperties.Name="{ui:Tr Sftp.Upload}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE8F4;" ToolTip="{ui:Tr Sftp.NewFolder}" Command="{Binding NewFolderCommand}"
+                        AutomationProperties.Name="{ui:Tr Sftp.NewFolder}" />
+                <Button Style="{StaticResource Btn.Icon}" Content="&#xE711;" ToolTip="{ui:Tr Common.Close}" Click="Close_Click"
+                        AutomationProperties.Name="{ui:Tr Common.Close}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- Path -->
+        <Grid Grid.Row="1" Margin="8,0,8,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Button Style="{StaticResource Btn.Icon}" Content="&#xE74A;" Command="{Binding UpCommand}" ToolTip="{ui:Tr Nav.Up}" AutomationProperties.Name="{ui:Tr Nav.Up}" />
+            <TextBox Grid.Column="1" Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" Margin="4,0"
+                     KeyDown="Path_KeyDown" AutomationProperties.Name="{ui:Tr Sftp.Path}" />
+            <Button Grid.Column="2" Style="{StaticResource Btn.Icon}" Content="&#xE72C;" Command="{Binding RefreshCommand}" ToolTip="{ui:Tr Nav.Refresh}"
+                    AutomationProperties.Name="{ui:Tr Nav.Refresh}" />
+        </Grid>
+
+        <!-- Listing -->
+        <Border Grid.Row="2" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0">
+            <Grid>
+                <ListBox x:Name="List" ItemsSource="{Binding Entries}" SelectedItem="{Binding Selected}" Background="Transparent" BorderThickness="0"
+                         Padding="4" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True"
+                         MouseDoubleClick="List_MouseDoubleClick" KeyDown="List_KeyDown" ContextMenuOpening="List_ContextMenuOpening"
+                         PreviewMouseRightButtonDown="List_PreviewMouseRightButtonDown">
+                    <ListBox.ContextMenu>
+                        <ContextMenu />
+                    </ListBox.ContextMenu>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type tvm:SftpEntry}">
+                            <Grid Margin="2,1" ToolTip="{Binding FullName}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="Icon" Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Tertiary}"
+                                           Margin="0,0,10,0" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Style="{StaticResource Text.Caption}" FontSize="11" TextTrimming="CharacterEllipsis">
+                                        <Run Text="{Binding Permissions, Mode=OneWay}" FontFamily="{StaticResource Font.Mono}" /><Run Text="  " /><Run Text="{Binding ModifiedText, Mode=OneWay}" />
+                                    </TextBlock>
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" Text="{Binding SizeText}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="8,0,2,0" />
+                            </Grid>
+                            <DataTemplate.Triggers>
+                                <DataTrigger Binding="{Binding IsDirectory}" Value="True">
+                                    <Setter TargetName="Icon" Property="Foreground" Value="{DynamicResource Accent.Text}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <ProgressBar Style="{StaticResource Progress.Thin}" VerticalAlignment="Top" IsIndeterminate="True"
+                             Visibility="{Binding IsBusy, Converter={StaticResource Vis}}" />
+                <TextBlock Text="{Binding Error}" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="16" Foreground="{DynamicResource Danger}"
+                           Visibility="{Binding Error, Converter={StaticResource VisIfAny}}" />
+                <TextBlock Text="{ui:Tr Sftp.Empty}" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="16" TextAlignment="Center"
+                           Visibility="{Binding IsEmpty, Converter={StaticResource Vis}}" />
+            </Grid>
+        </Border>
+
+        <!-- Transfers -->
+        <Border Grid.Row="3" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="10,6"
+                Visibility="{Binding HasTransfers, Converter={StaticResource Vis}}">
+            <ItemsControl ItemsSource="{Binding Transfers}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type tvm:SftpTransfer}">
+                        <Grid Margin="0,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Fg.Secondary}" Margin="0,0,10,0" />
+                            <StackPanel Grid.Column="1">
+                                <Grid>
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" FontSize="12" Margin="0,0,70,0" />
+                                    <TextBlock Text="{Binding ProgressText}" Style="{StaticResource Text.Caption}" FontSize="11" HorizontalAlignment="Right" />
+                                </Grid>
+                                <ProgressBar Style="{StaticResource Progress.Thin}" Value="{Binding Percent, Mode=OneWay}" Maximum="100" Margin="0,4,0,0" />
+                                <TextBlock Text="{Binding Error}" Style="{StaticResource Text.Caption}" Foreground="{DynamicResource Danger}" TextWrapping="Wrap"
+                                           Visibility="{Binding Error, Converter={StaticResource VisIfAny}}" />
+                            </StackPanel>
+                            <Button Grid.Column="2" Style="{StaticResource Btn.IconSmall}" Content="&#xE711;" Margin="8,0,0,0" ToolTip="{ui:Tr Sftp.Stop}"
+                                    Command="{Binding DataContext.DismissTransferCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Border>
+    </Grid>
+</UserControl>

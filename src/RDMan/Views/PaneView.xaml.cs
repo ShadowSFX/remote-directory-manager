@@ -45,6 +45,9 @@ public partial class PaneView : UserControl
     /// <summary>The active tab's content area: remote-desktop surfaces are placed over it by the window's session overlay.</summary>
     public FrameworkElement ContentArea => TabView.ContentArea;
 
+    /// <summary>Where a session's native surface goes (the content area minus the SFTP panel).</summary>
+    public FrameworkElement SessionArea => TabView.SessionArea;
+
     /// <summary>Height of the tab strip row (drop zone for reordering / moving tabs).</summary>
     public const double StripHeight = 40;
 

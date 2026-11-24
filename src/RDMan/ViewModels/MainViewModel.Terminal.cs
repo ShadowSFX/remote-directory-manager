@@ -111,6 +111,20 @@ public sealed partial class MainViewModel
         if ((node ?? TreeSelection) is ServerNodeViewModel s) OpenTerminal(s, OpenTarget.OtherPane, newShell: true);
     }
 
+    /// <summary>Ctrl+Shift+E: the SFTP panel of the terminal in front.</summary>
+    [RelayCommand]
+    private void ToggleTerminalSftp()
+    {
+        if (ActiveTab?.Session is SshSessionViewModel t) t.ToggleSftp();
+    }
+
+    /// <summary>Ctrl+Shift+B: the terminal in front joins (or leaves) broadcast input.</summary>
+    [RelayCommand]
+    private void ToggleTerminalBroadcast()
+    {
+        if (ActiveTab?.Session is SshSessionViewModel { IsConnected: true } t) SetBroadcast(t, !t.IsBroadcasting);
+    }
+
     /// <summary>Ctrl+Shift+T: another shell on the same server when a terminal is in front, otherwise a new tab.</summary>
     [RelayCommand]
     private void NewTerminalTab()

@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="clr-namespace:RDMan.Infrastructure"
              xmlns:vm="clr-namespace:RDMan.ViewModels"
+             xmlns:v="clr-namespace:RDMan.Views"
              Background="{DynamicResource Bg.Content}">
     <UserControl.Resources>
         <!-- ───── Column header ───── -->
@@ -379,6 +380,10 @@
                         IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
                 <Button Style="{StaticResource Btn.Icon}" Content="&#xE74E;" Command="{Binding TerminalSession.SaveOutputCommand}" ToolTip="{ui:Tr Term.Tip.Save}"
                         IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
+                <Button Style="{StaticResource Btn.IconToggle}" Content="&#xE8B7;" Command="{Binding TerminalSession.ToggleSftpCommand}" ToolTip="{ui:Tr Term.Tip.Sftp}"
+                        ui:Ui.IsOn="{Binding TerminalSession.IsSftpOpen, FallbackValue=False}" IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
+                <Button Style="{StaticResource Btn.IconToggle}" Content="&#xE789;" Command="{Binding TerminalSession.ToggleBroadcastCommand}" ToolTip="{ui:Tr Term.Tip.Broadcast}"
+                        ui:Ui.IsOn="{Binding TerminalSession.IsBroadcasting, FallbackValue=False}" IsEnabled="{Binding TerminalSession.IsConnected, FallbackValue=False}" />
                 <Button Style="{StaticResource Btn.Icon}" Content="&#xE740;" Command="{Binding TerminalSession.FullScreenCommand}" ToolTip="{ui:Tr Desktop.FullScreen}"
                         IsEnabled="{Binding TerminalSession.IsSurfaceVisible, FallbackValue=False}" />
                 <Button Style="{StaticResource Btn.Icon}" Content="&#xE7E8;" Command="{Binding TerminalSession.DisconnectCommand}" ToolTip="{ui:Tr Desktop.Disconnect}"
@@ -532,6 +537,18 @@
 
         <!-- ═══════════ Content ═══════════ -->
         <Grid Grid.Row="3" x:Name="ContentArea">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="SftpSplitterColumn" Width="0" />
+                <ColumnDefinition x:Name="SftpColumn" Width="0" />
+            </Grid.ColumnDefinitions>
+            <!-- A session's native surface is placed exactly over this element (the window's overlay measures it) -->
+            <Border x:Name="SessionSurface" IsHitTestVisible="False" />
+            <!-- SFTP side panel of a terminal (columns sized in code: closed = 0) -->
+            <GridSplitter x:Name="SftpSplitter" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
+                          Background="{DynamicResource Line}" Visibility="Collapsed" DragCompleted="SftpSplitter_DragCompleted" Focusable="False" />
+            <v:SftpPanel x:Name="SftpPanelView" Grid.Column="2" Visibility="Collapsed" DataContext="{Binding TerminalSession.Sftp}"
+                         CloseRequested="SftpPanel_CloseRequested" />
             <!-- Desktop: not connected -->
             <StackPanel x:Name="IdlePanel" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="460" Margin="32"
                         Visibility="{Binding Session.ShowIdle, Converter={StaticResource Vis}, FallbackValue=Collapsed}">

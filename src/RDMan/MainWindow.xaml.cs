@@ -96,7 +96,7 @@ public partial class MainWindow : Window
         {
             if (SessionOverlay.ItemContainerGenerator.ContainerFromItem(tab) is not FrameworkElement container) continue;
             var rect = Rect.Empty;
-            if (tab.Session is not null && LayoutHost.ViewFor(tab.Pane) is { IsLoaded: true } view && view.ContentArea is { IsLoaded: true, ActualWidth: > 0 } area)
+            if (tab.Session is not null && LayoutHost.ViewFor(tab.Pane) is { IsLoaded: true } view && view.SessionArea is { IsLoaded: true, ActualWidth: > 0 } area)
             {
                 try
                 {

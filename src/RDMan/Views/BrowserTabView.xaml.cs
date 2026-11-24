@@ -44,12 +44,15 @@ public partial class BrowserTabView : UserControl
                 tab.PropertyChanged += OnTabPropertyChanged;
             }
             ApplyFullScreen();
+            WatchTerminal();
         };
     }
 
     private void OnTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(BrowserTabViewModel.IsFullScreen)) ApplyFullScreen();
+        if (e.PropertyName is nameof(BrowserTabViewModel.TerminalSession) or nameof(BrowserTabViewModel.Session) or nameof(BrowserTabViewModel.IsTerminal))
+            WatchTerminal();
     }
 
     /// <summary>Full screen: the content area (where the session sits) spans the identity band and toolbar too.</summary>

@@ -36,6 +36,8 @@ public partial class MainWindow
         new(Key.OemComma, ModifierKeys.Control, () => _vm.OpenSettingsCommand, true),
         new(Key.D, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.OpenActiveServerDesktopCommand, true),
         new(Key.F11, ModifierKeys.None, () => _vm.ToggleFullScreenCommand, true),
+        new(Key.E, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.ToggleTerminalSftpCommand, true),
+        new(Key.B, ModifierKeys.Control | ModifierKeys.Shift, () => _vm.ToggleTerminalBroadcastCommand, true),
     ];
 
     /// <summary>The key comes from a terminal's WebView2 (the page has the keyboard).</summary>

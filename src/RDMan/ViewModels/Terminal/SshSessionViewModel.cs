@@ -1098,6 +1098,83 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         if (e.NewValue is true) RaiseActivated();
     }
 
+    // ───────────── SFTP panel ─────────────
+
+    /// <summary>The SFTP side panel is shown next to the terminal.</summary>
+    [ObservableProperty] private bool _isSftpOpen;
+
+    public SftpBrowserViewModel? Sftp { get; private set; }
+
+    [RelayCommand]
+    public void ToggleSftp()
+    {
+        if (!IsSftpOpen && !IsLive && Host is null) return; // nothing to browse yet
+        IsSftpOpen = !IsSftpOpen;
+        if (!IsSftpOpen) return;
+        if (Sftp is null)
+        {
+            Sftp = new SftpBrowserViewModel(_main, this);
+            OnPropertyChanged(nameof(Sftp));
+        }
+        _ = Sftp.OpenAsync();
+    }
+
+    /// <summary>
+    /// A connection request for a companion channel (SFTP) with what this session already knows: the user typed,
+    /// passphrases and host keys accepted for this session — so the panel doesn't ask twice.
+    /// </summary>
+    public SshConnectRequest CreateConnectRequest()
+    {
+        var target = _env.Resolve(Server.Server);
+        if (string.IsNullOrWhiteSpace(target.User) && !string.IsNullOrEmpty(_sessionUser)) target = target with { User = _sessionUser };
+        var password = _sessionPassword;
+        if (target.Auth.Mode == SshAuthMode.Password && target.Auth.ProtectedPassword is { } pp)
+            password = _svc.State.Secrets.TryUnprotect(pp) ?? password;
+        var request = new SshConnectRequest
+        {
+            Target = target,
+            Config = _env.Config,
+            Secrets = _svc.State.Secrets,
+            Prompts = this,
+            Password = password,
+            TrustedOnce = _trustedOnce,
+        };
+        foreach (var (k, v) in _passphrases) request.Passphrases[k] = v;
+        return request;
+    }
+
+    // ───────────── Broadcast ─────────────
+
+    [ObservableProperty] private bool _isBroadcasting;
+    private int _broadcastCount;
+
+    /// <summary>Called by MainViewModel whenever the broadcast set changes.</summary>
+    public void SetBroadcastState(bool participating, int count)
+    {
+        IsBroadcasting = participating;
+        _broadcastCount = count;
+        if (IsConnected) Banner(null); // shows the broadcast banner again if it applies
+    }
+
+    [RelayCommand]
+    private void ToggleBroadcast() => _main.SetBroadcast(this, !IsBroadcasting);
+
+    private object? BroadcastBanner() => IsBroadcasting && _broadcastCount >= 2
+        ? new
+        {
+            kind = "warn",
+            icon = "\uE789",
+            text = Loc.F("Term.Broadcast.Banner", _broadcastCount),
+            actions = new[]
+            {
+                BannerAction(Loc.T("Term.Broadcast.Leave"), "link", () => _main.SetBroadcast(this, false)),
+                BannerAction(Loc.T("Term.Broadcast.StopAll"), "link", () => _main.BroadcastToAll(false)),
+            },
+        }
+        : IsBroadcasting
+            ? new { kind = "info", icon = "\uE789", text = Loc.T("Term.Broadcast.Alone"), actions = new[] { BannerAction(Loc.T("Term.Broadcast.Leave"), "link", () => _main.SetBroadcast(this, false)) } }
+            : null;
+
     // ───────────── Cards, banners, lines ─────────────
 
     private object CardAction(string label, string style, Action<JsonElement> run, bool cancel = false, bool isDefault = false, bool focus = false)
@@ -1121,10 +1198,12 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         _terminal?.Send(new { t = "card", card });
     }
 
+    /// <summary>Shows a banner; null clears it — and brings back the broadcast warning when it applies.</summary>
     private void Banner(object? banner)
     {
         foreach (var k in _actions.Keys.Where(k => k.StartsWith('b')).ToList()) _actions.Remove(k);
         _actionSeq++;
+        banner ??= IsConnected ? BroadcastBanner() : null;
         _terminal?.Send(new { t = "banner", banner });
     }
 
@@ -1424,6 +1503,8 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
     {
         if (_disposed) return;
         _disposed = true;
+        _main.LeaveBroadcast(this);
+        Sftp?.Dispose();
         _generation++;
         _connectCts?.Cancel();
         StopReconnect();
