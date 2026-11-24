@@ -31,7 +31,9 @@ public static class ConnectionStore
             p.Username ??= "";
         }
 
-        // Schema migrations go here (SchemaVersion < CurrentSchemaVersion).
+        // v1 → v2: servers gain Files/Desktop/DefaultAction/DesktopCredentials/Rdp. The defaults of those
+        // properties (Files = true, no desktop, inherit everything) are exactly the v1 behavior, so the
+        // migration is the normalization above; nothing else to rewrite.
         doc.SchemaVersion = ConnectionDocument.CurrentSchemaVersion;
     }
 
@@ -44,6 +46,9 @@ public static class ConnectionStore
         }
         node.Name ??= "";
         node.Credentials ??= new CredentialSettings();
+        node.DesktopCredentials ??= new CredentialSettings();
+        node.Rdp ??= new RdpProfile();
+        if (node.Rdp.ColorDepth is { } depth && depth is not (16 or 24 or 32)) node.Rdp.ColorDepth = null;
         switch (node)
         {
             case GroupNode g:
@@ -57,6 +62,9 @@ public static class ConnectionStore
                 s.StartFolder = string.IsNullOrWhiteSpace(s.StartFolder) ? null : s.StartFolder.Trim().Trim('\\', '/');
                 s.Tags ??= new List<string>();
                 s.Tags = s.Tags.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (s.Desktop is { } d && !Rdp.HostPort.IsValidPort(d.Port)) d.Port = DesktopEndpoint.DefaultPort;
+                // A server must offer at least one thing; an older or hand-edited file may disable both.
+                if (!s.Files && !s.HasDesktop) s.Files = true;
                 break;
         }
     }
@@ -80,6 +88,7 @@ public static class ConnectionStore
     private static void StripSecrets(TreeNode node)
     {
         node.Credentials.ProtectedPassword = null;
+        node.DesktopCredentials.ProtectedPassword = null;
         if (node is GroupNode g) foreach (var c in g.Children) StripSecrets(c);
     }
 
@@ -104,6 +113,8 @@ public static class ConnectionStore
         node.Id = Guid.NewGuid();
         if (node.Credentials.ProfileId is { } pid)
             node.Credentials.ProfileId = profileMap.TryGetValue(pid, out var mapped) ? mapped : null;
+        if (node.DesktopCredentials.ProfileId is { } dpid)
+            node.DesktopCredentials.ProfileId = profileMap.TryGetValue(dpid, out var dmapped) ? dmapped : null;
         if (node is GroupNode g) foreach (var c in g.Children) Reassign(c, profileMap);
     }
 }

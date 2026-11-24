@@ -20,6 +20,7 @@ public static partial class Strings
         AddDialogs();
         AddErrors();
         AddUpdates();
+        AddDesktop();
     }
 
     private static void T(string key, string es, string en) => Table.Add(key, (es, en));
@@ -356,6 +357,127 @@ public static partial class Strings
         T("Err.Generic.Detail", "Windows devolvió un error inesperado.", "Windows returned an unexpected error.");
         T("Err.Code", "Código {0}: {1}", "Code {0}: {1}");
         T("Err.EditCredentials", "Editar credenciales", "Edit credentials");
+    }
+
+    private static void AddDesktop()
+    {
+        T("Cap.Files", "Archivos", "Files");
+        T("Cap.Desktop", "Escritorio", "Desktop");
+        T("Desktop.Open", "Abrir escritorio", "Open desktop");
+        T("Files.Open", "Abrir archivos", "Open files");
+        T("Desktop.Connect", "Conectar", "Connect");
+        T("Desktop.Connecting", "Conectando con {0}…", "Connecting to {0}…");
+        T("Desktop.Reconnect", "Reconectar", "Reconnect");
+        T("Desktop.Disconnect", "Desconectar", "Disconnect");
+        T("Desktop.CtrlAltDel", "Enviar Ctrl+Alt+Supr", "Send Ctrl+Alt+Del");
+        T("Desktop.FullScreen", "Pantalla completa (F11)", "Full screen (F11)");
+        T("Desktop.FocusHint", "Ctrl+Alt+← devuelve el teclado a RDMan", "Ctrl+Alt+← gives the keyboard back to RDMan");
+        T("Desktop.Idle.Title", "Escritorio de {0}", "{0} desktop");
+        T("Desktop.Idle.Body", "La sesión no está conectada. Al conectar, el escritorio se ajusta solo al tamaño de esta pestaña.", "The session isn't connected. Once connected, the desktop resizes itself to this tab.");
+        T("Desktop.ConfirmLeave", "La sesión con {0} sigue conectada. ¿Desconectarla?", "The session with {0} is still connected. Disconnect it?");
+        T("Desktop.SavedWindowsCredential", "la credencial guardada de Windows", "Windows' saved credential");
+        T("Desktop.NotEnabled", "{0} no tiene el escritorio remoto activado. Actívalo en Propiedades.", "{0} doesn't have remote desktop turned on. Turn it on in Properties.");
+        T("Desktop.Port", "Puerto RDP {0}", "RDP port {0}");
+
+        T("Health.Desktop.Online", "Escritorio en línea · {0} ms", "Desktop online · {0} ms");
+        T("Health.Desktop.Offline", "Sin respuesta en el puerto {0}", "No response on port {0}");
+        T("Health.Files.Online", "Archivos en línea · {0} ms", "Files online · {0} ms");
+
+        T("Tree.Ctx.OpenDesktop", "Abrir escritorio", "Open desktop");
+        T("Tree.Ctx.OpenFiles", "Abrir archivos", "Open files");
+        T("Palette.Hint2", "Enter abre · Shift+Enter abre la otra vista · Ctrl+Enter en pestaña nueva · Esc cierra", "Enter opens · Shift+Enter opens the other view · Ctrl+Enter new tab · Esc closes");
+
+        T("Server.Section.General", "General", "General");
+        T("Server.Section.Files", "Archivos", "Files");
+        T("Server.Section.Desktop", "Escritorio remoto", "Remote desktop");
+        T("Server.Section.Credentials", "Credenciales", "Credentials");
+        T("Server.Section.Notes", "Notas", "Notes");
+        T("Server.Files.Enable", "Ofrecer archivos compartidos (SMB)", "Offer shared files (SMB)");
+        T("Server.Desktop.Enable", "Ofrecer escritorio remoto (RDP)", "Offer remote desktop (RDP)");
+        T("Server.Desktop.PortLabel", "Puerto", "Port");
+        T("Server.DefaultAction", "Al hacer clic, abrir", "On click, open");
+        T("Server.Validation.NoCapability", "Activa archivos, escritorio remoto o ambos.", "Turn on files, remote desktop or both.");
+        T("Server.Validation.RdpPort", "El puerto debe estar entre 1 y 65535.", "The port must be between 1 and 65535.");
+
+        T("Cred.Desktop.Section", "Credenciales del escritorio", "Desktop credentials");
+        T("Cred.Desktop.SameAsFiles", "Las mismas que archivos", "Same as files");
+        T("Cred.Desktop.Windows", "Credencial guardada de Windows", "Windows saved credential");
+        T("Cred.Desktop.WindowsNote", "Usa la credencial que Windows ya guardó para este equipo (la de Conexión a Escritorio remoto). Si no hay, se te pedirá al conectar.", "Uses the credential Windows already saved for this computer (from Remote Desktop Connection). If there isn't one, you'll be asked when connecting.");
+        T("Cred.Desktop.Uses", "Usará: {0}", "Will use: {0}");
+        T("Cred.Desktop.UsesFrom", "Usará: {0} (de «{1}»)", "Will use: {0} (from “{1}”)");
+
+        T("Rdp.Section", "Opciones del escritorio", "Desktop options");
+        T("Rdp.SectionNote", "Cada opción hereda del grupo salvo que la cambies aquí.", "Each option is inherited from the group unless you change it here.");
+        T("Rdp.Clipboard", "Portapapeles compartido", "Shared clipboard");
+        T("Rdp.Drives", "Mis unidades en el servidor", "My drives on the server");
+        T("Rdp.Printers", "Mis impresoras", "My printers");
+        T("Rdp.SmartCards", "Tarjetas inteligentes", "Smart cards");
+        T("Rdp.Audio", "Sonido", "Sound");
+        T("Rdp.Audio.Local", "En este equipo", "On this PC");
+        T("Rdp.Audio.Remote", "En el servidor", "On the server");
+        T("Rdp.Audio.Off", "Sin sonido", "Off");
+        T("Rdp.WindowsKeys", "Atajos de Windows (Win, Alt+Tab) al servidor", "Windows shortcuts (Win, Alt+Tab) go to the server");
+        T("Rdp.Nla", "Autenticación a nivel de red (NLA)", "Network Level Authentication (NLA)");
+        T("Rdp.ServerCheck", "Si no se puede verificar el servidor", "If the server can't be verified");
+        T("Rdp.ServerCheck.Warn", "Preguntar", "Ask");
+        T("Rdp.ServerCheck.Require", "No conectar", "Don't connect");
+        T("Rdp.ServerCheck.Skip", "Conectar igual", "Connect anyway");
+        T("Rdp.Protection", "Protección del inicio de sesión", "Sign-in protection");
+        T("Rdp.Protection.Standard", "Estándar", "Standard");
+        T("Rdp.Protection.RestrictedAdmin", "Admin restringido", "Restricted Admin");
+        T("Rdp.Protection.RemoteCredentialGuard", "Remote Credential Guard", "Remote Credential Guard");
+        T("Rdp.AdminSession", "Conectar a la sesión de administración", "Connect to the admin session");
+        T("Rdp.ColorDepth", "Colores", "Colors");
+        T("Rdp.Inherit", "Heredar", "Inherit");
+        T("Rdp.Yes", "Sí", "On");
+        T("Rdp.No", "No", "Off");
+        T("Rdp.InheritedFrom", "{0} · de «{1}»", "{0} · from “{1}”");
+        T("Rdp.Default", "{0} · predeterminado", "{0} · default");
+
+        T("CredPrompt.Title", "Iniciar sesión en {0}", "Sign in to {0}");
+        T("CredPrompt.Body", "Escribe una cuenta de Windows de {0}.", "Enter a Windows account on {0}.");
+        T("CredPrompt.Remember", "Recordar para este servidor", "Remember for this server");
+        T("CredPrompt.Connect", "Conectar", "Connect");
+
+        T("RdpErr.Replaced.Title", "Alguien más abrió esta sesión", "Someone else took over this session");
+        T("RdpErr.Replaced.Detail", "La misma cuenta inició sesión desde otro equipo o ventana y Windows movió la sesión allí.", "The same account signed in from another computer or window, and Windows moved the session there.");
+        T("RdpErr.Idle.Title", "Sesión cerrada por inactividad", "Session ended for inactivity");
+        T("RdpErr.Idle.Detail", "El servidor desconecta las sesiones inactivas. Tus programas siguen abiertos; vuelve a conectar.", "The server disconnects idle sessions. Your programs are still running; connect again.");
+        T("RdpErr.LogonTimeout.Title", "Se agotó el tiempo de inicio de sesión", "Sign-in timed out");
+        T("RdpErr.LogonTimeout.Detail", "El servidor esperó demasiado el inicio de sesión.", "The server waited too long for the sign-in.");
+        T("RdpErr.LoggedOff.Title", "Sesión cerrada", "Signed out");
+        T("RdpErr.LoggedOff.Detail", "Se cerró la sesión de Windows en el servidor.", "The Windows session on the server was signed out.");
+        T("RdpErr.DisconnectedByAdmin.Title", "Desconectado desde el servidor", "Disconnected from the server");
+        T("RdpErr.DisconnectedByAdmin.Detail", "Un administrador u otra herramienta desconectó la sesión.", "An administrator or another tool disconnected the session.");
+        T("RdpErr.Denied.Title", "El servidor rechazó la conexión", "The server refused the connection");
+        T("RdpErr.Denied.Detail", "La cuenta no tiene permiso para Escritorio remoto en ese servidor (grupo «Usuarios de escritorio remoto»).", "The account isn't allowed to use Remote Desktop on that server (\"Remote Desktop Users\" group).");
+        T("RdpErr.FreshCreds.Title", "Hay que escribir la contraseña", "The password must be typed");
+        T("RdpErr.FreshCreds.Detail", "La política del servidor no acepta credenciales guardadas. Escribe usuario y contraseña.", "The server policy doesn't accept saved credentials. Enter a username and password.");
+        T("RdpErr.Licensing.Title", "Problema de licencias de Escritorio remoto", "Remote Desktop licensing problem");
+        T("RdpErr.Licensing.Detail", "El servidor no tiene licencias de Servicios de Escritorio remoto disponibles.", "The server has no Remote Desktop Services licenses available.");
+        T("RdpErr.Closed.Title", "Sesión desconectada", "Session disconnected");
+        T("RdpErr.Closed.Detail", "Puedes volver a conectar cuando quieras.", "You can connect again whenever you want.");
+        T("RdpErr.ByServer.Title", "El servidor cerró la conexión", "The server closed the connection");
+        T("RdpErr.ByServer.Detail", "Puede haberse reiniciado o desconectado la sesión.", "It may have restarted or disconnected the session.");
+        T("RdpErr.NotFound.Title", "No se encontró el servidor", "Server not found");
+        T("RdpErr.NotFound.Detail", "El nombre no se pudo resolver. Revisa la dirección.", "The name couldn't be resolved. Check the address.");
+        T("RdpErr.Unreachable.Title", "No se pudo llegar al servidor", "Couldn't reach the server");
+        T("RdpErr.Unreachable.Detail", "No hubo respuesta en el puerto de Escritorio remoto. Comprueba que el servidor esté encendido y que el firewall permita RDP.", "No answer on the Remote Desktop port. Check that the server is on and the firewall allows RDP.");
+        T("RdpErr.Dropped.Title", "Se perdió la conexión", "The connection dropped");
+        T("RdpErr.Dropped.Detail", "La red se interrumpió. Tu sesión sigue en el servidor; vuelve a conectar.", "The network was interrupted. Your session is still on the server; connect again.");
+        T("RdpErr.Logon.Title", "Usuario o contraseña incorrectos", "Wrong username or password");
+        T("RdpErr.Logon.Detail", "Windows no aceptó estas credenciales en el servidor.", "Windows didn't accept these credentials on the server.");
+        T("RdpErr.Account.Title", "Problema con la cuenta", "Account problem");
+        T("RdpErr.Account.Detail", "La cuenta está deshabilitada, bloqueada, vencida o tiene restricciones.", "The account is disabled, locked, expired or restricted.");
+        T("RdpErr.PasswordExpired.Title", "La contraseña venció", "The password expired");
+        T("RdpErr.PasswordExpired.Detail", "Hay que cambiar la contraseña antes de iniciar sesión.", "The password must be changed before signing in.");
+        T("RdpErr.NoAuthority.Title", "No se pudo validar la cuenta", "The account couldn't be validated");
+        T("RdpErr.NoAuthority.Detail", "No se contactó al dominio de la cuenta. Para cuentas locales usa SERVIDOR\\usuario.", "The account's domain couldn't be contacted. For local accounts use SERVER\\user.");
+        T("RdpErr.Certificate.Title", "Certificado del servidor vencido", "Server certificate expired");
+        T("RdpErr.Certificate.Detail", "El certificado de Escritorio remoto del servidor está vencido.", "The server's Remote Desktop certificate has expired.");
+        T("RdpErr.Generic.Title", "La sesión terminó", "The session ended");
+        T("RdpErr.Generic.Detail", "Windows informó un error de Escritorio remoto.", "Windows reported a Remote Desktop error.");
+        T("RdpErr.Code", "Código {0} · {1}", "Code {0} · {1}");
     }
 
     private static void AddUpdates()

@@ -48,7 +48,18 @@ public abstract class TreeNode
     public string? Description { get; set; }
     /// <summary>Identity color key (see <c>TagColors</c>); null = neutral.</summary>
     public string? Color { get; set; }
+
+    /// <summary>Credentials for file access (SMB). Remote desktop falls back to these.</summary>
     public CredentialSettings Credentials { get; set; } = new();
+
+    /// <summary>
+    /// Credentials only for remote desktop. <see cref="CredentialMode.Inherit"/> means "the parent's desktop
+    /// credential, or — when nobody defines one — the same credential used for files".
+    /// </summary>
+    public CredentialSettings DesktopCredentials { get; set; } = new();
+
+    /// <summary>Remote desktop options; every null field is inherited from the parent group.</summary>
+    public RdpProfile Rdp { get; set; } = new();
 }
 
 public sealed class GroupNode : TreeNode
@@ -67,11 +78,43 @@ public sealed class ServerNode : TreeNode
     public string? StartFolder { get; set; }
     public List<string> Tags { get; set; } = new();
     public DateTimeOffset? LastConnected { get; set; }
+
+    /// <summary>Shared files (SMB) are offered for this server.</summary>
+    public bool Files { get; set; } = true;
+
+    /// <summary>Remote desktop (RDP) endpoint; null or disabled = no desktop for this server.</summary>
+    public DesktopEndpoint? Desktop { get; set; }
+
+    /// <summary>What a plain click opens when the server offers both.</summary>
+    public ServerAction DefaultAction { get; set; } = ServerAction.Files;
+
+    [JsonIgnore] public bool HasDesktop => Desktop is { Enabled: true };
+    [JsonIgnore] public bool HasFiles => Files;
+
+    /// <summary>The action a plain click performs, respecting which capabilities exist.</summary>
+    [JsonIgnore]
+    public ServerAction EffectiveDefaultAction => (DefaultAction, HasFiles, HasDesktop) switch
+    {
+        (_, true, false) => ServerAction.Files,
+        (_, false, true) => ServerAction.Desktop,
+        (var a, _, _) => a,
+    };
+}
+
+public enum ServerAction { Files, Desktop }
+
+public sealed class DesktopEndpoint
+{
+    public const int DefaultPort = 3389;
+
+    public bool Enabled { get; set; } = true;
+    public int Port { get; set; } = DefaultPort;
 }
 
 public sealed class ConnectionDocument
 {
-    public const int CurrentSchemaVersion = 1;
+    /// <summary>2: servers gained remote desktop (Desktop, DesktopCredentials, Rdp, Files, DefaultAction).</summary>
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public GroupNode Root { get; set; } = new() { Name = "root" };
