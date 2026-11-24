@@ -1,0 +1,296 @@
+/* RDMan terminal page. Colors come from the app theme as CSS variables (set by bridge.js on "theme"). */
+
+@font-face {
+  font-family: "Cascadia Code NF";
+  src: url("fonts/CascadiaCodeNF.woff2") format("woff2");
+  font-weight: 200 700;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Cascadia Code NF";
+  src: url("fonts/CascadiaCodeNFItalic.woff2") format("woff2");
+  font-weight: 200 700;
+  font-style: italic;
+  font-display: block;
+}
+
+:root {
+  --term-bg: #1B1F26;
+  --ui-bg: #252A35;
+  --ui-line: #363D4B;
+  --ui-fg: #E8EBF1;
+  --ui-fg2: #A6AEBB;
+  --ui-fg3: #737C8C;
+  --ui-hover: rgba(255, 255, 255, .08);
+  --ui-accent: #7480FF;
+  --ui-accent-text: #A3ABFF;
+  --ui-on-accent: #FFFFFF;
+  --ui-danger: #F0605D;
+  --ui-danger-subtle: rgba(240, 96, 93, .15);
+  --ui-warn: #E0AE45;
+  --ui-warn-subtle: rgba(224, 174, 69, .14);
+  --ui-shadow: rgba(0, 0, 0, .45);
+  --ui-scrim: rgba(8, 9, 12, .55);
+  --rail: transparent;
+  --pad: 12px;
+  --ui-font: "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  --icon-font: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--term-bg);
+  color: var(--ui-fg);
+  font-family: var(--ui-font);
+  font-size: 13px;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+/* Identity rail: the server's color, 2px on the left edge (same language as the tab strip). */
+#rail {
+  width: 2px;
+  flex: none;
+  background: var(--rail);
+}
+
+#term {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0 8px var(--pad);
+}
+
+.xterm .xterm-viewport { background-color: transparent !important; }
+.xterm .xterm-screen { outline: none; }
+.xterm-decoration-overview-ruler { opacity: .9; }
+
+/* ───────────── Shared UI pieces ───────────── */
+.icon {
+  font-family: var(--icon-font);
+  font-size: 16px;
+  line-height: 1;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: default;
+}
+button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 1px;
+}
+
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-hover);
+  font-weight: 600;
+}
+.btn:hover { background: var(--ui-line); }
+.btn.primary { background: var(--ui-accent); border-color: var(--ui-accent); color: var(--ui-on-accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.danger { background: var(--ui-danger); border-color: var(--ui-danger); color: #fff; }
+.btn.link { border-color: transparent; background: transparent; color: var(--ui-accent-text); padding: 0 8px; }
+.btn.link:hover { background: var(--ui-hover); }
+
+/* ───────────── Banner (reconnecting, broadcast, clipboard) ───────────── */
+#banner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 48px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 0 6px 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-bg);
+  box-shadow: 0 6px 20px var(--ui-shadow);
+  z-index: 20;
+}
+#banner[hidden] { display: none; }
+#banner.warn { border-color: var(--ui-warn); background: color-mix(in srgb, var(--ui-bg) 88%, var(--ui-warn)); }
+#banner.warn .icon { color: var(--ui-warn); }
+#banner.danger { border-color: var(--ui-danger); }
+#banner.danger .icon { color: var(--ui-danger); }
+#banner.info .icon { color: var(--ui-accent-text); }
+#banner-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#banner-actions { display: flex; gap: 4px; }
+#banner-actions .btn { height: 26px; padding: 0 10px; }
+.spin { display: inline-block; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ───────────── Search ───────────── */
+#search {
+  position: absolute;
+  top: 8px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-bg);
+  box-shadow: 0 6px 20px var(--ui-shadow);
+  z-index: 25;
+}
+#search[hidden] { display: none; }
+#search-input {
+  width: 220px;
+  height: 28px;
+  padding: 0 8px;
+  margin-right: 4px;
+  border: 1px solid var(--ui-line);
+  border-radius: 4px;
+  background: var(--term-bg);
+  color: var(--ui-fg);
+  font: inherit;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#search-input:focus { border-color: var(--ui-accent); }
+#search-input.nomatch { border-color: var(--ui-danger); }
+#search .toggle, #search .icon-btn {
+  width: 28px;
+  height: 28px;
+  color: var(--ui-fg2);
+}
+#search .toggle { font-family: "Cascadia Code NF", monospace; font-size: 12px; }
+#search .icon-btn { font-family: var(--icon-font); font-size: 12px; }
+#search .toggle:hover, #search .icon-btn:hover { background: var(--ui-hover); color: var(--ui-fg); }
+#search .toggle.on { background: color-mix(in srgb, var(--ui-accent) 28%, transparent); color: var(--ui-fg); }
+#search-count {
+  min-width: 64px;
+  padding: 0 6px;
+  color: var(--ui-fg3);
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ───────────── Card (host key, paste warning) ───────────── */
+#scrim {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ui-scrim);
+  z-index: 30;
+}
+#scrim[hidden] { display: none; }
+#card {
+  width: min(520px, calc(100% - 48px));
+  max-height: calc(100% - 48px);
+  overflow: auto;
+  padding: 24px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-bg);
+  box-shadow: 0 16px 48px var(--ui-shadow);
+  -webkit-user-select: text;
+  user-select: text;
+}
+#card.danger { border-color: var(--ui-danger); }
+.card-head { display: flex; align-items: center; gap: 12px; }
+.card-head .icon { font-size: 20px; color: var(--ui-accent-text); }
+#card.danger .card-head .icon { color: var(--ui-danger); }
+#card.warn .card-head .icon { color: var(--ui-warn); }
+#card h1 { margin: 0; font-size: 16px; font-weight: 600; line-height: 22px; }
+#card p { margin: 12px 0 0; color: var(--ui-fg2); line-height: 20px; }
+#card-detail {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  font-size: 12px;
+}
+#card-detail[hidden] { display: none; }
+#card-detail dt { color: var(--ui-fg3); }
+#card-detail dd { margin: 0; font-family: "Cascadia Code NF", monospace; color: var(--ui-fg); word-break: break-all; }
+#card-pre {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--term-bg);
+  border: 1px solid var(--ui-line);
+  font: 12px/1.35 "Cascadia Code NF", monospace;
+  color: var(--ui-fg2);
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre;
+}
+#card-pre[hidden] { display: none; }
+#card-pre.art { display: inline-block; max-height: none; line-height: 1.15; }
+#card-actions {
+  margin-top: 20px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* ───────────── Context menu ───────────── */
+#menu {
+  position: absolute;
+  min-width: 200px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-bg);
+  box-shadow: 0 8px 24px var(--ui-shadow);
+  z-index: 40;
+}
+#menu[hidden] { display: none; }
+#menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  gap: 12px;
+  text-align: left;
+}
+#menu button:hover, #menu button:focus { background: var(--ui-hover); outline: none; }
+#menu button:disabled { color: var(--ui-fg3); }
+#menu .icon { width: 16px; font-size: 14px; color: var(--ui-fg2); }
+#menu .label { flex: 1; }
+#menu .kbd { color: var(--ui-fg3); font-size: 12px; }
+#menu hr { border: 0; border-top: 1px solid var(--ui-line); margin: 4px 0; }
+
+/* Visual bell: a brief inner glow, not a full flash. */
+#flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px var(--ui-warn);
+  opacity: 0;
+  transition: opacity .25s ease-out;
+  z-index: 15;
+}
+#flash.on { opacity: .9; transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  #flash { transition: none; }
+}

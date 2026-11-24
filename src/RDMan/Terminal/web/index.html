@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'none'">
+<title>RDMan terminal</title>
+<link rel="stylesheet" href="vendor/xterm.css">
+<link rel="stylesheet" href="terminal.css">
+</head>
+<body>
+<div id="frame">
+  <div id="rail"></div>
+  <div id="term"></div>
+</div>
+
+<div id="banner" hidden>
+  <span class="icon" id="banner-icon"></span>
+  <span id="banner-text"></span>
+  <span id="banner-actions"></span>
+</div>
+
+<div id="search" hidden role="search">
+  <input id="search-input" type="text" spellcheck="false" autocomplete="off">
+  <button class="toggle" id="search-case" title="">Aa</button>
+  <button class="toggle" id="search-word" title=""><u>ab</u></button>
+  <button class="toggle" id="search-regex" title="">.*</button>
+  <span id="search-count"></span>
+  <button class="icon-btn" id="search-prev" title="">&#xE70E;</button>
+  <button class="icon-btn" id="search-next" title="">&#xE70D;</button>
+  <button class="icon-btn" id="search-close" title="">&#xE711;</button>
+</div>
+
+<div id="scrim" hidden>
+  <div id="card" role="dialog" aria-modal="true">
+    <div class="card-head">
+      <span class="icon" id="card-icon"></span>
+      <h1 id="card-title"></h1>
+    </div>
+    <p id="card-body"></p>
+    <div id="card-detail" hidden></div>
+    <pre id="card-pre" hidden></pre>
+    <div id="card-actions"></div>
+  </div>
+</div>
+
+<div id="menu" hidden role="menu"></div>
+<div id="flash"></div>
+
+<script src="vendor/xterm.js"></script>
+<script src="vendor/addon-fit.js"></script>
+<script src="vendor/addon-webgl.js"></script>
+<script src="vendor/addon-search.js"></script>
+<script src="vendor/addon-web-links.js"></script>
+<script src="vendor/addon-unicode11.js"></script>
+<script src="vendor/addon-image.js"></script>
+<script src="vendor/addon-serialize.js"></script>
+<script src="vendor/addon-clipboard.js"></script>
+<script src="vendor/addon-progress.js"></script>
+<script src="bridge.js"></script>
+</body>
+</html>

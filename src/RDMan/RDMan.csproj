@@ -35,6 +35,9 @@
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="RoyalApps.Community.Rdp.WinForms" Version="2.1.1" />
+    <!-- SSH terminal: SSH.NET (MIT) for the protocol, WebView2 + vendored xterm.js (Terminal/web) for the screen -->
+    <PackageReference Include="SSH.NET" Version="2026.0.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
   </ItemGroup>
 
   <ItemGroup>
@@ -46,6 +49,11 @@
   <ItemGroup>
     <Resource Include="Assets\rdman.ico" />
     <Resource Include="Assets\rdman.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Terminal page, xterm.js and the Cascadia Code NF font, served to WebView2 from memory (single-file friendly) -->
+    <EmbeddedResource Include="Terminal\web\**\*" LogicalName="web/%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>
