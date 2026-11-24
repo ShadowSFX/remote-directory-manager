@@ -58,6 +58,7 @@ public sealed class AppSettings
     public bool AutoUpdate { get; set; } = true;
     public bool RestoreTabs { get; set; } = true;
     public bool ThisPcExpanded { get; set; } = true;
+    public bool ViewsExpanded { get; set; } = true;
 
     public double SidebarWidth { get; set; } = 272;
     /// <summary>1.x flag (two panes, right one shown). Still written so an older build degrades sensibly.</summary>

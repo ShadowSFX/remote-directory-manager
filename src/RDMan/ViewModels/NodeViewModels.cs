@@ -117,6 +117,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     public bool HasBoth => HasFiles && HasDesktop;
     public int DesktopPort => Server.Desktop?.Port ?? DesktopEndpoint.DefaultPort;
     public ServerAction DefaultAction => Server.EffectiveDefaultAction;
+    public bool IsFavorite => Server.IsFavorite;
 
     /// <summary>Reachability of the SMB port (445).</summary>
     public HostHealth FilesHealth => _filesHealth;

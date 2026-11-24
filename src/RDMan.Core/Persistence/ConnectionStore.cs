@@ -19,6 +19,15 @@ public static class ConnectionStore
     {
         doc.Root ??= new GroupNode { Name = "root" };
         doc.Profiles ??= new List<CredentialProfile>();
+        doc.SmartGroups ??= new List<SmartGroup>();
+        doc.SmartGroups.RemoveAll(g => g is null);
+        var seenSmart = new HashSet<Guid>();
+        foreach (var g in doc.SmartGroups)
+        {
+            if (g.Id == Guid.Empty || !seenSmart.Add(g.Id)) { g.Id = Guid.NewGuid(); seenSmart.Add(g.Id); }
+            Search.SmartGroupEvaluator.Normalize(g);
+        }
+        if (doc.SmartGroups.Count > 100) doc.SmartGroups = doc.SmartGroups.Take(100).ToList();
         var seen = new HashSet<Guid>();
         NormalizeNode(doc.Root, seen);
 
@@ -106,6 +115,7 @@ public static class ConnectionStore
             p.Id = newId;
         }
         Reassign(doc.Root, profileMap);
+        foreach (var g in doc.SmartGroups) g.Id = Guid.NewGuid();
     }
 
     private static void Reassign(TreeNode node, Dictionary<Guid, Guid> profileMap)

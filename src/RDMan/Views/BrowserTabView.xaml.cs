@@ -673,7 +673,15 @@ public partial class BrowserTabView : UserControl
         menu.Items.Add(Item("Tree.Ctx.OpenExplorer", "", main.OpenNodeInExplorerCommand));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Tree.Ctx.CopyPath", "", main.CopyNodePathCommand));
+        menu.Items.Add(new MenuItem { Header = Loc.T(s.IsFavorite ? "Favorite.Remove" : "Favorite.Add"), Tag = s.IsFavorite ? "\uE735" : "\uE734",
+            Command = main.ToggleFavoriteCommand, CommandParameter = s });
         menu.Items.Add(Item("Tree.Ctx.Properties", "", main.EditCommand));
+    }
+
+    private void CardStar_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { Tag: ServerNodeViewModel s }) Main?.ToggleFavorite(s);
+        e.Handled = true;
     }
 
     private void DashboardNewServer_Click(object sender, RoutedEventArgs e)
@@ -682,6 +690,7 @@ public partial class BrowserTabView : UserControl
     private void DashboardEditGroup_Click(object sender, RoutedEventArgs e)
     {
         if (Tab?.Dashboard?.Group is { } g) Main?.EditNode(g);
+        else if (Tab?.Dashboard?.Smart is { } sg) Main?.EditSmartGroup(sg);
     }
 
     private void DashboardImport_Click(object sender, RoutedEventArgs e) => Main?.ImportFromWindowsCommand.Execute(null);

@@ -1,0 +1,92 @@
+<v:DialogWindow x:Class="RDMan.Views.SmartGroupWindow"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:ui="clr-namespace:RDMan.Infrastructure"
+                xmlns:v="clr-namespace:RDMan.Views"
+                xmlns:vm="clr-namespace:RDMan.ViewModels"
+                Title="{Binding Title}" Width="640">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <ScrollViewer MaxHeight="600" VerticalScrollBarVisibility="Auto">
+            <StackPanel Style="{StaticResource Dialog.Body}">
+                <StackPanel Style="{StaticResource Field}">
+                    <TextBlock Text="{ui:Tr Smart.Name}" Style="{StaticResource Text.Label}" />
+                    <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" ui:Ui.Hint="{ui:Tr Smart.NameHint}" />
+                </StackPanel>
+
+                <Grid Margin="0,0,0,12">
+                    <TextBlock Text="{ui:Tr Smart.Rules}" Style="{StaticResource Text.Label}" VerticalAlignment="Center" Margin="0" />
+                    <Border HorizontalAlignment="Right" Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="2">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Style="{StaticResource Btn.Segment}" Content="{ui:Tr Smart.MatchAll}" Command="{Binding SetMatchAllCommand}" ui:Ui.IsOn="{Binding MatchAll}" />
+                            <Button Style="{StaticResource Btn.Segment}" Content="{ui:Tr Smart.MatchAny}" Command="{Binding SetMatchAnyCommand}" ui:Ui.IsOn="{Binding MatchAny}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Rules}" Focusable="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:SmartRuleRowViewModel}">
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox ItemsSource="{Binding DataContext.Fields, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Field}"
+                                          AutomationProperties.Name="{ui:Tr Smart.FieldLabel}" />
+                                <ComboBox Grid.Column="2" ItemsSource="{Binding DataContext.Ops, RelativeSource={RelativeSource AncestorType=Window}}"
+                                          DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Op}"
+                                          AutomationProperties.Name="{ui:Tr Smart.OpLabel}" />
+                                <TextBox Grid.Column="4" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged, Delay=150}" ui:Ui.Hint="{ui:Tr Smart.ValueHint}"
+                                         AutomationProperties.Name="{ui:Tr Smart.ValueLabel}" />
+                                <Button Grid.Column="6" Style="{StaticResource Btn.Icon}" Content="&#xE711;" FontSize="11" ToolTip="{ui:Tr Smart.RemoveRule}"
+                                        Command="{Binding DataContext.RemoveRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
+                                        IsEnabled="{Binding DataContext.CanRemoveRule, RelativeSource={RelativeSource AncestorType=Window}}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Button HorizontalAlignment="Left" Command="{Binding AddRuleCommand}" IsEnabled="{Binding CanAddRule}" AutomationProperties.Name="{ui:Tr Smart.AddRule}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
+                        <TextBlock Text="{ui:Tr Smart.AddRule}" />
+                    </StackPanel>
+                </Button>
+
+                <!-- Live preview -->
+                <Border Style="{StaticResource Surface.Card}" Padding="16,12" Margin="0,18,0,0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE71C;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Accent.Text}" Margin="0,0,10,0" />
+                            <TextBlock Text="{Binding PreviewTitle}" FontWeight="SemiBold" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding PreviewNames}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" Margin="23,4,0,0"
+                                   Visibility="{Binding PreviewNames, Converter={StaticResource VisIfAny}}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="1" Style="{StaticResource Dialog.Footer}">
+            <Grid>
+                <Button Style="{StaticResource Btn.Danger}" Content="{ui:Tr Common.Delete}" HorizontalAlignment="Left" MinWidth="96" Click="Delete_Click"
+                        Visibility="{Binding IsNew, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock Text="{Binding ValidationError}" Foreground="{DynamicResource Danger}" VerticalAlignment="Center" Margin="0,0,12,0" FontSize="12"
+                               Visibility="{Binding ValidationError, Converter={StaticResource VisIfAny}}" />
+                    <Button Content="{ui:Tr Common.Cancel}" IsCancel="True" MinWidth="96" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource Btn.Primary}" Content="{ui:Tr Common.Save}" IsDefault="True" MinWidth="96" Click="Save_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</v:DialogWindow>

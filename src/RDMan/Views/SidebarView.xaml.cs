@@ -156,6 +156,8 @@ public partial class SidebarView : UserControl
             menu.Items.Add(Item("Tree.Ctx.Disconnect", "\uE8CD", Vm.DisconnectNodeCommand, node));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Tree.Ctx.Duplicate", "\uE8F4", Vm.DuplicateCommand, node));
+            var server = (ServerNodeViewModel)node;
+            menu.Items.Add(Item(server.IsFavorite ? "Favorite.Remove" : "Favorite.Add", server.IsFavorite ? "\uE735" : "\uE734", Vm.ToggleFavoriteCommand, node));
         }
         else
         {
@@ -276,9 +278,30 @@ public partial class SidebarView : UserControl
         var tab = Vm.ActiveTab;
         if (tab is not null) await tab.TransferAsync(files, dest, effect == DragDropEffects.Move);
     }
+
+    // ───────────── Smart groups ─────────────
+    private void SmartGroup_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not Button { DataContext: SmartGroupViewModel g, ContextMenu: { } menu }) return;
+        menu.Items.Clear();
+        menu.Items.Add(new MenuItem { Header = Loc.T("Tree.Ctx.Open"), Tag = "\uE8A7", Command = Vm.OpenSmartGroupCommand, CommandParameter = g });
+        menu.Items.Add(new MenuItem { Header = Loc.T("Tree.Ctx.OpenNewTab"), Tag = "\uE8A7", Command = Vm.OpenSmartGroupInNewTabCommand, CommandParameter = g });
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = Loc.T("Smart.Edit"), Tag = "\uE70F", Command = Vm.EditSmartGroupCommand, CommandParameter = g });
+        var del = new MenuItem { Header = Loc.T("Common.Delete"), Tag = "\uE74D", Command = Vm.DeleteSmartGroupCommand, CommandParameter = g };
+        del.Foreground = (System.Windows.Media.Brush)FindResource("Danger");
+        menu.Items.Add(del);
+    }
+
+    /// <summary>Middle click opens the smart group in a new tab, like tree items.</summary>
+    private void SmartGroup_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Middle || sender is not Button { DataContext: SmartGroupViewModel g }) return;
+        Vm.OpenSmartGroupInNewTabCommand.Execute(g);
+        e.Handled = true;
+    }
 }
 
-/// <summary>Explorer's drag rules: same volume → move, different → copy; Ctrl forces copy, Shift forces move.</summary>
 public static class FileDropEffects
 {
     public static DragDropEffects Decide(DragEventArgs e, string destination)

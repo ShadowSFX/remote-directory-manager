@@ -161,6 +161,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -173,8 +174,102 @@
             </StackPanel>
         </Button>
 
+        <!-- Views: Favorites / Recent / Connected (computed) and smart groups (saved searches) -->
+        <StackPanel Grid.Row="1">
+            <Grid Height="36" Margin="0,8,0,0">
+                <TextBlock Text="{ui:Tr View.Section}" Style="{StaticResource SidebarHeader}" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0">
+                    <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE710;" FontSize="12" ToolTip="{ui:Tr Smart.New}" Command="{Binding NewSmartGroupCommand}" />
+                    <ToggleButton Width="24" Height="24" Focusable="False" Margin="2,0,0,0" IsChecked="{Binding IsViewsExpanded}" Style="{StaticResource Btn.IconSmall}"
+                                  ToolTip="{ui:Tr View.Toggle}">
+                        <TextBlock Text="&#xE70E;" FontFamily="{StaticResource Font.Icons}" FontSize="9" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="RenderTransform">
+                                        <Setter.Value>
+                                            <RotateTransform Angle="180" />
+                                        </Setter.Value>
+                                    </Setter>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsViewsExpanded}" Value="True">
+                                            <Setter Property="RenderTransform">
+                                                <Setter.Value>
+                                                    <RotateTransform Angle="0" />
+                                                </Setter.Value>
+                                            </Setter>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </ToggleButton>
+                </StackPanel>
+            </Grid>
+            <StackPanel Visibility="{Binding IsViewsExpanded, Converter={StaticResource Vis}}">
+            <Button Style="{StaticResource PlaceButton}" Command="{Binding OpenViewCommand}" CommandParameter="favorites" AutomationProperties.Name="{ui:Tr View.Favorites}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE734;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Secondary}" Width="18" Margin="20,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{ui:Tr View.Favorites}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding FavoriteCount}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource PlaceButton}" Command="{Binding OpenViewCommand}" CommandParameter="recent" AutomationProperties.Name="{ui:Tr View.Recent}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE81C;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Secondary}" Width="18" Margin="20,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{ui:Tr View.Recent}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding RecentCount}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource PlaceButton}" Command="{Binding OpenViewCommand}" CommandParameter="connected" AutomationProperties.Name="{ui:Tr View.Connected}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="&#xE703;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Secondary}" Width="18" Margin="20,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{ui:Tr View.Connected}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="{Binding ConnectedCount}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                </Grid>
+            </Button>
+            <ItemsControl ItemsSource="{Binding SmartGroups}" Focusable="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:SmartGroupViewModel}">
+                        <Button Style="{StaticResource PlaceButton}" AutomationProperties.Name="{Binding Name}" ToolTip="{ui:Tr Smart.Tooltip}"
+                                Command="{Binding DataContext.OpenSmartGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding}"
+                                ContextMenuOpening="SmartGroup_ContextMenuOpening" PreviewMouseDown="SmartGroup_PreviewMouseDown">
+                            <Button.ContextMenu>
+                                <ContextMenu />
+                            </Button.ContextMenu>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="&#xE71C;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Accent.Text}" Width="18" Margin="20,0,8,0" />
+                                <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="2" Text="{Binding Count}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+
         <!-- Connections header -->
-        <Grid Grid.Row="1" Height="36" Margin="0,8,0,0">
+        <Grid Grid.Row="2" Height="36" Margin="0,8,0,0">
             <TextBlock Text="{ui:Tr Tree.Connections}" Style="{StaticResource SidebarHeader}" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,0,10,0">
                 <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE8F4;" FontSize="12" ToolTip="{ui:Tr Menu.NewGroup}" Command="{Binding NewGroupCommand}" />
@@ -183,7 +278,7 @@
         </Grid>
 
         <!-- Connection tree -->
-        <TreeView x:Name="Tree" Grid.Row="2" ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0" Padding="0,0,0,8"
+        <TreeView x:Name="Tree" Grid.Row="3" ItemsSource="{Binding RootNodes}" Background="Transparent" BorderThickness="0" Padding="0,0,0,8"
                   ItemContainerStyle="{StaticResource TreeItem}" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" AllowDrop="True"
                   SelectedItemChanged="Tree_SelectedItemChanged" PreviewMouseLeftButtonDown="Tree_PreviewMouseLeftButtonDown"
@@ -200,7 +295,7 @@
         </TreeView>
 
         <!-- Empty state -->
-        <StackPanel Grid.Row="2" Margin="18,8,18,0" Visibility="{Binding IsTreeEmpty, Converter={StaticResource Vis}}">
+        <StackPanel Grid.Row="3" Margin="18,8,18,0" Visibility="{Binding IsTreeEmpty, Converter={StaticResource Vis}}">
             <TextBlock Text="{ui:Tr Tree.Empty.Title}" FontWeight="SemiBold" FontSize="14" />
             <TextBlock Text="{ui:Tr Tree.Empty.Body}" Style="{StaticResource Text.Secondary}" Margin="0,6,0,10" />
             <Button Style="{StaticResource Btn.Link}" HorizontalAlignment="Left" Content="{ui:Tr Tree.Empty.Import}"
@@ -208,7 +303,7 @@
         </StackPanel>
 
         <!-- This PC -->
-        <Border Grid.Row="3" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,6,0,8">
+        <Border Grid.Row="4" BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,6,0,8">
             <StackPanel>
                 <Grid Height="30">
                     <Button Style="{StaticResource Btn.Base}" Padding="0" Height="28" HorizontalAlignment="Left" Margin="6,0,0,0"

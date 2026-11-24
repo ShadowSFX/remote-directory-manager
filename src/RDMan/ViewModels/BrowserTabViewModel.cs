@@ -147,6 +147,8 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     {
         HomeLocation => Loc.T("Tree.Home"),
         GroupLocation g => _main.FindGroup(g.GroupId)?.Name ?? Loc.T("Tree.Home"),
+        ViewLocation v => MainViewModel.ViewTitle(v.View),
+        SmartGroupLocation sg => _main.FindSmartGroup(sg.SmartGroupId)?.Name ?? Loc.T("Tree.Home"),
         ThisPcLocation => Loc.T("Tree.ThisPc"),
         FolderLocation f when f.IsServerRoot => Server?.Name ?? f.DisplayLeaf,
         FolderLocation f when f.Target is { SubPath: null or "" } && Server is { Share: not null } => Server.Name,
@@ -159,6 +161,8 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     {
         HomeLocation => "",
         GroupLocation => "",
+        ViewLocation v => MainViewModel.ViewGlyph(v.View),
+        SmartGroupLocation => "\uE71C",
         ThisPcLocation => "",
         FolderLocation { IsUnc: true } => "",
         DesktopLocation => "",
@@ -261,6 +265,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         FolderLocation f => f.Parent() is { } p ? p : ServerGroupFor(f),
         GroupLocation g => _main.FindGroup(g.GroupId)?.Parent is { } pg ? new GroupLocation(pg.Model.Id) : new HomeLocation(),
         DesktopLocation => Server?.Parent is { } sg ? new GroupLocation(sg.Model.Id) : new HomeLocation(),
+        ViewLocation or SmartGroupLocation => new HomeLocation(),
         _ => null,
     };
 
@@ -398,6 +403,20 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
                 }
                 ShowDashboard(new DashboardViewModel(group.Name, group, group.Children));
                 return;
+            case ViewLocation v:
+                ShowDashboard(new DashboardViewModel(MainViewModel.ViewTitle(v.View), DashboardKind.View, _main.ViewServers(v.View),
+                    Loc.T($"View.Empty.{v.View}.Title"), Loc.T($"View.Empty.{v.View}.Body")));
+                return;
+            case SmartGroupLocation sl:
+                if (_main.FindSmartGroup(sl.SmartGroupId) is not { } smart)
+                {
+                    Current = new HomeLocation();
+                    await LoadAsync();
+                    return;
+                }
+                ShowDashboard(new DashboardViewModel(smart.Name, DashboardKind.Smart, _main.SmartGroupServers(smart.Model),
+                    Loc.T("Smart.Empty.Title"), Loc.T("Smart.Empty.Body"), smart));
+                return;
             case ThisPcLocation:
                 Dashboard = null;
                 ReplaceItems(BuildThisPc());
@@ -422,6 +441,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
             {
                 Server.Server.LastConnected = DateTimeOffset.Now;
                 _svc.State.MarkDirty();
+                _main.NotifyConnectionsChanged(); // Recent / Connected
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -660,6 +680,8 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     {
         if (e.PropertyName is nameof(RdpSessionViewModel.State) && IsFullScreen && Session is not { IsConnected: true })
             _main.SetFullScreen(this, false); // disconnected/failed: bring the window back to show what happened
+        if (e.PropertyName is nameof(RdpSessionViewModel.State) && Session?.State is DesktopState.Connected or DesktopState.Idle or DesktopState.Error)
+            _main.NotifyConnectionsChanged();
         if (e.PropertyName is nameof(RdpSessionViewModel.State) or nameof(RdpSessionViewModel.ConnectedAs))
         {
             NotifySessionVisibility();
@@ -745,6 +767,10 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
                         Breadcrumb.Add(new BreadcrumbSegment(a.Name, new GroupLocation(a.Model.Id), false, null));
                     Breadcrumb.Add(new BreadcrumbSegment(group.Name, Current, false, null));
                 }
+                break;
+            case ViewLocation or SmartGroupLocation:
+                Breadcrumb.Add(new BreadcrumbSegment(Loc.T("Tree.Home"), new HomeLocation(), false, null));
+                Breadcrumb.Add(new BreadcrumbSegment(Title, Current, false, null));
                 break;
             case ThisPcLocation:
                 Breadcrumb.Add(new BreadcrumbSegment(Loc.T("Tree.ThisPc"), Current, false, null));

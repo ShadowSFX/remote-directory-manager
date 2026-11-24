@@ -79,6 +79,9 @@ public sealed class ServerNode : TreeNode
     public List<string> Tags { get; set; } = new();
     public DateTimeOffset? LastConnected { get; set; }
 
+    /// <summary>Shown in the Favorites view.</summary>
+    public bool IsFavorite { get; set; }
+
     /// <summary>Shared files (SMB) are offered for this server.</summary>
     public bool Files { get; set; } = true;
 
@@ -119,4 +122,7 @@ public sealed class ConnectionDocument
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
     public GroupNode Root { get; set; } = new() { Name = "root" };
     public List<CredentialProfile> Profiles { get; set; } = new();
+
+    /// <summary>Saved searches shown under Views (older builds ignore this property).</summary>
+    public List<SmartGroup> SmartGroups { get; set; } = new();
 }

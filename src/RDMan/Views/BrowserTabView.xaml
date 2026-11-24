@@ -122,9 +122,29 @@
                         </Grid.RowDefinitions>
                         <Grid>
                             <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource Fg.Primary}"
-                                       Margin="0,0,56,0" />
+                                       Margin="0,0,80,0" />
                             <!-- What this server offers; each is a direct shortcut when it has both -->
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-4,-6,0">
+                                <Button x:Name="Star" FontSize="12" Click="CardStar_Click" Tag="{Binding}" Margin="0,0,2,0">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource Btn.IconSmall}">
+                                            <Setter Property="Content" Value="&#xE734;" />
+                                            <Setter Property="ToolTip" Value="{ui:Tr Favorite.Add}" />
+                                            <Setter Property="Opacity" Value="0" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMouseOver, ElementName=Card}" Value="True">
+                                                    <Setter Property="Opacity" Value="1" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding IsFavorite}" Value="True">
+                                                    <Setter Property="Content" Value="&#xE735;" />
+                                                    <Setter Property="Foreground" Value="{DynamicResource Status.Warn}" />
+                                                    <Setter Property="ToolTip" Value="{ui:Tr Favorite.Remove}" />
+                                                    <Setter Property="Opacity" Value="1" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
                                 <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE8B7;" FontSize="12" Click="CardFiles_Click" Tag="{Binding}"
                                         ToolTip="{ui:Tr Files.Open}" Visibility="{Binding HasBoth, Converter={StaticResource Vis}}" />
                                 <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE7F4;" FontSize="12" Click="CardDesktop_Click" Tag="{Binding}"
@@ -565,7 +585,7 @@
                                        Visibility="{Binding IsEmpty, Converter={StaticResource Vis}, ConverterParameter=invert}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                            <Button Margin="8,0,0,0" Click="DashboardEditGroup_Click" Visibility="{Binding IsHome, Converter={StaticResource Vis}, ConverterParameter=invert}"
+                            <Button Margin="8,0,0,0" Click="DashboardEditGroup_Click" Visibility="{Binding CanEdit, Converter={StaticResource Vis}}"
                                     AutomationProperties.Name="{ui:Tr Common.Edit}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE70F;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
@@ -574,7 +594,7 @@
                             </Button>
                             <!-- When empty, the onboarding card below carries the primary action instead -->
                             <Button Style="{StaticResource Btn.Primary}" Click="DashboardNewServer_Click" Margin="8,0,0,0" AutomationProperties.Name="{ui:Tr Server.TitleNew}"
-                                    Visibility="{Binding IsEmpty, Converter={StaticResource Vis}, ConverterParameter=invert}">
+                                    Visibility="{Binding ShowNewServer, Converter={StaticResource Vis}}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
                                     <TextBlock Text="{ui:Tr Server.TitleNew}" />
@@ -605,9 +625,9 @@
                     <Border Style="{StaticResource Surface.Card}" Padding="28" MaxWidth="560" HorizontalAlignment="Left" Margin="0,4,0,0"
                             Visibility="{Binding IsEmpty, Converter={StaticResource Vis}}">
                         <StackPanel>
-                            <TextBlock Text="{ui:Tr Tree.Empty.Title}" Style="{StaticResource Text.Subtitle}" />
-                            <TextBlock Text="{ui:Tr Tree.Empty.Body}" Style="{StaticResource Text.Secondary}" Margin="0,6,0,16" />
-                            <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding EmptyTitle}" Style="{StaticResource Text.Subtitle}" />
+                            <TextBlock Text="{Binding EmptyBody}" Style="{StaticResource Text.Secondary}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                            <StackPanel Orientation="Horizontal" Margin="0,16,0,0" Visibility="{Binding IsTreeDashboard, Converter={StaticResource Vis}}">
                                 <Button Style="{StaticResource Btn.Primary}" Content="{ui:Tr Server.TitleNew}" Click="DashboardNewServer_Click" />
                                 <Button Content="{ui:Tr Menu.ImportNetUse}" Margin="8,0,0,0" Click="DashboardImport_Click" />
                             </StackPanel>

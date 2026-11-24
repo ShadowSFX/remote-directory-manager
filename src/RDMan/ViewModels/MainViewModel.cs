@@ -29,6 +29,7 @@ public sealed partial class MainViewModel : ObservableObject
         _activePane = InitPanes();
         Palette = new CommandPaletteViewModel(this);
         BuildTree();
+        BuildSmartGroups();
         BuildLocalPlaces();
         services.State.SaveFailed += (_, msg) => services.Toasts.Show(Loc.F("Toast.SaveFailed", msg), ToastKind.Error);
         services.Updates.PropertyChanged += (_, e) =>
@@ -108,6 +109,17 @@ public sealed partial class MainViewModel : ObservableObject
             State.MarkSettingsDirty();
         }
     }
+    public bool IsViewsExpanded
+    {
+        get => State.Settings.ViewsExpanded;
+        set
+        {
+            if (State.Settings.ViewsExpanded == value) return;
+            State.Settings.ViewsExpanded = value;
+            OnPropertyChanged();
+            State.MarkSettingsDirty();
+        }
+    }
     public bool IsTreeEmpty => RootNodes.Count == 0;
     public string WindowTitle => ActiveTab is { } t ? $"{t.Title} — Remote Directory Manager" : "Remote Directory Manager";
     public string DataLocationText => State.Paths.IsPortable ? Loc.T("Status.Portable") : Loc.T("Status.AppData");
@@ -168,6 +180,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void Changed()
     {
         State.MarkDirty();
+        RefreshViewCounts();
         RefreshDashboards();
     }
 
@@ -628,6 +641,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (node is not ServerNodeViewModel s) return;
         await Services.Connections.DisconnectHostAsync(s.Host);
         Toasts.Show(Loc.F("Toast.Disconnected", s.Name));
+        NotifyConnectionsChanged();
     }
 
     // ───────────── Panes & tabs ─────────────

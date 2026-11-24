@@ -10,6 +10,8 @@ public abstract record Location
     public static Location FromSaved(SavedTab t) => t.Kind switch
     {
         "group" when t.NodeId is { } id => new GroupLocation(id),
+        "smart" when t.NodeId is { } sg => new SmartGroupLocation(sg),
+        "view" when t.Path is MainViewModel.ViewFavorites or MainViewModel.ViewRecent or MainViewModel.ViewConnected => new ViewLocation(t.Path),
         "thispc" => new ThisPcLocation(),
         "desktop" when t.NodeId is { } sid => new DesktopLocation(sid),
         "folder" when !string.IsNullOrWhiteSpace(t.Path) => new FolderLocation(t.Path!),
@@ -27,6 +29,18 @@ public sealed record HomeLocation : Location
 public sealed record GroupLocation(Guid GroupId) : Location
 {
     public override SavedTab ToSaved() => new() { Kind = "group", NodeId = GroupId };
+}
+
+/// <summary>Favorites, Recent or Connected: servers from anywhere in the tree.</summary>
+public sealed record ViewLocation(string View) : Location
+{
+    public override SavedTab ToSaved() => new() { Kind = "view", Path = View };
+}
+
+/// <summary>A saved search (smart group).</summary>
+public sealed record SmartGroupLocation(Guid SmartGroupId) : Location
+{
+    public override SavedTab ToSaved() => new() { Kind = "smart", NodeId = SmartGroupId };
 }
 
 /// <summary>The remote desktop (RDP) of a server in the tree.</summary>
