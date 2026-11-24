@@ -454,24 +454,75 @@
     pre.className = c.preKind || '';
     pre.hidden = !c.pre;
 
+    // Inputs (passwords, one-time codes) and an optional checkbox; their values travel with the chosen action.
+    const form = $('card-form');
+    form.replaceChildren();
+    const inputs = [];
+    for (const f of c.fields || []) {
+      const label = document.createElement('label');
+      label.className = 'field';
+      const span = document.createElement('span');
+      span.textContent = f.label || '';
+      const input = document.createElement('input');
+      input.type = f.type === 'password' ? 'password' : 'text';
+      input.value = f.value || '';
+      input.spellcheck = false;
+      input.autocomplete = 'off';
+      input.dataset.id = f.id;
+      label.append(span, input);
+      form.append(label);
+      inputs.push(input);
+    }
+    let check = null;
+    if (c.check) {
+      const label = document.createElement('label');
+      label.className = 'check';
+      check = document.createElement('input');
+      check.type = 'checkbox';
+      check.checked = !!c.check.checked;
+      check.dataset.id = c.check.id;
+      const span = document.createElement('span');
+      span.textContent = c.check.label || '';
+      label.append(check, span);
+      form.append(label);
+    }
+    form.hidden = inputs.length === 0 && !check;
+
+    const values = () => {
+      const v = {};
+      for (const i of inputs) v[i.dataset.id] = i.value;
+      if (check) v[check.dataset.id] = check.checked;
+      return v;
+    };
+    const run = (a) => {
+      const v = a.cancel ? {} : values();
+      for (const i of inputs) i.value = ''; // don't keep secrets in the page
+      showCard(null);
+      post({ t: 'action', id: a.id, values: v });
+    };
+
     const actions = $('card-actions');
-    const buttons = (c.actions || []).map((a) => button(a, () => { showCard(null); post({ t: 'action', id: a.id }); }));
+    const buttons = (c.actions || []).map((a) => button(a, () => run(a)));
     actions.replaceChildren(...buttons);
     scrim.hidden = false;
 
-    // Keyboard: Esc = the cancel action, Enter = the default one; focus starts on the safe choice.
+    // Keyboard: Esc = the cancel action, Enter = the default one; focus starts on the first input or the safe choice.
     const cancel = (c.actions || []).find((a) => a.cancel);
     const primary = (c.actions || []).find((a) => a.default);
     cardKeyHandler = (e) => {
-      if (e.key === 'Escape' && cancel) { e.preventDefault(); e.stopPropagation(); showCard(null); post({ t: 'action', id: cancel.id }); }
-      else if (e.key === 'Tab') { /* let focus move between buttons */ }
-      else if (!(e.target instanceof HTMLButtonElement) && e.key === 'Enter' && primary) {
-        e.preventDefault(); e.stopPropagation(); showCard(null); post({ t: 'action', id: primary.id });
+      if (e.key === 'Escape' && cancel) { e.preventDefault(); e.stopPropagation(); run(cancel); }
+      else if (e.key === 'Enter' && primary && !(e.target instanceof HTMLButtonElement) && !(e.target instanceof HTMLInputElement && e.target.type === 'checkbox')) {
+        e.preventDefault(); e.stopPropagation(); run(primary);
       }
     };
     document.addEventListener('keydown', cardKeyHandler, true);
-    const focusIdx = (c.actions || []).findIndex((a) => a.focus);
-    (buttons[focusIdx >= 0 ? focusIdx : buttons.length - 1] || $('card')).focus();
+    if (inputs.length > 0) {
+      const empty = inputs.find((i) => !i.value) || inputs[0];
+      empty.focus();
+    } else {
+      const focusIdx = (c.actions || []).findIndex((a) => a.focus);
+      (buttons[focusIdx >= 0 ? focusIdx : buttons.length - 1] || $('card')).focus();
+    }
   }
 
   function onContextMenu(e) {

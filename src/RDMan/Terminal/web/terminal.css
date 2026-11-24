@@ -242,6 +242,25 @@ button:focus-visible, input:focus-visible {
 }
 #card-pre[hidden] { display: none; }
 #card-pre.art { display: inline-block; max-height: none; line-height: 1.15; }
+#card-form { margin-top: 16px; display: grid; gap: 12px; }
+#card-form[hidden] { display: none; }
+#card-form .field { display: grid; gap: 6px; }
+#card-form .field span { color: var(--ui-fg2); font-size: 12px; font-weight: 600; }
+#card-form .field input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: 4px;
+  background: var(--term-bg);
+  color: var(--ui-fg);
+  font: 13px "Cascadia Code NF", monospace;
+  outline: none;
+  -webkit-user-select: text;
+  user-select: text;
+}
+#card-form .field input:focus { border-color: var(--ui-accent); box-shadow: 0 0 0 1px var(--ui-accent); }
+#card-form .check { display: flex; align-items: center; gap: 8px; color: var(--ui-fg2); }
+#card-form .check input { width: 16px; height: 16px; margin: 0; accent-color: var(--ui-accent); }
 #card-actions {
   margin-top: 20px;
   display: flex;

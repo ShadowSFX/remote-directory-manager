@@ -64,7 +64,7 @@ public sealed class TerminalHost : IDisposable
         return _environment ??= CoreWebView2Environment.CreateAsync(
             browserExecutableFolder: null,
             userDataFolder: Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData), "RDMan", "WebView2"),
-            options: new CoreWebView2EnvironmentOptions { AdditionalBrowserArguments = "--disable-features=msSmartScreenProtection" });
+            options: new CoreWebView2EnvironmentOptions { AdditionalBrowserArguments = "--disable-features=msSmartScreenProtection --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows" });
     }
 
     private async Task InitializeAsync()
