@@ -46,6 +46,14 @@
     <SolidColorBrush x:Key="Danger.Subtle" Color="#1AD63C3C" />
     <SolidColorBrush x:Key="Warn.Subtle" Color="#1FB7791F" />
 
+    <!-- Protocol badges (tree): kept apart from the status green/red/amber and the indigo accent -->
+    <SolidColorBrush x:Key="Proto.Smb" Color="#FF076A62" />
+    <SolidColorBrush x:Key="Proto.Smb.Subtle" Color="#1A076A62" />
+    <SolidColorBrush x:Key="Proto.Rdp" Color="#FF1259B5" />
+    <SolidColorBrush x:Key="Proto.Rdp.Subtle" Color="#1A1259B5" />
+    <SolidColorBrush x:Key="Proto.Ssh" Color="#FF7232B5" />
+    <SolidColorBrush x:Key="Proto.Ssh.Subtle" Color="#1A7232B5" />
+
     <SolidColorBrush x:Key="Caption.CloseHover" Color="#FFC42B1C" />
     <Color x:Key="Shadow.Color">#FF1A1E26</Color>
     <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="Shadow.Opacity">0.16</sys:Double>
