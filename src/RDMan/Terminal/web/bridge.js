@@ -291,6 +291,7 @@
     term.parser.registerOscHandler(133, (data) => {
       const [kind, arg] = data.split(';');
       if (kind === 'A') {
+        post({ t: 'prompt' });
         const marker = term.registerMarker(0);
         if (marker) {
           prompts.push({ marker, exit: null });

@@ -4,6 +4,7 @@
                 xmlns:ui="clr-namespace:RDMan.Infrastructure"
                 xmlns:v="clr-namespace:RDMan.Views"
                 xmlns:vm="clr-namespace:RDMan.ViewModels"
+                xmlns:tvm="clr-namespace:RDMan.ViewModels.Terminal"
                 Title="{Binding Title}" Width="800" Height="660" SizeToContent="Manual">
     <v:DialogWindow.Resources>
         <!-- One credentials block for files and for remote desktop (IsDesktop switches the wording/options) -->
@@ -203,17 +204,27 @@
                         <Border Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="1" HorizontalAlignment="Left">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton Style="{StaticResource Radio.Segment}" GroupName="action"
-                                             IsChecked="{Binding DefaultAction, Converter={StaticResource Eq}, ConverterParameter=Files}">
+                                             IsChecked="{Binding DefaultAction, Converter={StaticResource Eq}, ConverterParameter=Files}"
+                                             Visibility="{Binding FilesEnabled, Converter={StaticResource Vis}}">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0" />
                                         <TextBlock Text="{ui:Tr Cap.Files}" />
                                     </StackPanel>
                                 </RadioButton>
                                 <RadioButton Style="{StaticResource Radio.Segment}" GroupName="action"
-                                             IsChecked="{Binding DefaultAction, Converter={StaticResource Eq}, ConverterParameter=Desktop}">
+                                             IsChecked="{Binding DefaultAction, Converter={StaticResource Eq}, ConverterParameter=Desktop}"
+                                             Visibility="{Binding DesktopEnabled, Converter={StaticResource Vis}}">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#xE7F4;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0" />
                                         <TextBlock Text="{ui:Tr Cap.Desktop}" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource Radio.Segment}" GroupName="action"
+                                             IsChecked="{Binding DefaultAction, Converter={StaticResource Eq}, ConverterParameter=Terminal}"
+                                             Visibility="{Binding Ssh.Enabled, Converter={StaticResource Vis}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE756;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,7,0" />
+                                        <TextBlock Text="{ui:Tr Cap.Terminal}" />
                                     </StackPanel>
                                 </RadioButton>
                             </StackPanel>
@@ -365,6 +376,197 @@
                                                    Visibility="{Binding HasStoredPassword, Converter={StaticResource Vis}}" />
                                     </StackPanel>
                                 </Grid>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- SSH terminal -->
+                <StackPanel Visibility="{Binding IsTerminalSection, Converter={StaticResource Vis}}" DataContext="{Binding Ssh}">
+                    <StackPanel Visibility="{Binding IsServer, Converter={StaticResource Vis}}">
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Term.Editor.Enable}" IsChecked="{Binding Enabled}" Margin="0,4,0,18" FontWeight="SemiBold" />
+                        <StackPanel IsEnabled="{Binding Enabled}">
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{ui:Tr Term.Editor.Port}" Style="{StaticResource Text.Label}" />
+                                    <TextBox Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="22"
+                                             AutomationProperties.Name="{ui:Tr Term.Editor.Port}" />
+                                </StackPanel>
+                                <CheckBox Grid.Column="2" Style="{StaticResource Switch}" VerticalAlignment="Bottom" Margin="0,0,0,7" IsChecked="{Binding UseSshConfig}">
+                                    <TextBlock Text="{ui:Tr Term.Editor.UseConfig}" TextWrapping="Wrap" />
+                                </CheckBox>
+                            </Grid>
+                            <!-- What "ssh <address>" resolves to, live -->
+                            <Border Background="{DynamicResource Bg.Hover}" CornerRadius="6" Padding="12,9" Margin="0,0,0,18"
+                                    Visibility="{Binding ConfigPreview, Converter={StaticResource VisIfAny}}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="PreviewIcon" Text="&#xE756;" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Tertiary}"
+                                               Margin="0,1,10,0" VerticalAlignment="Top" />
+                                    <TextBlock Grid.Column="1" Text="{Binding ConfigPreview}" TextWrapping="Wrap" Foreground="{DynamicResource Fg.Secondary}" />
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </StackPanel>
+                    <TextBlock Text="{ui:Tr Term.Editor.GroupNote}" Style="{StaticResource Text.Secondary}" Margin="0,4,0,14" TextWrapping="Wrap"
+                               Visibility="{Binding IsServer, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+
+                    <!-- Sign-in -->
+                    <Border Style="{StaticResource Panel}">
+                        <StackPanel>
+                            <TextBlock Text="{ui:Tr Term.Editor.Auth.Section}" Style="{StaticResource SectionTitle}" FontSize="14" />
+                            <StackPanel Style="{StaticResource Field}">
+                                <TextBlock Text="{ui:Tr Term.Prompt.User}" Style="{StaticResource Text.Label}" />
+                                <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="{Binding UsernameHint}"
+                                         AutomationProperties.Name="{ui:Tr Term.Prompt.User}" />
+                            </StackPanel>
+                            <StackPanel Margin="-8,0,-8,0">
+                                <RadioButton Style="{StaticResource Radio.Option}" IsChecked="{Binding IsInherit}">
+                                    <StackPanel>
+                                        <TextBlock Text="{ui:Tr Term.Editor.Auth.Inherit}" />
+                                        <TextBlock Text="{Binding InheritText}" Style="{StaticResource Text.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource Radio.Option}" IsChecked="{Binding IsAuto}">
+                                    <StackPanel>
+                                        <TextBlock Text="{ui:Tr Term.Editor.Auth.Auto}" />
+                                        <TextBlock Text="{ui:Tr Term.Editor.Auth.AutoNote}" Style="{StaticResource Text.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <RadioButton Style="{StaticResource Radio.Option}" IsChecked="{Binding IsKey}">
+                                    <StackPanel>
+                                        <TextBlock Text="{ui:Tr Term.Editor.Auth.Key}" />
+                                        <TextBlock Text="{ui:Tr Term.Editor.Auth.KeyNote}" Style="{StaticResource Text.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </RadioButton>
+                                <Grid Margin="36,4,8,8" Visibility="{Binding IsKey, Converter={StaticResource Vis}}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox ItemsSource="{Binding Keys}" SelectedItem="{Binding SelectedKey}" Visibility="{Binding HasKeys, Converter={StaticResource Vis}}"
+                                              AutomationProperties.Name="{ui:Tr Term.Editor.Auth.Key}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate DataType="{x:Type tvm:KeyChoice}">
+                                                <StackPanel Margin="0,2">
+                                                    <TextBlock Text="{Binding Label}" />
+                                                    <TextBlock Text="{Binding Detail}" Style="{StaticResource Text.Mono}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <TextBlock Text="{ui:Tr Term.Editor.Key.None}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center"
+                                               Visibility="{Binding HasKeys, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+                                    <Button Grid.Column="1" Margin="8,0,0,0" Command="{Binding ImportKeyCommand}" VerticalAlignment="Top">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#xE8B5;" Style="{StaticResource Icon}" FontSize="12" Margin="0,0,8,0" />
+                                            <TextBlock Text="{ui:Tr Term.Editor.Key.Import}" />
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+                                <RadioButton Style="{StaticResource Radio.Option}" Content="{ui:Tr Term.Editor.Auth.Password}" IsChecked="{Binding IsPassword}" />
+                                <StackPanel Margin="36,4,8,8" Visibility="{Binding IsPassword, Converter={StaticResource Vis}}">
+                                    <PasswordBox x:Name="SshPassword" Tag="empty" PasswordChanged="SshPassword_PasswordChanged" Width="260" HorizontalAlignment="Left"
+                                                 AutomationProperties.Name="{ui:Tr Term.Prompt.Password}" />
+                                    <TextBlock Text="{ui:Tr Gateway.PasswordKept}" Style="{StaticResource Text.Caption}" Margin="0,6,0,0"
+                                               Visibility="{Binding HasStoredPassword, Converter={StaticResource Vis}}" />
+                                </StackPanel>
+                                <RadioButton Style="{StaticResource Radio.Option}" IsChecked="{Binding IsAgent}">
+                                    <StackPanel>
+                                        <TextBlock Text="{ui:Tr Term.Editor.Auth.Agent}" />
+                                        <TextBlock Text="{ui:Tr Term.Editor.Auth.AgentNote}" Style="{StaticResource Text.Caption}" Margin="0,2,0,0" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                                <TextBlock Text="&#xE72E;" Style="{StaticResource Icon}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}" Margin="0,0,8,0" />
+                                <TextBlock Text="{ui:Tr Term.Editor.Auth.Stored}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" MaxWidth="460" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Port forwarding (servers) -->
+                    <Border Style="{StaticResource Panel}" Visibility="{Binding IsServer, Converter={StaticResource Vis}}" IsEnabled="{Binding Enabled}">
+                        <StackPanel>
+                            <Grid>
+                                <TextBlock Text="{ui:Tr Term.Editor.Forward.Section}" Style="{StaticResource Text.Subtitle}" FontSize="14" />
+                                <Button Style="{StaticResource Btn.Link}" HorizontalAlignment="Right" Command="{Binding AddForwardCommand}" Content="{ui:Tr Term.Editor.Forward.Add}" />
+                            </Grid>
+                            <TextBlock Text="{ui:Tr Term.Editor.Forward.Note}" Style="{StaticResource Text.Caption}" Margin="0,4,0,12" TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding Forwards}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type tvm:ForwardRowViewModel}">
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="128" />
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="84" />
+                                                <ColumnDefinition Width="28" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox ItemsSource="{x:Static tvm:ForwardRowViewModel.Kinds}" SelectedItem="{Binding SelectedKind}" DisplayMemberPath="Label"
+                                                      AutomationProperties.Name="{ui:Tr Term.Editor.Forward.Kind}" />
+                                            <TextBox Grid.Column="2" Text="{Binding BindPort, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}"
+                                                     ui:Ui.Hint="{ui:Tr Term.Editor.Forward.PortHint}" AutomationProperties.Name="{ui:Tr Term.Editor.Forward.PortHint}" />
+                                            <TextBlock Grid.Column="3" Text="&#xE72A;" Style="{StaticResource Icon}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}"
+                                                       HorizontalAlignment="Center" Visibility="{Binding NeedsTarget, Converter={StaticResource Vis}}" />
+                                            <TextBox Grid.Column="4" Text="{Binding Target, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}"
+                                                     ui:Ui.Hint="{ui:Tr Term.Editor.Forward.TargetHint}" Visibility="{Binding NeedsTarget, Converter={StaticResource Vis}}"
+                                                     AutomationProperties.Name="{ui:Tr Term.Editor.Forward.TargetHint}" />
+                                            <CheckBox Grid.Column="6" Content="{ui:Tr Term.Editor.Forward.Auto}" IsChecked="{Binding AutoStart}" VerticalAlignment="Center" />
+                                            <Button Grid.Column="7" Style="{StaticResource Btn.IconSmall}" Content="&#xE711;" Margin="6,0,0,0" ToolTip="{ui:Tr Common.Delete}"
+                                                    Command="{Binding DataContext.RemoveForwardCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Terminal options -->
+                    <Border Style="{StaticResource Panel}">
+                        <StackPanel>
+                            <TextBlock Text="{ui:Tr Term.Editor.Options.Section}" Style="{StaticResource Text.Subtitle}" FontSize="14" />
+                            <TextBlock Text="{ui:Tr Rdp.SectionNote}" Style="{StaticResource Text.Caption}" Margin="0,4,0,12" />
+                            <ItemsControl ItemsSource="{Binding Options}" Focusable="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type tvm:SshOptionRowViewModel}">
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="250" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" Margin="0,0,8,0"
+                                                         Visibility="{Binding IsOverridden, Converter={StaticResource Vis}}" />
+                                                <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" SelectedItem="{Binding Selected}" DisplayMemberPath="Label"
+                                                      AutomationProperties.Name="{Binding Label}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Style="{StaticResource Field}" Margin="0,8,0,16">
+                                <TextBlock Text="{ui:Tr Term.Editor.ProxyJump}" Style="{StaticResource Text.Label}" />
+                                <TextBox Text="{Binding ProxyJump, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="{Binding ProxyJumpHint}"
+                                         AutomationProperties.Name="{ui:Tr Term.Editor.ProxyJump}" />
+                            </StackPanel>
+                            <StackPanel Style="{StaticResource Field}" Margin="0">
+                                <TextBlock Text="{ui:Tr Term.Editor.Startup}" Style="{StaticResource Text.Label}" />
+                                <TextBox Text="{Binding StartupCommand, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Mono}" ui:Ui.Hint="{Binding StartupCommandHint}"
+                                         AutomationProperties.Name="{ui:Tr Term.Editor.Startup}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

@@ -217,7 +217,11 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
     /// <summary>The native session surface is shown only for the selected tab of its pane, in desktop mode, while connecting/connected.</summary>
     public bool IsSessionVisible => Mode is TabMode.Desktop or TabMode.Terminal && ReferenceEquals(Pane.SelectedTab, this) && Session is { IsSurfaceVisible: true };
 
-    public void NotifySessionVisibility() => OnPropertyChanged(nameof(IsSessionVisible));
+    public void NotifySessionVisibility()
+    {
+        OnPropertyChanged(nameof(IsSessionVisible));
+        if (HasActivity && ReferenceEquals(Pane.SelectedTab, this)) HasActivity = false; // seen
+    }
 
     /// <summary>Raised when the user releases the keyboard from the session (Ctrl+Alt+←/→).</summary>
     public event EventHandler? SessionFocusReleased;

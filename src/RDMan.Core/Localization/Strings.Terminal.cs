@@ -48,6 +48,79 @@ public static partial class Strings
         T("SshErr.Unknown.Detail", "{0}", "{0}");
 
         AddTerminalSession();
+        AddTerminalEditor();
+    }
+
+    private static void AddTerminalEditor()
+    {
+        T("Server.Section.Terminal", "Terminal SSH", "SSH terminal");
+        T("Server.TestSshOk", "SSH (puerto {0}) responde en {1} ms", "SSH (port {0}) answers in {1} ms");
+        T("Server.TestSshFail", "SSH (puerto {0}) no responde", "SSH (port {0}) doesn't answer");
+        T("Term.Editor.Enable", "Abrir una terminal SSH en este servidor", "Open an SSH terminal on this server");
+        T("Term.Editor.Port", "Puerto", "Port");
+        T("Term.Editor.UseConfig", "Usar ~/.ssh/config, como el comando ssh", "Use ~/.ssh/config, like the ssh command");
+        T("Term.Editor.Preview.Config", "Según ~/.ssh/config (Host {0}): {1}", "From ~/.ssh/config (Host {0}): {1}");
+        T("Term.Editor.Preview.Plain", "Se conectará a {0}", "Will connect to {0}");
+        T("Term.Editor.Preview.Key", "llave {0}", "key {0}");
+        T("Term.Editor.Preview.Jump", "a través de {0}", "through {0}");
+        T("Term.Editor.GroupNote", "Lo que definas aquí lo heredan las terminales de los servidores de este grupo (por ejemplo, la llave .pem de una cuenta de AWS).", "What you set here is inherited by the terminals of this group's servers (for example, the .pem key of an AWS account).");
+        T("Term.Editor.Auth.Section", "Inicio de sesión", "Sign-in");
+        T("Term.Editor.Auth.Inherit", "Heredar del grupo", "Inherit from the group");
+        T("Term.Editor.Auth.InheritRoot", "Automático (nada configurado en los grupos)", "Automatic (nothing set in the groups)");
+        T("Term.Editor.Auth.InheritFrom", "{0}, definido en «{1}»", "{0}, set in “{1}”");
+        T("Term.Editor.Auth.Auto", "Automático", "Automatic");
+        T("Term.Editor.Auth.AutoNote", "Como el comando ssh: el agente SSH, las llaves de ~/.ssh y de la configuración, y si hace falta, la contraseña.", "Like the ssh command: the SSH agent, the keys in ~/.ssh and the config, and a password if needed.");
+        T("Term.Editor.Auth.Key", "Llave privada guardada en RDMan", "Private key saved in RDMan");
+        T("Term.Editor.Auth.KeyNote", "Por ejemplo, el .pem de AWS. Se guarda cifrado; el archivo original ya no hace falta.", "For example, the AWS .pem. Stored encrypted; the original file is no longer needed.");
+        T("Term.Editor.Auth.Describe.Key", "llave {0}", "key {0}");
+        T("Term.Editor.Auth.Password", "Contraseña", "Password");
+        T("Term.Editor.Auth.Agent", "Solo el agente SSH", "SSH agent only");
+        T("Term.Editor.Auth.AgentNote", "Las llaves cargadas en el agente de OpenSSH de Windows o en Pageant.", "The keys loaded in the Windows OpenSSH agent or Pageant.");
+        T("Term.Editor.Auth.Stored", "Contraseñas y llaves se guardan cifradas para tu usuario de Windows y no se exportan salvo que lo pidas.", "Passwords and keys are stored encrypted for your Windows user and aren't exported unless you ask.");
+        T("Term.Editor.User.Hint", "Del ~/.ssh/config, o se preguntará", "From ~/.ssh/config, or asked when connecting");
+        T("Term.Editor.InheritedHint", "{0} (heredado de «{1}»)", "{0} (inherited from “{1}”)");
+        T("Term.Editor.Key.None", "Aún no hay llaves en RDMan.", "No keys in RDMan yet.");
+        T("Term.Editor.Key.Import", "Importar llave…", "Import key…");
+        T("Term.Editor.Key.ImportTitle", "Elegir una llave privada", "Choose a private key");
+        T("Term.Editor.Key.Filter", "Llaves privadas (*.pem;*.key;*.ppk;id_*)|*.pem;*.key;*.ppk;id_*|Todos los archivos (*.*)|*.*", "Private keys (*.pem;*.key;*.ppk;id_*)|*.pem;*.key;*.ppk;id_*|All files (*.*)|*.*");
+        T("Term.Editor.Key.Imported", "Llave {0} importada ({1})", "Key {0} imported ({1})");
+        T("Term.Editor.Key.AlreadyImported", "Esa llave ya estaba en RDMan como {0}", "That key was already in RDMan as {0}");
+        T("Term.Editor.Key.RememberPassphrase", "Recordar la frase (cifrada)", "Remember the passphrase (encrypted)");
+        T("Term.Editor.Key.StoredNote", "Si no la recuerdas, RDMan la pedirá la primera vez que la uses en cada sesión.", "If you don't, RDMan asks for it the first time you use the key in each session.");
+        T("Term.Editor.Forward.Section", "Reenvío de puertos", "Port forwarding");
+        T("Term.Editor.Forward.Add", "Añadir", "Add");
+        T("Term.Editor.Forward.Note", "Se abren con la terminal. Local: un puerto de este equipo llega a un destino visto desde el servidor. Remoto: al revés. SOCKS: un proxy por el servidor.", "Opened with the terminal. Local: a port on this PC reaches a destination as seen from the server. Remote: the other way round. SOCKS: a proxy through the server.");
+        T("Term.Editor.Forward.Kind", "Tipo", "Type");
+        T("Term.Editor.Forward.Local", "Local (-L)", "Local (-L)");
+        T("Term.Editor.Forward.Remote", "Remoto (-R)", "Remote (-R)");
+        T("Term.Editor.Forward.Dynamic", "SOCKS (-D)", "SOCKS (-D)");
+        T("Term.Editor.Forward.PortHint", "Puerto", "Port");
+        T("Term.Editor.Forward.TargetHint", "destino:puerto", "host:port");
+        T("Term.Editor.Forward.Auto", "Al conectar", "On connect");
+        T("Term.Editor.Forward.Invalid", "Revisa los reenvíos de puertos: cada uno necesita un puerto válido y, si no es SOCKS, un destino host:puerto.", "Check the port forwards: each needs a valid port and, unless it's SOCKS, a host:port destination.");
+        T("Term.Editor.Options.Section", "Opciones de la terminal", "Terminal options");
+        T("Term.Editor.ProxyJump", "Servidor intermedio (ProxyJump)", "Jump host (ProxyJump)");
+        T("Term.Editor.ProxyJump.Hint", "usuario@bastion:22 — vacío: el del ~/.ssh/config", "user@bastion:22 — empty: the one in ~/.ssh/config");
+        T("Term.Editor.Startup", "Comando al iniciar", "Command on start");
+        T("Term.Editor.Startup.Hint", "Por ejemplo: cd /var/www", "For example: cd /var/www");
+        T("Term.Editor.Validation.Port", "El puerto SSH debe ser un número entre 1 y 65535 (o vacío).", "The SSH port must be a number from 1 to 65535 (or empty).");
+        T("Term.Editor.Validation.Key", "Importa o elige la llave privada para este servidor.", "Import or choose the private key for this server.");
+        T("Term.Editor.Validation.User", "El usuario no puede tener espacios.", "The user can't contain spaces.");
+        T("Term.Opt.Prompt", "Prompt powerline de RDMan (solo en esta sesión)", "RDMan powerline prompt (this session only)");
+        T("Term.Opt.Scheme", "Colores", "Colors");
+        T("Term.Opt.Stats", "Mostrar CPU, memoria y disco", "Show CPU, memory and disk");
+        T("Term.Opt.Log", "Guardar la sesión en un archivo", "Save the session to a file");
+        T("Term.Opt.KeepAlive", "Mantener viva la conexión", "Keep the connection alive");
+        T("Term.Opt.KeepAlive.Config", "según ~/.ssh/config (30 s)", "per ~/.ssh/config (30 s)");
+        T("Term.Opt.Off", "No", "Off");
+        T("Term.Opt.Clipboard", "Programas del servidor copian al portapapeles", "Server programs copy to the clipboard");
+        T("Term.Opt.Clipboard.Allow", "Permitir", "Allow");
+        T("Term.Opt.Clipboard.Ask", "Preguntar", "Ask");
+        T("Term.Scheme.Auto", "RDMan (sigue el tema)", "RDMan (follows the theme)");
+
+        T("Tree.Ctx.OpenTerminal", "Abrir terminal", "Open terminal");
+        T("Tree.Ctx.NewTerminal", "Nueva terminal", "New terminal");
+        T("Tree.Ctx.CopySsh", "Copiar comando ssh", "Copy ssh command");
     }
 
     private static void AddTerminalSession()
@@ -65,7 +138,10 @@ public static partial class Strings
         T("Term.NotEnabled", "{0} no tiene terminal SSH. Actívala en sus propiedades.", "{0} has no SSH terminal. Turn it on in its properties.");
         T("Term.ConfirmLeave", "Se cerrará la terminal de {0}.", "The terminal on {0} will be closed.");
         T("Term.ConfirmReconnect", "La sesión actual de {0} se cerrará y se abrirá otra.", "The current session on {0} will be closed and a new one opened.");
-        T("Term.ConnectedAs", "{0} · con {1}", "{0} · with {1}");
+        T("Term.SignedIn.Key", "con la llave {0}", "with the key {0}");
+        T("Term.SignedIn.Agent", "con el agente SSH", "with the SSH agent");
+        T("Term.SignedIn.Password", "con contraseña", "with a password");
+        T("Term.SignedIn.Interactive", "con verificación del servidor", "with server verification");
         T("Term.Line.Connecting", "Conectando a {0}…", "Connecting to {0}…");
         T("Term.Line.Reconnecting", "Reconectando a {0}…", "Reconnecting to {0}…");
         T("Term.Line.Reconnected", "reconectado {0}", "reconnected {0}");

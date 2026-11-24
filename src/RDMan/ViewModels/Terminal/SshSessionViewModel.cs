@@ -109,7 +109,12 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
     [ObservableProperty] private string? _remoteTitle;
     [ObservableProperty] private string? _currentDirectory;
     /// <summary>OSC 9;4 progress: null = none, 0-100, or -1 = indeterminate.</summary>
-    [ObservableProperty] private int? _progressValue;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasProgress), nameof(ProgressIndeterminate))]
+    private int? _progressValue;
+
+    public bool HasProgress => ProgressValue is not null;
+    public bool ProgressIndeterminate => ProgressValue == -1;
     [ObservableProperty] private bool _progressError;
 
     // Stats band
@@ -388,14 +393,19 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         _reconnectAttempt = 0;
         _passwordPromptedAfterFailure = false;
         Banner(null);
-        ConnectedAs = Loc.F("Term.ConnectedAs", target.Display, request.AuthenticatedWith ?? "");
+        ConnectedAs = DescribeSignIn(request.AuthenticatedWith);
         Server.Server.LastConnected = DateTimeOffset.Now;
         _svc.State.MarkDirty();
         if (isReconnect) Line(Dim("── " + Loc.F("Term.Line.Reconnected", DateTime.Now.ToString("t", CultureInfo.CurrentCulture)) + " ──"));
         if (command is not null && !channel.RunsCommand) Line(Dim(Loc.T("Term.Line.PromptUnavailable")));
 
-        if (settings.StartupCommand.Value is { Length: > 0 } startup)
-            channel.Write(Encoding.UTF8.GetBytes(startup + "\r"), 0, Encoding.UTF8.GetByteCount(startup + "\r"));
+        // Typed once the shell shows its first prompt (RDMan's prompt says when); otherwise after a short wait.
+        _pendingStartup = settings.StartupCommand.Value is { Length: > 0 } startup ? startup : null;
+        if (_pendingStartup is not null)
+        {
+            var waitGen = gen;
+            _ = Task.Delay(channel.RunsCommand ? 4000 : 800).ContinueWith(_ => _ui.BeginInvoke(() => { if (waitGen == _generation) SendStartupCommand(); }));
+        }
 
         if (!_forwardsLoaded)
         {
@@ -414,6 +424,25 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         if (settings.ShowStats.Value) StartStats(client, gen);
         _main.NotifyConnectionsChanged();
     }
+
+    private string? _pendingStartup;
+
+    private void SendStartupCommand()
+    {
+        if (_pendingStartup is not { } command || !IsConnected) return;
+        _pendingStartup = null;
+        SendInput(command + "\r");
+    }
+
+    /// <summary>"with the key pangya_vps", "with the SSH agent", "with a password" (identity band, status bar).</summary>
+    private static string DescribeSignIn(string? method) => method switch
+    {
+        null or "" => "",
+        "agent" => Loc.T("Term.SignedIn.Agent"),
+        "password" => Loc.T("Term.SignedIn.Password"),
+        "keyboard-interactive" => Loc.T("Term.SignedIn.Interactive"),
+        _ => Loc.F("Term.SignedIn.Key", method),
+    };
 
     private void Cancelled(int gen)
     {
@@ -995,6 +1024,9 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
                 break;
             case "activate":
                 RaiseActivated();
+                break;
+            case "prompt":
+                SendStartupCommand();
                 break;
             case "action":
                 var id = Str(m, "id");

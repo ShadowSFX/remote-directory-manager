@@ -178,23 +178,21 @@ public partial class SidebarView : UserControl
 
         if (node is ServerNodeViewModel sv)
         {
-            // Both views when available; the one a click opens comes first and in bold.
-            var files = Item("Tree.Ctx.OpenFiles", "\uE8B7", Vm.OpenNodeFilesCommand, node);
-            var desktop = Item("Tree.Ctx.OpenDesktop", "\uE7F4", Vm.OpenNodeDesktopCommand, node, sv.HasFiles ? null : "Enter");
-            if (sv.DefaultAction == Core.Models.ServerAction.Desktop)
+            // Every view the server offers; the one a click opens comes first and in bold.
+            var views = new List<(Core.Models.ServerAction Action, MenuItem Item)>();
+            if (sv.HasFiles) views.Add((Core.Models.ServerAction.Files, Item("Tree.Ctx.OpenFiles", "\uE8B7", Vm.OpenNodeFilesCommand, node)));
+            if (sv.HasDesktop) views.Add((Core.Models.ServerAction.Desktop, Item("Tree.Ctx.OpenDesktop", "\uE7F4", Vm.OpenNodeDesktopCommand, node)));
+            if (sv.HasTerminal) views.Add((Core.Models.ServerAction.Terminal, Item("Tree.Ctx.OpenTerminal", "\uE756", Vm.OpenNodeTerminalCommand, node)));
+            foreach (var (action, item) in views.OrderBy(v => v.Action == sv.DefaultAction ? 0 : 1))
             {
-                desktop.InputGestureText = "Enter";
-                desktop.FontWeight = FontWeights.SemiBold;
-                menu.Items.Add(desktop);
-                if (sv.HasFiles) menu.Items.Add(files);
+                if (action == sv.DefaultAction)
+                {
+                    item.InputGestureText = "Enter";
+                    item.FontWeight = FontWeights.SemiBold;
+                }
+                menu.Items.Add(item);
             }
-            else
-            {
-                files.InputGestureText = "Enter";
-                files.FontWeight = FontWeights.SemiBold;
-                menu.Items.Add(files);
-                if (sv.HasDesktop) menu.Items.Add(desktop);
-            }
+            if (sv.HasTerminal) menu.Items.Add(Item("Tree.Ctx.NewTerminal", "\uE710", Vm.OpenNodeTerminalInNewTabCommand, node, "Ctrl+Shift+T"));
         }
         else menu.Items.Add(Item("Tree.Ctx.Open", "\uE8A7", Vm.OpenNodeCommand, node, "Enter"));
         menu.Items.Add(Item("Tree.Ctx.OpenNewTab", "\uECCD", Vm.OpenNodeInNewTabCommand, node, "Ctrl+Clic"));
@@ -206,6 +204,7 @@ public partial class SidebarView : UserControl
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Tree.Ctx.CopyPath", "\uE8C8", Vm.CopyNodePathCommand, node));
             menu.Items.Add(Item("Tree.Ctx.CopyHost", "\uE8C8", Vm.CopyNodeHostCommand, node));
+            if (((ServerNodeViewModel)node).HasTerminal) menu.Items.Add(Item("Tree.Ctx.CopySsh", "\uE756", Vm.CopySshCommandCommand, node));
             menu.Items.Add(Item("Tree.Ctx.Disconnect", "\uE8CD", Vm.DisconnectNodeCommand, node));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Tree.Ctx.Duplicate", "\uE8F4", Vm.DuplicateCommand, node));

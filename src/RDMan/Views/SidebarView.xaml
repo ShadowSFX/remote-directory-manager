@@ -139,6 +139,9 @@
                     <!-- remote desktop available -->
                     <TextBlock Text="&#xE7F4;" FontFamily="{StaticResource Font.Icons}" FontSize="10" Foreground="{DynamicResource Fg.Tertiary}"
                                VerticalAlignment="Center" Margin="0,1,6,0" Visibility="{Binding HasDesktop, Converter={StaticResource Vis}}" />
+                    <!-- SSH terminal available -->
+                    <TextBlock Text="&#xE756;" FontFamily="{StaticResource Font.Icons}" FontSize="10" Foreground="{DynamicResource Fg.Tertiary}"
+                               VerticalAlignment="Center" Margin="0,1,6,0" Visibility="{Binding HasTerminal, Converter={StaticResource Vis}}" />
                     <TextBlock Text="{Binding Host}" Style="{StaticResource Text.Mono}" FontSize="11" Foreground="{DynamicResource Fg.Tertiary}"
                                VerticalAlignment="Center" MaxWidth="110" Visibility="{Binding ShowHostInTree, Converter={StaticResource Vis}}" />
                 </StackPanel>

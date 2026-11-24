@@ -19,7 +19,7 @@ public sealed record ColorChoice(string? Key, System.Windows.Media.Brush Brush, 
 
 public sealed record ProfileChoice(Guid Id, string Display);
 
-public enum EditorSection { General, Files, Desktop, Notes }
+public enum EditorSection { General, Files, Desktop, Terminal, Notes }
 
 public sealed record SectionChoice(EditorSection Section, string Glyph, string Label);
 
@@ -235,6 +235,7 @@ public abstract partial class NodeEditorViewModel : ObservableObject
         BuildRdpOptions(node.Rdp ?? new RdpProfile());
         Gateway = new GatewayEditorViewModel(main, node.Rdp?.Gateway);
         RefreshRdpInherited();
+        Ssh = new Terminal.SshEditorViewModel(main, node, () => SelectedParent?.Group?.Group);
         // Placeholder until the derived editor declares its sections (AddSections selects the first one).
         _selectedSection = new SectionChoice(EditorSection.General, "", "");
     }
@@ -251,13 +252,14 @@ public abstract partial class NodeEditorViewModel : ObservableObject
     [ObservableProperty] private string? _validationError;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGeneralSection), nameof(IsFilesSection), nameof(IsDesktopSection), nameof(IsNotesSection))]
+    [NotifyPropertyChangedFor(nameof(IsGeneralSection), nameof(IsFilesSection), nameof(IsDesktopSection), nameof(IsTerminalSection), nameof(IsNotesSection))]
     private SectionChoice _selectedSection;
 
     public ObservableCollection<SectionChoice> Sections { get; } = new();
     public bool IsGeneralSection => SelectedSection.Section == EditorSection.General;
     public bool IsFilesSection => SelectedSection.Section == EditorSection.Files;
     public bool IsDesktopSection => SelectedSection.Section == EditorSection.Desktop;
+    public bool IsTerminalSection => SelectedSection.Section == EditorSection.Terminal;
     public bool IsNotesSection => SelectedSection.Section == EditorSection.Notes;
 
     public void ShowSection(EditorSection section) => SelectedSection = Sections.First(s => s.Section == section);
@@ -275,12 +277,15 @@ public abstract partial class NodeEditorViewModel : ObservableObject
     public CredentialEditorViewModel DesktopCredentials { get; }
     public ObservableCollection<RdpOptionRowViewModel> RdpOptions { get; } = new();
     public GatewayEditorViewModel Gateway { get; }
+    /// <summary>SSH terminal: capability (servers), authentication and options (inherited down the tree).</summary>
+    public Terminal.SshEditorViewModel Ssh { get; }
 
     partial void OnSelectedParentChanged(GroupChoice value)
     {
         Credentials.RefreshInherited();
         DesktopCredentials.RefreshInherited();
         RefreshRdpInherited();
+        Ssh?.RefreshInherited(); // null while the constructor is still running
     }
 
     private EffectiveCredential ResolveInherited()
@@ -375,6 +380,7 @@ public abstract partial class NodeEditorViewModel : ObservableObject
         foreach (var row in RdpOptions) row.ApplyTo(rdp);
         Gateway.ApplyTo(rdp);
         Node.Rdp = rdp;
+        Ssh.ApplyTo(Node);
     }
 
     /// <summary>Sets the error and shows the section where it can be fixed.</summary>
@@ -414,7 +420,18 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
             (EditorSection.General, "\uE946", "Server.Section.General"),
             (EditorSection.Files, "\uE8B7", "Server.Section.Files"),
             (EditorSection.Desktop, "\uE7F4", "Server.Section.Desktop"),
+            (EditorSection.Terminal, "\uE756", "Server.Section.Terminal"),
             (EditorSection.Notes, "\uE70B", "Server.Section.Notes"));
+        Ssh.Address = _address;
+        Ssh.UpdatePreview();
+        Ssh.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(Terminal.SshEditorViewModel.Enabled)) return;
+            OnPropertyChanged(nameof(HasBoth));
+            if (Ssh.Enabled && !FilesEnabled && !DesktopEnabled) DefaultAction = ServerAction.Terminal;
+            if (!Ssh.Enabled && DefaultAction == ServerAction.Terminal) DefaultAction = FilesEnabled ? ServerAction.Files : ServerAction.Desktop;
+            if (!Ssh.Enabled && !FilesEnabled && !DesktopEnabled) FilesEnabled = true; // a server must offer something
+        };
     }
 
     public ServerNode Server => (ServerNode)Node;
@@ -433,8 +450,8 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
     [ObservableProperty] private string _desktopPort;
     [ObservableProperty] private ServerAction _defaultAction;
 
-    /// <summary>The "on click, open" choice only matters when the server offers both.</summary>
-    public bool HasBoth => FilesEnabled && DesktopEnabled;
+    /// <summary>The "on click, open" choice only matters when the server offers more than one thing.</summary>
+    public bool HasBoth => (FilesEnabled ? 1 : 0) + (DesktopEnabled ? 1 : 0) + (Ssh.Enabled ? 1 : 0) > 1;
 
     public ObservableCollection<string> DiscoveredShares { get; } = new();
     public bool HasDiscoveredShares => DiscoveredShares.Count > 0;
@@ -445,6 +462,8 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
     {
         TestResult = null;
         CheckDuplicate();
+        Ssh.Address = value;
+        Ssh.UpdatePreview();
     }
 
     /// <summary>
@@ -455,6 +474,20 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
     public void CommitAddress()
     {
         var value = Address;
+        // "ubuntu@10.0.0.5", "ssh://root@host:2222", "ssh user@host -p 2222": an SSH target.
+        if (value.Contains('@') || value.StartsWith("ssh", StringComparison.OrdinalIgnoreCase) && value.Contains(' '))
+        {
+            if (Core.Ssh.SshDestination.TryParseCommandLine(value, out var d) || Core.Ssh.SshDestination.TryParse(value, out d))
+            {
+                Address = d.Host;
+                Ssh.Enabled = true;
+                if (d.User is not null) Ssh.Username = d.User;
+                if (d.Port is { } sp) Ssh.Port = sp.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (IsNew && !DesktopEnabled) FilesEnabled = false; // a fresh "user@host" is a Linux box: terminal only
+            }
+            CheckDuplicate();
+            return;
+        }
         if (value.Contains('\\') || value.Contains('/') || value.StartsWith("smb:", StringComparison.OrdinalIgnoreCase))
         {
             if (UncPath.TryParse(value, out var t, out _) && t is not null)
@@ -481,14 +514,15 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
 
     partial void OnDesktopEnabledChanged(bool value)
     {
-        if (!value && DefaultAction == ServerAction.Desktop) DefaultAction = ServerAction.Files;
-        if (value && !FilesEnabled) DefaultAction = ServerAction.Desktop;
+        if (!value && DefaultAction == ServerAction.Desktop) DefaultAction = FilesEnabled ? ServerAction.Files : ServerAction.Terminal;
+        if (value && !FilesEnabled && !Ssh.Enabled) DefaultAction = ServerAction.Desktop;
+        if (!value && !FilesEnabled && !Ssh.Enabled) FilesEnabled = true; // a server must offer something
     }
 
     partial void OnFilesEnabledChanged(bool value)
     {
-        if (!value && DesktopEnabled) DefaultAction = ServerAction.Desktop;
-        if (!value && !DesktopEnabled) DesktopEnabled = true; // a server must offer something
+        if (!value && DefaultAction == ServerAction.Files) DefaultAction = DesktopEnabled ? ServerAction.Desktop : ServerAction.Terminal;
+        if (!value && !DesktopEnabled && !Ssh.Enabled) DesktopEnabled = true; // a server must offer something
     }
 
     private void CheckDuplicate()
@@ -511,7 +545,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
         if (string.IsNullOrWhiteSpace(Name)) return Fail(Loc.T("Server.Validation.Name"), EditorSection.General);
         if (!UncPath.TryParse(Address, out var t, out var err) || t is null)
             return Fail(err == UncPath.ParseError.PortNotSupported ? Loc.T("Server.Validation.Port") : Loc.T("Server.Validation.Address"), EditorSection.General);
-        if (!FilesEnabled && !DesktopEnabled) return Fail(Loc.T("Server.Validation.NoCapability"), EditorSection.General);
+        if (!FilesEnabled && !DesktopEnabled && !Ssh.Enabled) return Fail(Loc.T("Server.Validation.NoCapability"), EditorSection.General);
 
         var share = Share.Trim().Trim('\\', '/');
         var start = StartFolder.Trim().Trim('\\', '/').Replace('/', '\\');
@@ -529,6 +563,7 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
             if (DesktopCredentials.Validate() is { } deskErr) return Fail(deskErr, EditorSection.Desktop);
             if (Gateway.Validate() is { } gwErr) return Fail(gwErr, EditorSection.Desktop);
         }
+        if (Ssh.Validate() is { } sshErr) return Fail(sshErr, EditorSection.Terminal);
 
         ApplyCommon();
         Server.Host = t.Host;
@@ -539,7 +574,8 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
         Server.Files = FilesEnabled;
         if (DesktopEnabled) Server.Desktop = new DesktopEndpoint { Enabled = true, Port = port };
         else if (Server.Desktop is not null) Server.Desktop.Enabled = false; // keep the port for when it's turned back on
-        Server.DefaultAction = HasBoth ? DefaultAction : DesktopEnabled ? ServerAction.Desktop : ServerAction.Files;
+        // The click action must be something the server offers; with one capability it is that one.
+        Server.DefaultAction = Server.Offers(DefaultAction) ? DefaultAction : Server.EffectiveDefaultAction;
         return true;
     }
 
@@ -560,6 +596,17 @@ public sealed partial class ServerEditorViewModel : NodeEditorViewModel
         var ok = true;
         try
         {
+            if (Ssh.Enabled && Services.Ssh.SshEnvironment.ProbeEndpoint(new ServerNode
+                {
+                    Host = t.Host,
+                    Terminal = new SshEndpoint { Port = int.TryParse(Ssh.Port, out var sp) ? sp : null, UseSshConfig = Ssh.UseSshConfig },
+                    Ssh = new SshProfile { ProxyJump = string.IsNullOrWhiteSpace(Ssh.ProxyJump) ? null : Ssh.ProxyJump },
+                }) is { } ssh)
+            {
+                var latency = await ConnectionService.ProbeAsync(ssh.Host, ssh.Port, ConnectionService.ProbeTimeout, CancellationToken.None);
+                ok &= latency is not null;
+                results.Add(latency is null ? Loc.F("Server.TestSshFail", ssh.Port) : Loc.F("Server.TestSshOk", ssh.Port, latency));
+            }
             if (DesktopEnabled && TryPort(out var port))
             {
                 var latency = await ConnectionService.ProbeAsync(t.Host, port, ConnectionService.ProbeTimeout, CancellationToken.None);
@@ -621,6 +668,7 @@ public sealed partial class GroupEditorViewModel : NodeEditorViewModel
             (EditorSection.General, "\uE946", "Server.Section.General"),
             (EditorSection.Files, "\uE8B7", "Server.Section.Files"),
             (EditorSection.Desktop, "\uE7F4", "Server.Section.Desktop"),
+            (EditorSection.Terminal, "\uE756", "Server.Section.Terminal"),
             (EditorSection.Notes, "\uE70B", "Server.Section.Notes"));
     }
 
@@ -633,6 +681,7 @@ public sealed partial class GroupEditorViewModel : NodeEditorViewModel
         if (Credentials.Validate() is { } fileErr) return Fail(fileErr, EditorSection.Files);
         if (DesktopCredentials.Validate() is { } deskErr) return Fail(deskErr, EditorSection.Desktop);
         if (Gateway.Validate() is { } gwErr) return Fail(gwErr, EditorSection.Desktop);
+        if (Ssh.Validate() is { } sshErr) return Fail(sshErr, EditorSection.Terminal);
         ApplyCommon();
         return true;
     }

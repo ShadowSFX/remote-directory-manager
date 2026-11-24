@@ -57,7 +57,7 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate DataType="{x:Type vm:BrowserTabViewModel}">
-                                <Grid x:Name="TabRoot" Background="Transparent" ToolTip="{Binding Title}">
+                                <Grid x:Name="TabRoot" Background="Transparent" ToolTip="{Binding TabToolTip}">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
@@ -70,7 +70,16 @@
                                         <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="13" Foreground="{DynamicResource Fg.Secondary}" />
                                         <Ellipse Width="6" Height="6" Fill="{DynamicResource Accent}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                                  Margin="0,0,-3,4" Visibility="{Binding IsLoading, Converter={StaticResource Vis}}" />
+                                        <!-- a terminal rang or needs you (password, host key) while you were elsewhere -->
+                                        <Ellipse Width="7" Height="7" Fill="{DynamicResource Status.Warn}" Stroke="{DynamicResource Bg.Chrome}" StrokeThickness="1.5"
+                                                 HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,-4,0"
+                                                 Visibility="{Binding HasActivity, Converter={StaticResource Vis}}" />
                                     </Grid>
+                                    <!-- OSC 9;4 progress reported by a program in the terminal (apt, cargo, winget…) -->
+                                    <ProgressBar Grid.ColumnSpan="3" Height="2" VerticalAlignment="Bottom" Margin="8,0,8,1" Style="{StaticResource Progress.Thin}"
+                                                 Minimum="0" Maximum="100" Value="{Binding TerminalSession.ProgressValue, Mode=OneWay, FallbackValue=0, TargetNullValue=0}"
+                                                 IsIndeterminate="{Binding TerminalSession.ProgressIndeterminate, Mode=OneWay, FallbackValue=False}"
+                                                 Visibility="{Binding TerminalSession.HasProgress, Converter={StaticResource Vis}, FallbackValue=Collapsed}" />
                                     <TextBlock x:Name="TabTitle" Grid.Column="1" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                                Foreground="{DynamicResource Fg.Secondary}" />
                                     <Button x:Name="CloseBtn" Grid.Column="2" Style="{StaticResource Btn.IconSmall}" Width="22" Height="22" Content="&#xE711;" FontSize="9"

@@ -36,6 +36,7 @@ public partial class NodeEditorWindow : DialogWindow
         {
             vm.Credentials.NewPassword = "";
             vm.DesktopCredentials.NewPassword = "";
+            vm.Ssh.NewPassword = null;
         };
     }
 
@@ -84,6 +85,13 @@ public partial class NodeEditorWindow : DialogWindow
     /// <summary>A pasted "\host\shareolder" or "host:port" is split right away (after the text lands in the box).</summary>
     private void AddressBox_Pasting(object sender, DataObjectPastingEventArgs e)
         => Dispatcher.BeginInvoke(() => (AddressBox.DataContext as ServerEditorViewModel)?.CommitAddress(), System.Windows.Threading.DispatcherPriority.Input);
+
+    private void SshPassword_PasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is not PasswordBox { DataContext: ViewModels.Terminal.SshEditorViewModel ssh } box) return;
+        box.Tag = box.SecurePassword.Length == 0 ? "empty" : null;
+        ssh.NewPassword = box.Password;
+    }
 
     private void GatewayPassword_PasswordChanged(object sender, RoutedEventArgs e)
     {
