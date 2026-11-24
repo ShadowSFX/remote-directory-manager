@@ -16,7 +16,14 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly MainViewModel _main;
     private AppSettings S => _main.State.Settings;
 
-    public SettingsViewModel(MainViewModel main) => _main = main;
+    public SettingsViewModel(MainViewModel main)
+    {
+        _main = main;
+        Terminal = new Terminal.TerminalSettingsViewModel(main);
+    }
+
+    /// <summary>Settings → Terminal (SSH): fonts, colors, cursor, copy/paste, bell.</summary>
+    public Terminal.TerminalSettingsViewModel Terminal { get; }
 
     public ThemePreference Theme
     {

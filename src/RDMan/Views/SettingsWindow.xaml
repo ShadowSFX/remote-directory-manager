@@ -86,6 +86,115 @@
                     </StackPanel>
                 </Border>
 
+                <TextBlock Text="{ui:Tr Settings.Terminal}" Style="{StaticResource Text.Subtitle}" FontSize="14" />
+                <Border Style="{StaticResource Group}" DataContext="{Binding Terminal}">
+                    <StackPanel>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.Font}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ComboBox ItemsSource="{Binding Fonts}" Text="{Binding FontFamily, UpdateSourceTrigger=LostFocus}" IsEditable="True" Width="200"
+                                          AutomationProperties.Name="{ui:Tr Settings.Terminal.Font}" />
+                                <ComboBox ItemsSource="{Binding Sizes}" SelectedItem="{Binding FontSize}" Width="70" Margin="8,0,0,0"
+                                          AutomationProperties.Name="{ui:Tr Settings.Terminal.Size}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.Colors}" VerticalAlignment="Center" />
+                            <ComboBox HorizontalAlignment="Right" Width="278" ItemsSource="{Binding Schemes}" SelectedItem="{Binding Scheme}"
+                                      AutomationProperties.Name="{ui:Tr Settings.Terminal.Colors}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Border Background="{Binding Background}" CornerRadius="3" Padding="4,3" BorderBrush="{DynamicResource Line}" BorderThickness="1">
+                                                <ItemsControl ItemsSource="{Binding Swatches}" Focusable="False">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <StackPanel Orientation="Horizontal" />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Width="7" Height="10" Background="{Binding}" Margin="0,0,2,0" CornerRadius="1" />
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </Border>
+                                            <TextBlock Text="{Binding Name}" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.Rendering}" VerticalAlignment="Center" />
+                            <Border HorizontalAlignment="Right" Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="renderer" Content="{ui:Tr Settings.Terminal.Gpu}"
+                                                 IsChecked="{Binding Renderer, Converter={StaticResource Eq}, ConverterParameter=Gpu}" ToolTip="{ui:Tr Settings.Terminal.GpuTip}" />
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="renderer" Content="ClearType"
+                                                 IsChecked="{Binding Renderer, Converter={StaticResource Eq}, ConverterParameter=Subpixel}" ToolTip="{ui:Tr Settings.Terminal.ClearTypeTip}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.LineHeight}" VerticalAlignment="Center" />
+                            <ComboBox HorizontalAlignment="Right" ItemsSource="{Binding LineHeights}" SelectedItem="{Binding LineHeight}" Width="90"
+                                      AutomationProperties.Name="{ui:Tr Settings.Terminal.LineHeight}" />
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.Cursor}" VerticalAlignment="Center" />
+                            <Border HorizontalAlignment="Right" Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="cursor" Content="{ui:Tr Settings.Terminal.Cursor.Bar}"
+                                                 IsChecked="{Binding Cursor, Converter={StaticResource Eq}, ConverterParameter=Bar}" />
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="cursor" Content="{ui:Tr Settings.Terminal.Cursor.Block}"
+                                                 IsChecked="{Binding Cursor, Converter={StaticResource Eq}, ConverterParameter=Block}" />
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="cursor" Content="{ui:Tr Settings.Terminal.Cursor.Underline}"
+                                                 IsChecked="{Binding Cursor, Converter={StaticResource Eq}, ConverterParameter=Underline}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.Scrollback}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ComboBox ItemsSource="{Binding ScrollbackSizes}" SelectedItem="{Binding Scrollback}" Width="100"
+                                          AutomationProperties.Name="{ui:Tr Settings.Terminal.Scrollback}" />
+                                <TextBlock Text="{ui:Tr Settings.Terminal.Lines}" VerticalAlignment="Center" Margin="10,0,0,0" Foreground="{DynamicResource Fg.Secondary}" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.RightClick}" VerticalAlignment="Center" />
+                            <Border HorizontalAlignment="Right" Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="rightclick" Content="{ui:Tr Settings.Terminal.RightClick.Menu}"
+                                                 IsChecked="{Binding RightClick, Converter={StaticResource Eq}, ConverterParameter=Menu}" />
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="rightclick" Content="{ui:Tr Settings.Terminal.RightClick.CopyPaste}"
+                                                 IsChecked="{Binding RightClick, Converter={StaticResource Eq}, ConverterParameter=CopyPaste}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <Grid Style="{StaticResource Row}">
+                            <TextBlock Text="{ui:Tr Settings.Terminal.Bell}" VerticalAlignment="Center" />
+                            <Border HorizontalAlignment="Right" Background="{DynamicResource Bg.Hover}" CornerRadius="7" Padding="1">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="bell" Content="{ui:Tr Settings.Terminal.Bell.Visual}"
+                                                 IsChecked="{Binding Bell, Converter={StaticResource Eq}, ConverterParameter=Visual}" />
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="bell" Content="{ui:Tr Settings.Terminal.Bell.Sound}"
+                                                 IsChecked="{Binding Bell, Converter={StaticResource Eq}, ConverterParameter=Sound}" />
+                                    <RadioButton Style="{StaticResource Radio.Segment}" GroupName="bell" Content="{ui:Tr Settings.Terminal.Bell.Off}"
+                                                 IsChecked="{Binding Bell, Converter={StaticResource Eq}, ConverterParameter=Off}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Settings.Terminal.CursorBlink}" IsChecked="{Binding CursorBlink}" Margin="0,0,0,14" />
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Settings.Terminal.Tint}" IsChecked="{Binding TintWithServerColor}" Margin="0,0,0,14" />
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Settings.Terminal.Contrast}" IsChecked="{Binding EnsureContrast}" Margin="0,0,0,14" />
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Settings.Terminal.SmartCtrlC}" IsChecked="{Binding SmartCtrlC}" Margin="0,0,0,14" />
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Settings.Terminal.CopyOnSelect}" IsChecked="{Binding CopyOnSelect}" Margin="0,0,0,14" />
+                        <CheckBox Style="{StaticResource Switch}" Content="{ui:Tr Settings.Terminal.PasteWarning}" IsChecked="{Binding WarnMultilinePaste}" Margin="0,0,0,14" />
+                    </StackPanel>
+                </Border>
+
                 <TextBlock Text="{ui:Tr Settings.Updates}" Style="{StaticResource Text.Subtitle}" FontSize="14" />
                 <Border Style="{StaticResource Group}">
                     <StackPanel>

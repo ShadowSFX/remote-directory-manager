@@ -1,0 +1,99 @@
+<v:DialogWindow x:Class="RDMan.Views.SnippetsWindow"
+                xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                xmlns:ui="clr-namespace:RDMan.Infrastructure"
+                xmlns:v="clr-namespace:RDMan.Views"
+                xmlns:tvm="clr-namespace:RDMan.ViewModels.Terminal"
+                Title="{ui:Tr Snippets.Title}" Width="820" Height="560" SizeToContent="Manual">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- List -->
+            <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Margin="16,14,10,8">
+                        <TextBlock Text="{ui:Tr Snippets.List}" Style="{StaticResource Text.Section}" VerticalAlignment="Center" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE710;" Command="{Binding AddCommand}" ToolTip="{ui:Tr Snippets.Add}"
+                                    AutomationProperties.Name="{ui:Tr Snippets.Add}" />
+                            <Button Style="{StaticResource Btn.IconSmall}" Content="&#xE74D;" Command="{Binding RemoveCommand}" ToolTip="{ui:Tr Common.Delete}"
+                                    IsEnabled="{Binding HasSelection}" AutomationProperties.Name="{ui:Tr Common.Delete}" />
+                        </StackPanel>
+                    </Grid>
+                    <ListBox Grid.Row="1" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}" Background="Transparent" BorderThickness="0"
+                             Padding="8,0,8,8" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type tvm:SnippetItemViewModel}">
+                                <StackPanel Margin="4,6">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding ScopeText}" Style="{StaticResource Text.Caption}" TextTrimming="CharacterEllipsis" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Grid.Row="1" Text="{ui:Tr Snippets.Empty}" Style="{StaticResource Text.Secondary}" TextWrapping="Wrap" Margin="20,8,20,0"
+                               Visibility="{Binding IsEmpty, Converter={StaticResource Vis}}" />
+                </Grid>
+            </Border>
+
+            <!-- Editor -->
+            <Grid Grid.Column="1" Margin="24,16,24,8" DataContext="{Binding Selected}" Visibility="{Binding Converter={StaticResource VisIfAny}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid Margin="0,0,0,16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="220" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{ui:Tr Snippets.Name}" Style="{StaticResource Text.Label}" />
+                        <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{ui:Tr Snippets.Name}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="{ui:Tr Snippets.Scope}" Style="{StaticResource Text.Label}" />
+                        <ComboBox ItemsSource="{Binding DataContext.Scopes, RelativeSource={RelativeSource AncestorType=Window}}" SelectedItem="{Binding Scope}"
+                                  AutomationProperties.Name="{ui:Tr Snippets.Scope}" />
+                    </StackPanel>
+                </Grid>
+                <Grid Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="{ui:Tr Snippets.Body}" Style="{StaticResource Text.Label}" />
+                    <TextBox Grid.Row="1" Text="{Binding Body, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource TextBox.Multiline}"
+                             FontFamily="{StaticResource Font.Mono}" AcceptsReturn="True" AcceptsTab="True" VerticalContentAlignment="Top"
+                             VerticalScrollBarVisibility="Auto" AutomationProperties.Name="{ui:Tr Snippets.Body}" />
+                </Grid>
+                <TextBlock Grid.Row="2" Text="{ui:Tr Snippets.PlaceholderHelp}" Style="{StaticResource Text.Caption}" TextWrapping="Wrap" Margin="0,8,0,12" />
+                <CheckBox Grid.Row="3" Style="{StaticResource Switch}" Content="{ui:Tr Snippets.Run}" IsChecked="{Binding RunImmediately}" Margin="0,0,0,8" />
+            </Grid>
+        </Grid>
+        <Border Grid.Row="1" Style="{StaticResource Dialog.Footer}">
+            <Grid>
+                <TextBlock Text="{ui:Tr Snippets.Tip}" Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="{ui:Tr Common.Cancel}" IsCancel="True" MinWidth="96" Margin="0,0,8,0" />
+                    <Button Style="{StaticResource Btn.Primary}" Content="{ui:Tr Common.Save}" IsDefault="True" MinWidth="96" Click="Save_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</v:DialogWindow>

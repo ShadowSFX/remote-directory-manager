@@ -82,7 +82,7 @@ public sealed partial class MainViewModel : ObservableObject
     private void ToggleFullScreen()
     {
         if (FullScreenTab is { } current) SetFullScreen(current, false);
-        else if (ActiveTab is { IsDesktop: true } tab) SetFullScreen(tab, true);
+        else if (ActiveTab is { IsRemote: true } tab) SetFullScreen(tab, true);
     }
 
     [RelayCommand]
@@ -276,6 +276,12 @@ public sealed partial class MainViewModel : ObservableObject
             ? Loc.F("Tree.ConfirmDelete.Group", g.Name, g.ServerCount)
             : Loc.F("Tree.ConfirmDelete.Server", node.Name);
         if (!Dialogs.Confirm(Owner, Loc.T("Common.Delete"), message, Loc.T("Common.Delete"), danger: true)) return;
+        RemoveNode(node);
+    }
+
+    /// <summary>Removes a node (and its children) from the tree without asking.</summary>
+    private void RemoveNode(NodeViewModel node)
+    {
         Detach(node);
         foreach (var id in Descendants(node).Select(n => n.Model.Id).ToList())
         {
@@ -297,22 +303,9 @@ public sealed partial class MainViewModel : ObservableObject
     private void Duplicate(NodeViewModel? node)
     {
         if (node is not ServerNodeViewModel s) return;
-        var copy = new ServerNode
-        {
-            Name = Loc.F("Tree.CopySuffix", s.Server.Name),
-            Host = s.Server.Host,
-            Share = s.Server.Share,
-            StartFolder = s.Server.StartFolder,
-            Color = s.Server.Color,
-            Description = s.Server.Description,
-            Tags = s.Server.Tags.ToList(),
-            Credentials = s.Server.Credentials.Clone(),
-            Files = s.Server.Files,
-            Desktop = s.Server.Desktop is { } d ? new DesktopEndpoint { Enabled = d.Enabled, Port = d.Port } : null,
-            DefaultAction = s.Server.DefaultAction,
-            DesktopCredentials = s.Server.DesktopCredentials.Clone(),
-            Rdp = s.Server.Rdp.Clone(),
-        };
+        // Core copies every setting (files, desktop, terminal, credentials, options) so new capabilities can't be missed.
+        var copy = s.Server.CloneSettings();
+        copy.Name = Loc.F("Tree.CopySuffix", s.Server.Name);
         var vm = CreateVm(copy, s.Parent);
         Insert(vm, s.Parent, ChildrenOf(s.Parent).IndexOf(s) + 1);
         Changed();

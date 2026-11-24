@@ -931,13 +931,13 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
         PasteText(text);
     }
 
-    public void PasteText(string text)
+    public void PasteText(string text, bool warn = true)
     {
         if (_terminal is null || text.Length == 0) return;
         text = text.Replace("\r\n", "\n");
         var lines = text.TrimEnd('\n').Split('\n').Length;
         var t = _svc.State.Settings.Terminal;
-        if (t.WarnMultilinePaste && (lines > 1 || text.Length > 5000))
+        if (warn && t.WarnMultilinePaste && (lines > 1 || text.Length > 5000))
         {
             var preview = string.Join('\n', text.Split('\n').Take(12));
             if (lines > 12) preview += "\n…";
@@ -1002,7 +1002,8 @@ public sealed partial class SshSessionViewModel : RemoteSessionViewModel, ISshPr
                 CurrentDirectory = Str(m, "v");
                 break;
             case "bell":
-                Bell?.Invoke(this, EventArgs.Empty);
+                if (_svc.State.Settings.Terminal.Bell == TerminalBell.Sound) System.Media.SystemSounds.Beep.Play();
+                if (_svc.State.Settings.Terminal.Bell != TerminalBell.Off) Bell?.Invoke(this, EventArgs.Empty);
                 break;
             case "link":
                 ShellLauncher.OpenUrl(Str(m, "url"));

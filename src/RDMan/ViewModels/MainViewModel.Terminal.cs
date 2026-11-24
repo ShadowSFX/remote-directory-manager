@@ -119,6 +119,81 @@ public sealed partial class MainViewModel
         else NewTabCommand.Execute(null);
     }
 
+    /// <summary>
+    /// Palette quick connect ("ubuntu@10.0.0.5", "ssh host -p 2222", a ~/.ssh/config alias): saves the server in the
+    /// selected group (terminal only) and opens its terminal. One toast offers to undo the save.
+    /// </summary>
+    public void QuickConnect(Core.Ssh.SshDestination destination)
+    {
+        var parent = SelectedGroupForNew();
+        var node = new Core.Models.ServerNode
+        {
+            Name = destination.Host,
+            Host = destination.Host,
+            Files = false,
+            Terminal = new Core.Models.SshEndpoint { Port = destination.Port },
+            DefaultAction = Core.Models.ServerAction.Terminal,
+            SshAuth = new Core.Models.SshAuthSettings { Username = destination.User },
+            Color = parent?.ColorKey,
+        };
+        var svm = (ServerNodeViewModel)CreateVm(node, parent);
+        Insert(svm, parent);
+        Changed();
+        CheckHealth(svm);
+        SelectInTree(svm);
+        OpenTerminal(svm, OpenTarget.NewTab, newShell: true);
+        Toasts.Show(Loc.F("Palette.Quick.Saved", node.Name), ToastKind.Success, Loc.T("Palette.Quick.Undo"), () =>
+        {
+            foreach (var tab in AllTabs.Where(t => ReferenceEquals(t.Server, svm)).ToList())
+            {
+                tab.Session?.Disconnect();
+                tab.Pane.CloseTab(tab);
+            }
+            RemoveNode(svm);
+        });
+    }
+
+    /// <summary>Types a snippet into the active terminal, filling {{host}}, {{user}}, {{server}} and asking for the rest.</summary>
+    public void RunSnippet(Core.Models.Snippet snippet)
+    {
+        if (ActiveTab?.Session is not SshSessionViewModel { IsConnected: true } terminal || ActiveTab.Server is not { } server)
+        {
+            Toasts.Show(Loc.T("Snippets.NeedsTerminal"));
+            return;
+        }
+        string? user = null;
+        try { user = Ssh.Resolve(server.Server).User; }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException) { }
+
+        var body = snippet.Body;
+        var known = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["host"] = server.Host,
+            ["server"] = server.Name,
+            ["user"] = user ?? "",
+        };
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(body, @"\{\{\s*([\w.-]+)\s*\}\}"))
+        {
+            var name = m.Groups[1].Value;
+            if (!known.ContainsKey(name))
+            {
+                var prompt = new Views.TextPromptWindow(snippet.Name, Loc.F("Snippets.Ask", name), name, Loc.T("Common.Ok"));
+                if (Views.Dialogs.Show(prompt, Owner) != true) return;
+                known[name] = prompt.Value;
+            }
+        }
+        body = System.Text.RegularExpressions.Regex.Replace(body, @"\{\{\s*([\w.-]+)\s*\}\}", m => known[m.Groups[1].Value]);
+        terminal.PasteText(body, warn: false);
+        if (snippet.RunImmediately) terminal.SendInput("\r");
+        terminal.Focus();
+    }
+
+    [RelayCommand]
+    private void ManageSnippets()
+    {
+        Views.Dialogs.Show(new Views.SnippetsWindow(new SnippetsViewModel(this)), Owner);
+    }
+
     /// <summary>"ssh -p 22 -i key user@host" for the server, as OpenSSH would need it.</summary>
     [RelayCommand]
     private void CopySshCommand(NodeViewModel? node)
