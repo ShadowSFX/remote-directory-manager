@@ -535,6 +535,8 @@ public static partial class Strings
 
         T("Tree.Ctx.OpenDesktop", "Abrir escritorio", "Open desktop");
         T("Tree.Ctx.OpenFiles", "Abrir archivos", "Open files");
+        T("Tree.Resource.IsOpen", "Abierto: clic para ir a la pestaña", "Open: click to go to its tab");
+        T("Tree.Resource.NotOpen", "Clic para abrir", "Click to open");
         T("Palette.Hint2", "Enter abre · Shift+Enter abre la otra vista · Ctrl+Enter en pestaña nueva · Esc cierra", "Enter opens · Shift+Enter opens the other view · Ctrl+Enter new tab · Esc closes");
 
         T("Server.Section.General", "General", "General");

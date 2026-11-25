@@ -72,7 +72,9 @@ public partial class MainViewModel
         {
             _detached.Remove(window);
             NotifyConnectionsChanged();
+            ScheduleOpenMarks();
         };
+        ScheduleOpenMarks();
         window.Show();
         window.Session.Connect();
     }

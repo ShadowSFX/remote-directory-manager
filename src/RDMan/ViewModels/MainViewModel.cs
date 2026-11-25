@@ -36,7 +36,7 @@ public sealed partial class MainViewModel : ObservableObject
         {
             if (e.PropertyName == nameof(UpdateService.Status)) OnUpdateStatusChanged();
         };
-        GroupNodeViewModel.ExpansionChanged += (_, _) => Services.State.MarkDirty();
+        NodeViewModel.ExpansionChanged += (_, _) => Services.State.MarkDirty();
         Loc.Instance.LanguageChanged += (_, _) =>
         {
             BuildLocalPlaces();
@@ -354,8 +354,17 @@ public sealed partial class MainViewModel : ObservableObject
         RevealInTree?.Invoke(this, node);
     }
 
-    /// <summary>The tree should scroll to this node (it may be virtualized away and have no row yet).</summary>
-    public event EventHandler<NodeViewModel>? RevealInTree;
+    /// <summary>Selects a server's resource row (expanding the server).</summary>
+    public void SelectInTree(ServerResourceViewModel resource)
+    {
+        foreach (var a in resource.Server.Ancestors()) a.IsExpanded = true;
+        resource.Server.IsExpanded = true;
+        resource.IsSelected = true;
+        RevealInTree?.Invoke(this, resource);
+    }
+
+    /// <summary>The tree should scroll to this node or resource row (it may be virtualized away and have no row yet).</summary>
+    public event EventHandler<object>? RevealInTree;
 
     public void CheckHealth(ServerNodeViewModel server)
     {
@@ -363,27 +372,47 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     // ───────────── Opening ─────────────
-    /// <summary>Plain click: the server's default view (files or desktop).</summary>
-    public void OpenServer(ServerNodeViewModel server, OpenTarget target)
+    /// <summary>Plain click: the server's default view (files, desktop or terminal).</summary>
+    /// <param name="reuse">With <see cref="OpenTarget.Current"/>, show a tab that already has it instead of opening it again.</param>
+    public void OpenServer(ServerNodeViewModel server, OpenTarget target, bool reuse = true)
+        => OpenResource(server, server.DefaultAction, target, reuse);
+
+    /// <summary>One resource of a server (the tree's resource rows, the cards' badges).</summary>
+    public void OpenResource(ServerNodeViewModel server, ServerAction action, OpenTarget target, bool reuse = true)
     {
-        switch (server.DefaultAction)
+        switch (action)
         {
             case ServerAction.Desktop: OpenDesktop(server, target); break;
-            case ServerAction.Terminal: OpenTerminal(server, target); break;
-            default: OpenFiles(server, target); break;
+            case ServerAction.Terminal: OpenTerminal(server, target, reuse: reuse); break;
+            default: OpenFiles(server, target, reuse); break;
         }
     }
 
-    public void OpenFiles(ServerNodeViewModel server, OpenTarget target)
+    public void OpenFiles(ServerNodeViewModel server, OpenTarget target, bool reuse = true)
     {
         if (!server.HasFiles)
         {
             if (server.HasDesktop) OpenDesktop(server, target);
-            else OpenTerminal(server, target);
+            else OpenTerminal(server, target, reuse: reuse);
             return;
         }
-        Open(new FolderLocation(server.RootPath), target);
+        // Already browsing this server somewhere: go there, wherever it got to (Ctrl+click opens a fresh tab).
+        if (reuse && target == OpenTarget.Current && FindResourceTab(server, ServerAction.Files) is { } hit)
+        {
+            Reveal(hit.Pane, hit.Tab);
+            return;
+        }
+        var location = new FolderLocation(server.RootPath);
+        if (target == OpenTarget.Current && ActiveTab is { } front && KeepsTab(front)) OpenInNewTab(location, ActivePane);
+        else Open(location, target);
     }
+
+    /// <summary>
+    /// Opening a server's resource never takes over a tab that shows one already (files, a desktop or a terminal of
+    /// any server, connected or not): that one stays where it is, so a later click can go back to it. Home, views and
+    /// local folders are replaced as before.
+    /// </summary>
+    private static bool KeepsTab(BrowserTabViewModel tab) => tab.Session is { IsConnected: true } || tab.ShownResource is not null;
 
     public void OpenDesktop(ServerNodeViewModel server, OpenTarget target)
     {
@@ -400,7 +429,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         // One session per server: a second embedded session with the same account would take over the first
         // (Windows: "replaced by another connection"), so an existing desktop tab is reused.
-        var existing = FindTab(t => t.Current is DesktopLocation d && d.ServerId == server.Model.Id);
+        var existing = FindResourceTab(server, ServerAction.Desktop);
         if (existing is { } hit)
         {
             Reveal(hit.Pane, hit.Tab);
@@ -418,7 +447,7 @@ public sealed partial class MainViewModel : ObservableObject
                 OpenInOtherPane(location, ActivePane, t => t.RequestConnect());
                 break;
             default:
-                if (ActiveTab is null || ActiveTab.Session is { IsConnected: true })
+                if (ActiveTab is null || KeepsTab(ActiveTab))
                     OpenInNewTab(location, ActivePane, t => t.RequestConnect());
                 else
                 {
@@ -438,9 +467,7 @@ public sealed partial class MainViewModel : ObservableObject
         if (from.Server is not { } server) return;
         var pane = from.Pane;
         // Prefer the same pane, then any other pane.
-        var hit = FindTab(t => ReferenceEquals(t.Pane, pane) && IsCompanion(t))
-                  ?? FindTab(IsCompanion);
-        if (hit is { } h)
+        if (FindResourceTab(server, view, except: view == ServerAction.Desktop ? null : from, prefer: pane) is { } h)
         {
             Reveal(h.Pane, h.Tab);
             return;
@@ -448,13 +475,52 @@ public sealed partial class MainViewModel : ObservableObject
         if (view == ServerAction.Desktop) OpenDesktop(server, OpenTarget.NewTab);
         else if (view == ServerAction.Terminal) OpenTerminal(server, OpenTarget.NewTab);
         else OpenInNewTab(new FolderLocation(server.RootPath), pane);
+    }
 
-        bool IsCompanion(BrowserTabViewModel t) => view switch
+    /// <summary>
+    /// The tab showing <paramref name="action"/> of <paramref name="server"/>, nearest first: the tab in front of the
+    /// preferred (or active) pane, that pane's other tabs, what the other panes show, then any tab.
+    /// </summary>
+    private (PaneViewModel Pane, BrowserTabViewModel Tab)? FindResourceTab(ServerNodeViewModel server, ServerAction action,
+        BrowserTabViewModel? except = null, PaneViewModel? prefer = null)
+    {
+        bool Match(BrowserTabViewModel t) => !ReferenceEquals(t, except) && t.Shows(server, action);
+        var first = prefer ?? ActivePane;
+        if (first.SelectedTab is { } front && Match(front)) return (first, front);
+        foreach (var t in first.Tabs)
+            if (Match(t)) return (first, t);
+        foreach (var p in Panes)
+            if (p.SelectedTab is { } shown && Match(shown)) return (p, shown);
+        return FindTab(Match);
+    }
+
+    private bool _openMarksPending;
+
+    /// <summary>
+    /// Tabs or windows came, went or now show something else: the tree's resource rows and badges follow (which ones
+    /// are open). Coalesced, so a burst of changes (restoring tabs, closing a pane) updates once.
+    /// </summary>
+    public void ScheduleOpenMarks()
+    {
+        if (_openMarksPending) return;
+        _openMarksPending = true;
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(UpdateOpenMarks, System.Windows.Threading.DispatcherPriority.Background);
+    }
+
+    private void UpdateOpenMarks()
+    {
+        _openMarksPending = false;
+        var open = new Dictionary<ServerNodeViewModel, HashSet<ServerAction>>();
+        void Add(ServerNodeViewModel s, ServerAction a)
         {
-            ServerAction.Desktop => t.Current is DesktopLocation d && d.ServerId == server.Model.Id,
-            ServerAction.Terminal => !ReferenceEquals(t, from) && t.Current is TerminalLocation tl && tl.ServerId == server.Model.Id,
-            _ => !ReferenceEquals(t, from) && t.Current is FolderLocation { IsUnc: true } && ReferenceEquals(t.Server, server),
-        };
+            if (!open.TryGetValue(s, out var set)) open[s] = set = [];
+            set.Add(a);
+        }
+        foreach (var t in AllTabs)
+            if (t.ShownResource is { } r) Add(r.Server, r.Action);
+        foreach (var s in DetachedSessions) Add(s.Server, ServerAction.Desktop);
+        foreach (var server in AllServers())
+            server.SetOpen(open.TryGetValue(server, out var set) ? set : []);
     }
 
     /// <summary>Shows a tab wherever it lives (leaving another tab's full screen first).</summary>
@@ -544,7 +610,8 @@ public sealed partial class MainViewModel : ObservableObject
                 OpenInNewTab(location, from, configure);
             return;
         }
-        if (other.SelectedTab is null || other.SelectedTab.Session is { IsConnected: true })
+        if (other.SelectedTab is null || other.SelectedTab.Session is { IsConnected: true }
+            || (location is FolderLocation { IsUnc: true } or DesktopLocation or TerminalLocation && other.SelectedTab.ShownResource is not null))
             other.AddTab(location, index: other.SelectedTab is null ? null : other.Tabs.IndexOf(other.SelectedTab) + 1, configure: configure);
         else
         {
@@ -672,18 +739,30 @@ public sealed partial class MainViewModel : ObservableObject
         if (!ReferenceEquals(pane, ActivePane)) return;
         OnPropertyChanged(nameof(ActiveTab));
         OnPropertyChanged(nameof(WindowTitle));
-        SyncTreeSelection();
+        SyncTreeSelection(tabChanged: true);
     }
 
     public void NotifyActiveTabChrome(BrowserTabViewModel tab)
     {
         if (!ReferenceEquals(tab, ActiveTab)) return;
         OnPropertyChanged(nameof(WindowTitle));
-        SyncTreeSelection();
+        SyncTreeSelection(tabChanged: false);
     }
 
-    private void SyncTreeSelection()
+    /// <param name="tabChanged">
+    /// Another tab came to the front. Desktops and terminals select their row only then: their chrome changes all the
+    /// time (titles, state), which must not pull the selection away while the user browses the tree.
+    /// </param>
+    private void SyncTreeSelection(bool tabChanged)
     {
+        // A server listing its resources: select the row of the one in front (not the server above it).
+        if (ActiveTab?.ShownResource is { Server.IsExpanded: true } shown
+            && (tabChanged || shown.Action == ServerAction.Files)
+            && shown.Server.ResourceFor(shown.Action) is { } resource)
+        {
+            if (!resource.IsSelected) SelectInTree(resource);
+            return;
+        }
         NodeViewModel? node = ActiveTab?.Current switch
         {
             GroupLocation g => FindGroup(g.GroupId),

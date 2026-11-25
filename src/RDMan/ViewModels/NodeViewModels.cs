@@ -45,6 +45,11 @@ public abstract partial class NodeViewModel : ObservableObject
     {
         for (var p = Parent; p is not null; p = p.Parent) yield return p;
     }
+
+    /// <summary>A group or a server was expanded/collapsed in the tree (the state is saved).</summary>
+    public static event EventHandler? ExpansionChanged;
+
+    protected static void RaiseExpansionChanged(NodeViewModel node) => ExpansionChanged?.Invoke(node, EventArgs.Empty);
 }
 
 public sealed partial class GroupNodeViewModel : NodeViewModel
@@ -63,11 +68,9 @@ public sealed partial class GroupNodeViewModel : NodeViewModel
             if (Group.IsExpanded == value) return;
             Group.IsExpanded = value;
             OnPropertyChanged();
-            ExpansionChanged?.Invoke(this, EventArgs.Empty);
+            RaiseExpansionChanged(this);
         }
     }
-
-    public static event EventHandler? ExpansionChanged;
 
     public IEnumerable<ServerNodeViewModel> AllServers()
     {
@@ -105,6 +108,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
         _filesHealth.PropertyChanged += OnHealthChanged;
         AttachDesktopHealth();
         AttachTerminalHealth();
+        SyncResources();
         Loc.Instance.LanguageChanged += OnLanguageChanged;
     }
 
@@ -127,6 +131,58 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
     public bool DesktopIsDefault => CapabilityCount > 1 && DefaultAction == ServerAction.Desktop;
     public bool TerminalIsDefault => CapabilityCount > 1 && DefaultAction == ServerAction.Terminal;
     public bool IsFavorite => Server.IsFavorite;
+
+    /// <summary>
+    /// The resources listed under the server in the tree (one row per files / desktop / terminal). Empty when the
+    /// server offers a single resource: a click opens it directly and there's nothing to expand.
+    /// </summary>
+    public ObservableCollection<ServerResourceViewModel> Resources { get; } = new();
+
+    /// <summary>The tree shows <see cref="Resources"/> (saved, like a group's).</summary>
+    public bool IsExpanded
+    {
+        get => Server.IsExpanded && Resources.Count > 0;
+        set
+        {
+            if (value && Resources.Count == 0) value = false;
+            if (Server.IsExpanded == value) return;
+            Server.IsExpanded = value;
+            OnPropertyChanged();
+            RaiseExpansionChanged(this);
+        }
+    }
+
+    // Which resources have a tab or window right now: the tree outlines their badges and dots their rows.
+    private HashSet<ServerAction> _open = [];
+    public bool FilesIsOpen => _open.Contains(ServerAction.Files);
+    public bool DesktopIsOpen => _open.Contains(ServerAction.Desktop);
+    public bool TerminalIsOpen => _open.Contains(ServerAction.Terminal);
+    public bool IsOpen(ServerAction action) => _open.Contains(action);
+
+    public void SetOpen(HashSet<ServerAction> open)
+    {
+        if (_open.SetEquals(open)) return;
+        _open = open;
+        OnPropertyChanged(nameof(FilesIsOpen));
+        OnPropertyChanged(nameof(DesktopIsOpen));
+        OnPropertyChanged(nameof(TerminalIsOpen));
+        foreach (var r in Resources) r.IsOpen = open.Contains(r.Action);
+    }
+
+    public ServerResourceViewModel? ResourceFor(ServerAction action) => Resources.FirstOrDefault(r => r.Action == action);
+
+    /// <summary>Keeps the resource rows in step with the capabilities (rebuilt only when they change: no flicker).</summary>
+    private void SyncResources()
+    {
+        var offered = Server.CapabilityCount > 1 ? Server.OfferedActions : [];
+        if (!Resources.Select(r => r.Action).SequenceEqual(offered))
+        {
+            Resources.Clear();
+            foreach (var a in offered) Resources.Add(new ServerResourceViewModel(this, a) { IsOpen = _open.Contains(a) });
+        }
+        else foreach (var r in Resources) r.Refresh();
+        if (Resources.Count == 0 && Server.IsExpanded) Server.IsExpanded = false; // nothing left to show under it
+    }
     /// <summary>The tree row shows only the alias (full width); the address only when there's no alias.</summary>
     public string TreeLabel => string.IsNullOrWhiteSpace(Name) ? Host : Name;
 
@@ -262,6 +318,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
         }
         AttachDesktopHealth();
         AttachTerminalHealth();
+        SyncResources();
         base.Refresh();
     }
 
@@ -270,6 +327,7 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(PrimaryStatusText));
         OnPropertyChanged(nameof(LastConnectedText));
+        foreach (var r in Resources) r.Refresh(); // their names
     }
 
     public void Detach()
@@ -287,6 +345,69 @@ public sealed partial class ServerNodeViewModel : NodeViewModel
         if (HasDesktop) yield return (Server.Host, DesktopPort);
         if (TerminalEndpoint() is { } ssh) yield return ssh;
     }
+}
+
+/// <summary>
+/// One resource of a server (shared files, remote desktop or terminal) listed under it in the tree. Not a
+/// <see cref="NodeViewModel"/>: it can't be dragged, renamed or deleted; it only opens (or shows) that resource.
+/// </summary>
+public sealed partial class ServerResourceViewModel : ObservableObject
+{
+    public ServerResourceViewModel(ServerNodeViewModel server, ServerAction action)
+    {
+        Server = server;
+        Action = action;
+    }
+
+    public ServerNodeViewModel Server { get; }
+    public ServerAction Action { get; }
+
+    /// <summary>A tab or window shows this resource: a click goes there instead of connecting again.</summary>
+    [ObservableProperty] private bool _isOpen;
+    [ObservableProperty] private bool _isSelected;
+
+    // The tree's item style binds these on every row; a resource has no children and is never a drop target.
+    public bool IsExpanded { get => false; set { } }
+    public bool IsDropTarget => false;
+
+    public string Label => Loc.T(Action switch
+    {
+        ServerAction.Desktop => "Cap.Desktop",
+        ServerAction.Terminal => "Cap.Terminal",
+        _ => "Cap.Files",
+    });
+
+    public string Protocol => Action switch
+    {
+        ServerAction.Desktop => "RDP",
+        ServerAction.Terminal => "SSH",
+        _ => "SMB",
+    };
+
+    public string Glyph => Action switch
+    {
+        ServerAction.Desktop => "",
+        ServerAction.Terminal => "",
+        _ => "",
+    };
+
+    /// <summary>What sets this resource apart at a glance: the share, or a port that isn't the usual one.</summary>
+    public string? Detail => Action switch
+    {
+        ServerAction.Files => string.IsNullOrWhiteSpace(Server.Share) ? null : Server.Share,
+        ServerAction.Desktop => Server.DesktopPort != DesktopEndpoint.DefaultPort ? $":{Server.DesktopPort}" : null,
+        _ => Server.Server.Terminal?.Port is { } p && p != SshEndpoint.DefaultPort ? $":{p}" : null,
+    };
+
+    /// <summary>Where it points: "\host\share", "host:3389", "ssh host".</summary>
+    public string Address => Action switch
+    {
+        ServerAction.Desktop => $"{Server.Host}:{Server.DesktopPort}",
+        ServerAction.Terminal => $"ssh {Server.Host}" + (Server.Server.Terminal?.Port is { } p && p != SshEndpoint.DefaultPort ? $" -p {p}" : ""),
+        _ => Server.RootPath,
+    };
+
+    public void Refresh() => OnPropertyChanged(string.Empty);
 }
 
 public static class RelativeTime

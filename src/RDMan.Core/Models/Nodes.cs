@@ -103,6 +103,9 @@ public sealed class ServerNode : TreeNode
     /// <summary>What a plain click opens when the server offers more than one thing.</summary>
     public ServerAction DefaultAction { get; set; } = ServerAction.Files;
 
+    /// <summary>The tree shows this server's resources (files / desktop / terminal) under it. Only for 2+ resources.</summary>
+    public bool IsExpanded { get; set; }
+
     [JsonIgnore] public bool HasDesktop => Desktop is { Enabled: true };
     [JsonIgnore] public bool HasFiles => Files;
     [JsonIgnore] public bool HasTerminal => Terminal is { Enabled: true };
@@ -116,6 +119,11 @@ public sealed class ServerNode : TreeNode
         ServerAction.Terminal => HasTerminal,
         _ => HasFiles,
     };
+
+    /// <summary>What the server offers, always in the order files, desktop, terminal (the tree lists them so).</summary>
+    [JsonIgnore]
+    public IReadOnlyList<ServerAction> OfferedActions =>
+        [.. new[] { ServerAction.Files, ServerAction.Desktop, ServerAction.Terminal }.Where(Offers)];
 
     /// <summary>The action a plain click performs, respecting which capabilities exist.</summary>
     [JsonIgnore]

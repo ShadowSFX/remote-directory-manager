@@ -387,6 +387,7 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         UpdateSelectionText();
         _sessionUp = false;
         Server = ResolveServer();
+        _main.ScheduleOpenMarks(); // the tab may show another server's resource now
         if (Current is not (DesktopLocation or TerminalLocation)) EndSession();
         UpdateConnectedAs();
         RebuildBreadcrumb();
@@ -825,9 +826,32 @@ public sealed partial class BrowserTabViewModel : ObservableObject, IDisposable
         return node is null ? null : _main.FindServer(node.Id);
     }
 
+    /// <summary>
+    /// The server resource this tab shows (its shared files, its desktop or a terminal), or null. Works for tabs not
+    /// started yet too (restored background tabs resolve their server on first view).
+    /// </summary>
+    public (ServerNodeViewModel Server, Core.Models.ServerAction Action)? ShownResource
+    {
+        get
+        {
+            // Desktops and terminals name their server; a folder belongs to the server whose share it is in.
+            return Current switch
+            {
+                DesktopLocation d when _main.FindServer(d.ServerId) is { } ds => (ds, Core.Models.ServerAction.Desktop),
+                TerminalLocation t when _main.FindServer(t.ServerId) is { } ts => (ts, Core.Models.ServerAction.Terminal),
+                FolderLocation { IsUnc: true } when (Server ?? ResolveServer()) is { } fs => (fs, Core.Models.ServerAction.Files),
+                _ => null,
+            };
+        }
+    }
+
+    public bool Shows(ServerNodeViewModel server, Core.Models.ServerAction action)
+        => ShownResource is { } r && ReferenceEquals(r.Server, server) && r.Action == action;
+
     public void RefreshIdentity()
     {
         Server = ResolveServer();
+        _main.ScheduleOpenMarks();
         if (Current is DesktopLocation or TerminalLocation && Server is null)
         {
             // The server was deleted: end its session and leave (LoadAsync sends a desktop without a server Home).

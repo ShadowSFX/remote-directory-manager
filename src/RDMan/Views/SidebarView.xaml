@@ -110,7 +110,8 @@
             </Grid>
         </HierarchicalDataTemplate>
 
-        <DataTemplate DataType="{x:Type vm:ServerNodeViewModel}">
+        <!-- A server with 2+ resources expands to list them (see ServerResourceViewModel); otherwise it has no children. -->
+        <HierarchicalDataTemplate DataType="{x:Type vm:ServerNodeViewModel}" ItemsSource="{Binding Resources}">
             <Grid Background="Transparent">
                 <Grid.ToolTip>
                     <ToolTip>
@@ -135,22 +136,62 @@
                     <Ellipse Style="{StaticResource StatusDot}" HorizontalAlignment="Right" />
                 </Grid>
                 <TextBlock Grid.Column="1" Text="{Binding TreeLabel}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                <!-- What the server offers: shared folders (SMB), remote desktop (RDP), terminal (SSH). 4+8 = same gap and 10 = same right edge as a group's count -->
+                <!-- What the server offers: shared folders (SMB), remote desktop (RDP), terminal (SSH); outlined = open in a tab or window.
+                     4+8 = same gap and 10 = same right edge as a group's count -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="4,0,10,0" VerticalAlignment="Center">
-                    <Border Style="{StaticResource CapBadge.Smb}" ToolTip="{ui:Tr Cap.Files}" ui:Ui.IsOn="{Binding FilesIsDefault}"
+                    <Border Style="{StaticResource CapBadge.Smb}" ToolTip="{ui:Tr Cap.Files}" ui:Ui.IsOn="{Binding FilesIsOpen}"
                             Visibility="{Binding HasFiles, Converter={StaticResource Vis}}">
                         <TextBlock Text="SMB" />
                     </Border>
-                    <Border Style="{StaticResource CapBadge.Rdp}" ToolTip="{ui:Tr Cap.Desktop}" ui:Ui.IsOn="{Binding DesktopIsDefault}"
+                    <Border Style="{StaticResource CapBadge.Rdp}" ToolTip="{ui:Tr Cap.Desktop}" ui:Ui.IsOn="{Binding DesktopIsOpen}"
                             Visibility="{Binding HasDesktop, Converter={StaticResource Vis}}">
                         <TextBlock Text="RDP" />
                     </Border>
-                    <Border Style="{StaticResource CapBadge.Ssh}" ToolTip="{ui:Tr Cap.Terminal}" ui:Ui.IsOn="{Binding TerminalIsDefault}"
+                    <Border Style="{StaticResource CapBadge.Ssh}" ToolTip="{ui:Tr Cap.Terminal}" ui:Ui.IsOn="{Binding TerminalIsOpen}"
                             Visibility="{Binding HasTerminal, Converter={StaticResource Vis}}">
                         <TextBlock Text="SSH" />
                     </Border>
                 </StackPanel>
             </Grid>
+        </HierarchicalDataTemplate>
+
+        <!-- One resource of a server: protocol-colored glyph in the identity column, name, what sets it apart (share,
+             non-default port), and on the right edge (10, like the badges and counts) a dot when a tab or window has it. -->
+        <DataTemplate DataType="{x:Type vm:ServerResourceViewModel}">
+            <Grid Background="Transparent" AutomationProperties.Name="{Binding Label}">
+                <Grid.ToolTip>
+                    <ToolTip>
+                        <StackPanel MaxWidth="320">
+                            <TextBlock Text="{Binding Address}" FontFamily="{StaticResource Font.Mono}" FontSize="12" />
+                            <TextBlock Text="{ui:Tr Tree.Resource.IsOpen}" Margin="0,6,0,0" Foreground="{DynamicResource Fg.Secondary}"
+                                       Visibility="{Binding IsOpen, Converter={StaticResource Vis}}" />
+                            <TextBlock Text="{ui:Tr Tree.Resource.NotOpen}" Margin="0,6,0,0" Foreground="{DynamicResource Fg.Secondary}"
+                                       Visibility="{Binding IsOpen, Converter={StaticResource Vis}, ConverterParameter=invert}" />
+                        </StackPanel>
+                    </ToolTip>
+                </Grid.ToolTip>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="Glyph" Width="18" Margin="2,0,8,0" Text="{Binding Glyph}" Style="{StaticResource Icon}" FontSize="14"
+                           Foreground="{DynamicResource Proto.Smb}" TextAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Label}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding Detail}" Style="{StaticResource Text.Caption}" Margin="8,0,0,0" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" Visibility="{Binding Detail, Converter={StaticResource VisIfAny}}" />
+                <Ellipse Grid.Column="3" Width="6" Height="6" Margin="8,0,10,0" VerticalAlignment="Center" Fill="{DynamicResource Accent}"
+                         Visibility="{Binding IsOpen, Converter={StaticResource Vis}}" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Action}" Value="Desktop">
+                    <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Proto.Rdp}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Action}" Value="Terminal">
+                    <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource Proto.Ssh}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
 
         <Style x:Key="SidebarHeader" TargetType="TextBlock" BasedOn="{StaticResource Text.Section}">

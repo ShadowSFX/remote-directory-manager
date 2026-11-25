@@ -24,15 +24,15 @@ public sealed partial class MainViewModel
     /// Opens a terminal on the server. Unlike desktops, several terminals per server are normal: "open" reuses an
     /// existing terminal tab of that server when there is one, otherwise starts a new shell.
     /// </summary>
-    public void OpenTerminal(ServerNodeViewModel server, OpenTarget target, bool newShell = false)
+    public void OpenTerminal(ServerNodeViewModel server, OpenTarget target, bool newShell = false, bool reuse = true)
     {
         if (!server.HasTerminal)
         {
             Toasts.Show(Loc.F("Term.NotEnabled", server.Name), ToastKind.Info, Loc.T("Tree.Ctx.Properties"), () => EditNode(server));
             return;
         }
-        if (!newShell && target == OpenTarget.Current
-            && FindTab(t => t.Current is TerminalLocation tl && tl.ServerId == server.Model.Id) is { } hit)
+        if (!newShell && reuse && target == OpenTarget.Current
+            && FindResourceTab(server, Core.Models.ServerAction.Terminal) is { } hit)
         {
             Reveal(hit.Pane, hit.Tab);
             if (hit.Tab.Session is { IsLive: false } idle) idle.Connect();
@@ -50,7 +50,7 @@ public sealed partial class MainViewModel
                 OpenInOtherPane(location, ActivePane, t => t.RequestConnect());
                 break;
             default:
-                if (ActiveTab is null || ActiveTab.Session is { IsConnected: true })
+                if (ActiveTab is null || KeepsTab(ActiveTab))
                     OpenInNewTab(location, ActivePane, t => t.RequestConnect());
                 else
                 {

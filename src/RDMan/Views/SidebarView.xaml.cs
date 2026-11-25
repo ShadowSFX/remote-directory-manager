@@ -24,20 +24,24 @@ public partial class SidebarView : UserControl
         };
     }
 
-    private void OnRevealInTree(object? sender, NodeViewModel node)
-        => Dispatcher.BeginInvoke(() => Reveal(node), System.Windows.Threading.DispatcherPriority.Background);
+    private void OnRevealInTree(object? sender, object item)
+        => Dispatcher.BeginInvoke(() => Reveal(item), System.Windows.Threading.DispatcherPriority.Background);
 
     /// <summary>
-    /// Scrolls the (virtualized) tree to a node: realizes the row of every ancestor in turn — asking the panel to
-    /// bring its index into view when the row doesn't exist yet — then brings the node's row into view.
+    /// Scrolls the (virtualized) tree to a node or a server's resource row: realizes the row of every ancestor in
+    /// turn — asking the panel to bring its index into view when the row doesn't exist yet — then brings it into view.
     /// </summary>
-    private void Reveal(NodeViewModel node)
+    private void Reveal(object item)
     {
+        var node = item as NodeViewModel ?? (item as ServerResourceViewModel)?.Server;
+        if (node is null) return;
+        IEnumerable<object> path = node.Ancestors().Reverse().Cast<object>().Append(node);
+        if (item is ServerResourceViewModel) path = path.Append(item);
         ItemsControl parent = Tree;
-        foreach (var step in node.Ancestors().Reverse().Cast<NodeViewModel>().Append(node))
+        foreach (var step in path)
         {
             if (Realize(parent, step) is not { } row) return;
-            if (ReferenceEquals(step, node))
+            if (ReferenceEquals(step, item))
             {
                 row.BringIntoView();
                 return;
@@ -61,15 +65,28 @@ public partial class SidebarView : UserControl
 
     private MainViewModel Vm => (MainViewModel)DataContext;
 
-    private static NodeViewModel? NodeFrom(object source)
-        => Ui.FindAncestor<TreeViewItem>(source as DependencyObject)?.DataContext as NodeViewModel;
+    /// <summary>What the row under <paramref name="source"/> shows: a node or a server's resource.</summary>
+    private static object? ItemFrom(object source)
+        => Ui.FindAncestor<TreeViewItem>(source as DependencyObject)?.DataContext;
+
+    /// <summary>The node under <paramref name="source"/>; a resource row stands for its server (drops, menus).</summary>
+    private static NodeViewModel? NodeFrom(object source) => ItemFrom(source) switch
+    {
+        NodeViewModel n => n,
+        ServerResourceViewModel r => r.Server,
+        _ => null,
+    };
+
+    private static OpenTarget TargetFromModifiers()
+        => (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current;
 
     private static bool IsOnExpander(object source)
         => Ui.FindAncestor<System.Windows.Controls.Primitives.ToggleButton>(source as DependencyObject) is not null;
 
     private void Tree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
-        Vm.TreeSelection = e.NewValue as NodeViewModel;
+        // A resource row selects its server for everything that acts on "the selected server" (F2, Ctrl+Shift+D…).
+        Vm.TreeSelection = e.NewValue as NodeViewModel ?? (e.NewValue as ServerResourceViewModel)?.Server;
     }
 
     /// <summary>A node selected from code (new or imported node, the active tab's server) scrolls into view.</summary>
@@ -80,35 +97,67 @@ public partial class SidebarView : UserControl
     }
 
     // ───────────── Click to open ─────────────
+    // The row pressed (a node or a resource): the click acts on release, only on that same row and if no drag began.
+    private object? _pressed;
+
     private void Tree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _dragStart = e.GetPosition(Tree);
-        _dragCandidate = IsOnExpander(e.OriginalSource) ? null : NodeFrom(e.OriginalSource);
+        var onExpander = IsOnExpander(e.OriginalSource);
+        // The second press of a double-click doesn't act again (it would collapse what the first one expanded).
+        _pressed = onExpander || e.ClickCount > 1 ? null : ItemFrom(e.OriginalSource);
+        // TreeViewItem itself toggles a row with children on a double press: a server already toggled on the first click.
+        if (e.ClickCount > 1 && !onExpander && ItemFrom(e.OriginalSource) is ServerNodeViewModel or ServerResourceViewModel) e.Handled = true;
+        _dragCandidate = onExpander ? null : ItemFrom(e.OriginalSource) as NodeViewModel; // resource rows don't drag
         _dragging = false;
     }
 
     private void Tree_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (_dragging || IsOnExpander(e.OriginalSource)) return;
-        var node = NodeFrom(e.OriginalSource);
-        if (node is null || !ReferenceEquals(node, _dragCandidate)) return;
-        var target = (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current;
-        Open(node, target);
+        var item = ItemFrom(e.OriginalSource);
+        if (item is null || !ReferenceEquals(item, _pressed)) return;
+        _pressed = null;
+        Activate(item, TargetFromModifiers());
     }
 
     private void Tree_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        // Double-click on a group toggles it (TreeView default); on a server it would re-open — swallow it.
-        if (NodeFrom(e.OriginalSource) is ServerNodeViewModel) e.Handled = true;
+        // Double-click on a group toggles it (TreeView default); on a server or a resource the first click already
+        // acted, so swallow it.
+        if (ItemFrom(e.OriginalSource) is ServerNodeViewModel or ServerResourceViewModel) e.Handled = true;
     }
 
     private void Tree_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Middle) return;
-        var node = NodeFrom(e.OriginalSource);
-        if (node is null) return;
-        Open(node, OpenTarget.NewTab);
+        switch (ItemFrom(e.OriginalSource))
+        {
+            case ServerResourceViewModel r: Vm.OpenResource(r.Server, r.Action, OpenTarget.NewTab); break;
+            case NodeViewModel node: Open(node, OpenTarget.NewTab); break;
+            default: return;
+        }
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// A click or Enter: a resource opens (or shows the tab that has it); a server with several resources expands to
+    /// list them (Ctrl still opens its default view in a new tab); anything else opens.
+    /// </summary>
+    private void Activate(object item, OpenTarget target)
+    {
+        switch (item)
+        {
+            case ServerResourceViewModel r:
+                Vm.OpenResource(r.Server, r.Action, target);
+                break;
+            case ServerNodeViewModel { Resources.Count: > 0 } s when target == OpenTarget.Current:
+                s.IsExpanded = !s.IsExpanded;
+                break;
+            case NodeViewModel node:
+                Open(node, target);
+                break;
+        }
     }
 
     private void Open(NodeViewModel node, OpenTarget target)
@@ -122,13 +171,28 @@ public partial class SidebarView : UserControl
 
     private void Tree_KeyDown(object sender, KeyEventArgs e)
     {
+        var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (Tree.SelectedItem is ServerResourceViewModel resource)
+        {
+            switch (key)
+            {
+                case Key.Enter:
+                    Activate(resource, TargetFromModifiers());
+                    e.Handled = true;
+                    break;
+                case Key.F2:
+                    Vm.EditNode(resource.Server);
+                    e.Handled = true;
+                    break;
+            }
+            return;
+        }
         var node = Tree.SelectedItem as NodeViewModel;
         if (node is null) return;
-        var key = e.Key == Key.System ? e.SystemKey : e.Key;
         switch (key)
         {
             case Key.Enter:
-                Open(node, (Keyboard.Modifiers & ModifierKeys.Control) != 0 ? OpenTarget.NewTab : OpenTarget.Current);
+                Activate(node, TargetFromModifiers());
                 e.Handled = true;
                 break;
             case Key.F2:
@@ -173,6 +237,12 @@ public partial class SidebarView : UserControl
         {
             menu.Items.Add(Item("Menu.NewServer", "\uE710", Vm.NewServerCommand, null, "Ctrl+N"));
             menu.Items.Add(Item("Menu.NewGroup", "\uE8F4", Vm.NewGroupCommand, null));
+            return;
+        }
+
+        if ((ItemFrom(e.OriginalSource) ?? Tree.SelectedItem) is ServerResourceViewModel resource)
+        {
+            FillResourceMenu(menu, resource);
             return;
         }
 
@@ -235,6 +305,47 @@ public partial class SidebarView : UserControl
         var del = Item("Tree.Ctx.Delete", "\uE74D", Vm.DeleteCommand, node, "Supr");
         del.Foreground = (System.Windows.Media.Brush)FindResource("Danger");
         menu.Items.Add(del);
+    }
+
+    /// <summary>A resource row: the ways to open that resource, then its server's properties.</summary>
+    private void FillResourceMenu(ContextMenu menu, ServerResourceViewModel r)
+    {
+        MenuItem Do(string key, string glyph, Action action, string? gesture = null)
+        {
+            var item = new MenuItem { Header = Loc.T(key), Tag = glyph, InputGestureText = gesture ?? "" };
+            item.Click += (_, _) => action();
+            return item;
+        }
+        static MenuItem Item(string key, string glyph, ICommand cmd, object? param, string? gesture = null)
+            => new() { Header = Loc.T(key), Tag = glyph, Command = cmd, CommandParameter = param, InputGestureText = gesture ?? "" };
+
+        var (openKey, glyph) = r.Action switch
+        {
+            Core.Models.ServerAction.Desktop => ("Tree.Ctx.OpenDesktop", "\uE7F4"),
+            Core.Models.ServerAction.Terminal => ("Tree.Ctx.OpenTerminal", "\uE756"),
+            _ => ("Tree.Ctx.OpenFiles", "\uE8B7"),
+        };
+        var open = Do(openKey, glyph, () => Vm.OpenResource(r.Server, r.Action, OpenTarget.Current), "Enter");
+        open.FontWeight = FontWeights.SemiBold;
+        menu.Items.Add(open);
+        switch (r.Action)
+        {
+            case Core.Models.ServerAction.Desktop:
+                // One session per server: a desktop has no "new tab", but it can live in its own window.
+                menu.Items.Add(Item("Tree.Ctx.OpenDesktopWindow", "\uE8A7", Vm.OpenNodeDesktopWindowCommand, r.Server));
+                break;
+            case Core.Models.ServerAction.Terminal:
+                menu.Items.Add(Item("Tree.Ctx.NewTerminal", "\uE710", Vm.OpenNodeTerminalInNewTabCommand, r.Server, "Ctrl+Clic"));
+                menu.Items.Add(Item("Tree.Ctx.OpenOtherPane", "\uE89F", Vm.OpenNodeTerminalInOtherPaneCommand, r.Server));
+                break;
+            default:
+                menu.Items.Add(Do("Tree.Ctx.OpenNewTab", "\uECCD", () => Vm.OpenResource(r.Server, r.Action, OpenTarget.NewTab), "Ctrl+Clic"));
+                menu.Items.Add(Do("Tree.Ctx.OpenOtherPane", "\uE89F", () => Vm.OpenResource(r.Server, r.Action, OpenTarget.OtherPane)));
+                menu.Items.Add(Item("Tree.Ctx.OpenExplorer", "\uEC50", Vm.OpenNodeInExplorerCommand, r.Server));
+                break;
+        }
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Item("Tree.Ctx.Properties", "\uE70F", Vm.EditCommand, r.Server, "F2"));
     }
 
     // ───────────── Drag & drop to reorganize ─────────────

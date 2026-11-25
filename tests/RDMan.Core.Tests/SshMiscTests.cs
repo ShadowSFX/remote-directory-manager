@@ -290,15 +290,40 @@ public class SshMiscTests
             Terminal = new SshEndpoint { Port = 2200, Forwards = { new SshForward { BindPort = 1, TargetHost = "t", TargetPort = 2 } } },
             SshAuth = new SshAuthSettings { Username = "u" },
         };
+        s.IsExpanded = true;
         var c = s.CloneSettings();
         Assert.NotEqual(s.Id, c.Id);
         Assert.False(c.IsFavorite);
+        Assert.False(c.IsExpanded); // tree state, not a setting
         Assert.Equal(3390, c.Desktop!.Port);
         Assert.Equal(2200, c.Terminal!.Port);
         Assert.NotSame(s.Terminal.Forwards[0], c.Terminal.Forwards[0]);
         Assert.Equal("u", c.SshAuth.Username);
         c.Tags.Add("b");
         Assert.Single(s.Tags);
+    }
+
+    [Fact]
+    public void Offered_actions_keep_files_desktop_terminal_order()
+    {
+        var all = new ServerNode { DefaultAction = ServerAction.Terminal, Desktop = new DesktopEndpoint(), Terminal = new SshEndpoint() };
+        Assert.Equal([ServerAction.Files, ServerAction.Desktop, ServerAction.Terminal], all.OfferedActions);
+
+        var noFiles = new ServerNode { Files = false, Desktop = new DesktopEndpoint { Enabled = false }, Terminal = new SshEndpoint() };
+        Assert.Equal([ServerAction.Terminal], noFiles.OfferedActions);
+
+        Assert.Empty(new ServerNode { Files = false }.OfferedActions);
+    }
+
+    [Fact]
+    public void Server_expansion_round_trips_and_defaults_to_collapsed()
+    {
+        var json = JsonSerializer.Serialize<TreeNode>(new ServerNode { Host = "h", IsExpanded = true }, JsonFileStore.Options);
+        Assert.True(Assert.IsType<ServerNode>(JsonSerializer.Deserialize<TreeNode>(json, JsonFileStore.Options)).IsExpanded);
+
+        // Files written before the setting existed.
+        var old = JsonSerializer.Deserialize<TreeNode>("""{"kind":"server","host":"h"}""", JsonFileStore.Options);
+        Assert.False(Assert.IsType<ServerNode>(old).IsExpanded);
     }
 
     [Fact]

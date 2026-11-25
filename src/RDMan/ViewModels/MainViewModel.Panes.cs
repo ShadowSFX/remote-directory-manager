@@ -64,6 +64,7 @@ public sealed partial class MainViewModel
     internal void RegisterTab(BrowserTabViewModel tab)
     {
         if (!_liveTabs.Contains(tab)) _liveTabs.Add(tab);
+        ScheduleOpenMarks();
     }
 
     /// <summary>Disposes a tab that left its pane for good and drops its session surface.</summary>
@@ -72,6 +73,7 @@ public sealed partial class MainViewModel
         if (ReferenceEquals(FullScreenTab, tab)) ExitFullScreen();
         tab.Dispose();
         _liveTabs.Remove(tab);
+        ScheduleOpenMarks();
     }
 
     private void RaiseLayoutChanged()
@@ -246,7 +248,8 @@ public sealed partial class MainViewModel
     {
         switch (node)
         {
-            case ServerNodeViewModel s: OpenServer(s, target); break;
+            // Dropped here on purpose: open it here even if it's already open in another tab.
+            case ServerNodeViewModel s: OpenServer(s, target, reuse: false); break;
             case GroupNodeViewModel g: OpenGroup(g, target); break;
         }
     }
