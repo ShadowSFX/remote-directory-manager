@@ -242,11 +242,18 @@
         </ItemsControl>
         </Popup>
 
-        <!-- ═══════════ Command palette ═══════════ (Popup for the same airspace reason as the toasts) -->
+        <!-- ═══════════ Command palette ═══════════ (Popup for the same airspace reason as the toasts)
+             WPF caps a popup at 75% of its monitor's area, so a window-sized scrim gets cut short on a maximized
+             window: the scrim's height is set in code (UpdatePaletteBands) and PaletteScrimRest covers the rest. -->
+        <Popup x:Name="PaletteScrimRest" Placement="Relative" PlacementTarget="{Binding ElementName=Root}"
+               AllowsTransparency="True" StaysOpen="True" Focusable="False" PopupAnimation="Fade">
+            <Border x:Name="PaletteScrimRestLayer" Background="{DynamicResource Bg.Scrim}" MouseDown="PaletteScrimRest_MouseDown"
+                    Width="{Binding ActualWidth, ElementName=Root}" />
+        </Popup>
         <Popup x:Name="PalettePopup" IsOpen="{Binding Palette.IsOpen, Mode=OneWay}" Placement="Relative" PlacementTarget="{Binding ElementName=Root}"
                AllowsTransparency="True" StaysOpen="True" PopupAnimation="Fade">
         <Grid x:Name="PaletteLayer" Background="{DynamicResource Bg.Scrim}" MouseDown="PaletteScrim_MouseDown"
-              Width="{Binding ActualWidth, ElementName=Root}" Height="{Binding ActualHeight, ElementName=Root}">
+              Width="{Binding ActualWidth, ElementName=Root}">
             <Border x:Name="PaletteCard" Width="640" VerticalAlignment="Top" Margin="0,84,0,0" Background="{DynamicResource Bg.Popup}"
                     BorderBrush="{DynamicResource Line.Popup}" BorderThickness="1" CornerRadius="10" DataContext="{Binding Palette}"
                     MouseDown="PaletteCard_MouseDown">

@@ -31,11 +31,13 @@ public partial class MainWindow : Window
         RestorePlacement();
         SourceInitialized += OnSourceInitialized;
         StateChanged += (_, _) => UpdateMaximizeState();
+        DpiChanged += (_, _) => UpdateMaximizeState(); // the maximized inset is in device pixels
         Activated += (_, _) => App.Services.Clipboard.Revalidate();
         Closing += OnClosing;
         vm.PropertyChanged += OnVmPropertyChanged;
         vm.Palette.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen)) UpdatePaletteBands();
             if (e.PropertyName == nameof(CommandPaletteViewModel.IsOpen) && vm.Palette.IsOpen)
             {
                 // The palette is a topmost popup: never let it appear while another app is in front.
@@ -160,6 +162,7 @@ public partial class MainWindow : Window
         WindowEffects.Apply(this, ThemeManager.Instance.IsDark);
         ApplyBackdrop();
         HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WndProc);
+        UpdateMaximizeState(); // now with the DPI of the monitor the window opened on
     }
 
     /// <summary>
@@ -184,14 +187,59 @@ public partial class MainWindow : Window
         if (!IsLoaded) return;
         ToastPopup.HorizontalOffset = Math.Max(0, Root.ActualWidth - ToastList.ActualWidth - 32);
         ToastPopup.VerticalOffset = Math.Max(0, Root.ActualHeight - ToastList.ActualHeight - 40);
+        UpdatePaletteBands();
         // Nudge the offsets so WPF recomputes the screen position after the window moved.
-        foreach (var p in new[] { ToastPopup, PalettePopup })
+        foreach (var p in new[] { ToastPopup, PalettePopup, PaletteScrimRest })
         {
             if (!p.IsOpen) continue;
             var h = p.HorizontalOffset;
             p.HorizontalOffset = h + 0.01;
             p.HorizontalOffset = h;
         }
+    }
+
+    /// <summary>
+    /// Splits the palette's scrim so it covers the whole window. WPF limits a popup to 75% of its monitor's area
+    /// (Popup.RestrictSize: height ≤ 0.75 · monitor width · monitor height / popup width), which cuts a
+    /// window-sized scrim short on a maximized window. The palette popup (scrim + card) takes as much height as
+    /// allowed; PaletteScrimRest covers what is left below it.
+    /// </summary>
+    private void UpdatePaletteBands()
+    {
+        var height = Root.ActualHeight;
+        var split = height;
+        if (_vm.Palette.IsOpen && IsLoaded && height > 0 && PresentationSource.FromVisual(Root) is { CompositionTarget: { } target })
+        {
+            var toDevice = target.TransformToDevice;
+            var topLeft = Root.PointToScreen(new Point(0, 0));
+            var size = toDevice.Transform(new Point(Root.ActualWidth, height));
+            var rect = new NativeMethods.RECT
+            {
+                Left = (int)Math.Round(topLeft.X), Top = (int)Math.Round(topLeft.Y),
+                Right = (int)Math.Round(topLeft.X + size.X), Bottom = (int)Math.Round(topLeft.Y + size.Y),
+            };
+            // Same monitor WPF measures the popup against (the nearest to its placement target).
+            var info = new NativeMethods.MONITORINFO { cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MONITORINFO>() };
+            var monitor = NativeMethods.MonitorFromRect(ref rect, NativeMethods.MONITOR_DEFAULTTONEAREST);
+            if (monitor != IntPtr.Zero && NativeMethods.GetMonitorInfo(monitor, ref info))
+            {
+                double monitorWidth = info.rcMonitor.Right - info.rcMonitor.Left;
+                double monitorHeight = info.rcMonitor.Bottom - info.rcMonitor.Top;
+                var width = Math.Min(size.X, monitorWidth);
+                // Whole device pixels, one short of the limit, so both bands meet without a seam or a gap.
+                var maxPx = Math.Floor(0.75 * monitorWidth * monitorHeight / Math.Max(1, width)) - 1;
+                if (maxPx < size.Y) split = Math.Max(0, maxPx) / toDevice.M22;
+            }
+        }
+        PaletteLayer.Height = split;
+        var rest = height - split;
+        if (rest >= 1)
+        {
+            PaletteScrimRestLayer.Height = rest;
+            PaletteScrimRest.VerticalOffset = split;
+            PaletteScrimRest.IsOpen = true;
+        }
+        else PaletteScrimRest.IsOpen = false;
     }
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -319,9 +367,25 @@ public partial class MainWindow : Window
     {
         var maximized = WindowState == WindowState.Maximized;
         // WindowChrome draws outside the work area when maximized; inset by the resize frame.
-        Root.Margin = maximized ? new Thickness(7) : new Thickness(0);
+        Root.Margin = maximized ? MaximizedFrame() : new Thickness(0);
         MaxButton.Content = maximized ? "" : "";
         MaxButton.ToolTip = Loc.T(maximized ? "Title.Restore" : "Title.Maximize");
+    }
+
+    /// <summary>
+    /// How far Windows pushes a maximized window past the monitor's work area (resize frame + padded border at the
+    /// window's DPI: 8 px at 100%). The inset must be exact: if Root starts even 1 px off the monitor, popups placed
+    /// relative to it (palette, toasts) pick the neighbouring monitor.
+    /// </summary>
+    private Thickness MaximizedFrame()
+    {
+        var dpi = VisualTreeHelper.GetDpi(this);
+        var ppi = (uint)Math.Round(dpi.PixelsPerInchX);
+        var padded = NativeMethods.GetSystemMetricsForDpi(NativeMethods.SM_CXPADDEDBORDER, ppi);
+        var x = NativeMethods.GetSystemMetricsForDpi(NativeMethods.SM_CXSIZEFRAME, ppi) + padded;
+        var y = NativeMethods.GetSystemMetricsForDpi(NativeMethods.SM_CYSIZEFRAME, ppi) + padded;
+        if (x <= 0 || y <= 0) return new Thickness(8);
+        return new Thickness(x / dpi.DpiScaleX, y / dpi.DpiScaleY, x / dpi.DpiScaleX, y / dpi.DpiScaleY);
     }
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
@@ -531,6 +595,8 @@ public partial class MainWindow : Window
     }
 
     private void PaletteCard_MouseDown(object sender, MouseButtonEventArgs e) => e.Handled = true;
+
+    private void PaletteScrimRest_MouseDown(object sender, MouseButtonEventArgs e) => _vm.Palette.Close();
 
     private void PaletteList_MouseUp(object sender, MouseButtonEventArgs e)
     {
